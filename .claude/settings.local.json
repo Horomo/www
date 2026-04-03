@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "WebFetch(domain:bazi.fengshuix.com)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(mkdir /c/src/bazi-next)",
+      "Read(//c/src/**)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(npm run:*)"
+    ]
+  }
+}

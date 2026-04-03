@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bazi Calculator · 八字命盤</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #F1F5F9;
+  --surface:      #FFFFFF;
+  --surface2:     #F8FAFC;
+  --border:       #E2E8F0;
+  --accent:       #4F46E5;
+  --accent-light: rgba(79,70,229,0.08);
+  --text:         #1E293B;
+  --text2:        #475569;
+  --muted:        #94A3B8;
+  --danger:       #DC2626;
+
+  /* Five Element colors */
+  --wood:   #16A34A;
+  --fire:   #DC2626;
+  --earth:  #78716C;
+  --metal:  #B45309;
+  --water:  #2563EB;
+}
+
+html { font-size: 16px; }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+/* ── Header ── */
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+header .title-zh {
+  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+header .title-en {
+  font-size: clamp(0.75rem, 2vw, 0.85rem);
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.18em;
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+}
+
+header .divider {
+  width: 32px;
+  height: 3px;
+  background: var(--accent);
+  margin: 1rem auto 0;
+  border-radius: 2px;
+}
+
+/* ── Form ── */
+.form-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-section legend,
+.form-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text2);
+}
+
+.field input,
+.field select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  color-scheme: light;
+}
+
+.field select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394A3B8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.2rem;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+}
+
+.field select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tz-note {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+  line-height: 1.5;
+}
+
+.btn-calculate {
+  display: block;
+  margin: 1.25rem auto 0;
+  background: var(--accent);
+  border: none;
+  color: #FFFFFF;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.65rem 2rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.btn-calculate:hover {
+  background: #4338CA;
+  box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+}
+
+.btn-calculate:active {
+  transform: translateY(1px);
+}
+
+/* ── Results ── */
+#results {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+
+#results.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ── Solar Time Info ── */
+.solar-info {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.solar-info span {
+  color: var(--text2);
+  font-weight: 500;
+}
+
+/* ── 4-Pillar Table ── */
+.pillars-wrap {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+.pillars-table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+
+/* Column headers */
+.pillars-table .col-header {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  background: var(--surface2);
+}
+.pillars-table .col-header:last-child { border-right: none; }
+
+/* Pillar cells */
+.pillar-cell {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0.9rem 0.6rem;
+  text-align: center;
+  vertical-align: middle;
+  position: relative;
+}
+.pillar-cell:last-child { border-right: none; }
+.pillar-cell.day-master {
+  background: rgba(79,70,229,0.04);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.ganzhi-zh {
+  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.ganzhi-pinyin {
+  font-size: 0.75rem;
+  color: var(--text2);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.ganzhi-meta {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  display: block;
+  text-transform: uppercase;
+}
+
+/* Element color classes */
+.el-wood  { color: var(--wood); }
+.el-fire  { color: var(--fire); }
+.el-earth { color: var(--earth); }
+.el-metal { color: var(--metal); }
+.el-water { color: var(--water); }
+
+.day-master-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+/* Row label column */
+.row-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text2);
+  padding: 0.5rem 0.8rem;
+  background: var(--surface2);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  text-transform: uppercase;
+}
+
+/* ── Day Master Summary ── */
+.dm-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dm-summary h3 {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.dm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.dm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dm-item .dm-label {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dm-item .dm-value {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Ten Gods Table ── */
+.ten-gods-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ten-gods-section h3 {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.tg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  overflow-x: auto;
+  display: block;
+}
+
+.tg-table thead tr th {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.4rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tg-table tbody tr td {
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  color: var(--text2);
+}
+
+.tg-table tbody tr td:first-child {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.tg-table tbody tr td .tg-zh {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 0.95rem;
+  margin-right: 0.3rem;
+}
+
+.tg-self { color: var(--accent); font-weight: 600; }
+
+/* ── Error ── */
+.error-msg {
+  background: rgba(220,38,38,0.06);
+  border: 1px solid rgba(220,38,38,0.25);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+  display: none;
+}
+.error-msg.show { display: block; }
+
+/* ── Gender Toggle ── */
+.gender-group {
+  display: flex;
+  gap: 0.5rem;
+}
+.gender-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s;
+  user-select: none;
+}
+.gender-opt input[type="radio"] { display: none; }
+.gender-opt.sel-male   { border-color: #3B82F6; background: rgba(59,130,246,0.08); color: #2563EB; }
+.gender-opt.sel-female { border-color: #EC4899; background: rgba(236,72,153,0.08); color: #DB2777; }
+
+/* ── Da Yun (Major Luck Cycles) ── */
+.dayun-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.25rem 1.5rem;
+}
+.dayun-section h3 {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.dayun-meta {
+  font-size: 0.73rem;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+  line-height: 1.6;
+}
+.dayun-meta span { color: var(--text2); font-weight: 500; }
+.dayun-scroll { overflow-x: auto; padding-bottom: 0.4rem; }
+.dayun-strip {
+  display: flex;
+  gap: 8px;
+  min-width: max-content;
+}
+.dayun-pillar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 0.5rem 0.6rem;
+  min-width: 76px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dayun-pillar:hover { background: var(--accent-light); border-color: var(--accent); }
+.dayun-num {
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+.dayun-age {
+  font-size: 0.68rem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+.dayun-year {
+  font-size: 0.55rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.dayun-stem, .dayun-branch {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.dayun-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+  margin: 0.3rem 0;
+}
+.dayun-branch-en {
+  font-size: 0.54rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Footer ── */
+footer {
+  text-align: center;
+  margin-top: 3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* ── Unknown Time Toggle ── */
+.unknown-time-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--muted);
+  user-select: none;
+}
+.unknown-time-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.unknown-time-label:has(input:checked) span { color: var(--accent); }
+#tob:disabled { opacity: 0.35; pointer-events: none; }
+
+/* ── Unknown Hour Pillar Cell ── */
+.unknown-pillar { opacity: 0.35; }
+.unknown-zh { color: var(--muted) !important; letter-spacing: 0; }
+
+/* ── Charts Card ── */
+.charts-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.charts-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.chart-title {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+@media (max-width: 600px) {
+  .charts-inner { grid-template-columns: 1fr; }
+}
+
+/* ── Year Cycles (流年) ── */
+.yearcycle-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.yc-grid {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.yc-col { flex: 0 0 74px; }
+.yc-col-hd {
+  background: var(--surface2);
+  border-radius: 6px 6px 0 0;
+  padding: 6px 2px 5px;
+  text-align: center;
+  margin-bottom: 2px;
+}
+.yc-hd-stem {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: block;
+  line-height: 1;
+}
+.yc-hd-tg {
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: block;
+  margin-top: 3px;
+}
+.yc-cell {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 3px;
+  margin-bottom: 2px;
+  text-align: center;
+  transition: background 0.1s;
+}
+.yc-cell:hover { background: #EEF2FF; }
+.yc-cell.yc-current { background: rgba(79,70,229,0.08); border-color: var(--accent); }
+.yc-cell.yc-birth   { background: rgba(220,38,38,0.06); border-color: var(--danger); }
+.yc-yr {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.yc-be { font-size: 0.55rem; color: var(--muted); font-weight: 400; }
+.yc-gz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin: 3px 0 2px;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.yc-badge {
+  font-size: 0.42rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 1px 2px;
+  border-radius: 2px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.yc-animal { font-size: 0.58rem; color: var(--text2); }
+.yc-stage  { font-size: 0.52rem; color: var(--muted); margin-top: 1px; }
+
+/* ── Responsive ── */
+@media (max-width: 500px) {
+  .container { padding: 1.5rem 1rem 3rem; }
+  .form-section { padding: 1.25rem 1rem; }
+  .pillars-table { min-width: 360px; }
+  .ganzhi-zh { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="title-zh">八字命盤</div>
+    <div class="title-en">Four Pillars of Destiny</div>
+    <div class="divider"></div>
+  </header>
+
+  <!-- Input Form -->
+  <div class="form-section">
+    <div class="form-title">Birth Information · 生辰八字</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Date of Birth</label>
+        <input type="date" id="dob" value="1990-06-15">
+      </div>
+      <div class="field">
+        <label>Time of Birth</label>
+        <input type="time" id="tob" value="08:30">
+        <label class="unknown-time-label" id="unknown-time-label">
+          <input type="checkbox" id="unknown-time" onchange="toggleUnknownTime()">
+          <span>I don't know my birth time</span>
+        </label>
+      </div>
+      <div class="field" style="grid-column: 1 / -1">
+        <label>Timezone</label>
+        <select id="tz">
+          <optgroup label="UTC−">
+            <option value="-720">UTC−12:00 — Baker Island, Howland Island</option>
+            <option value="-660">UTC−11:00 — American Samoa, Niue</option>
+            <option value="-600">UTC−10:00 — Hawaii, Cook Islands</option>
+            <option value="-570">UTC−09:30 — Marquesas Islands</option>
+            <option value="-540">UTC−09:00 — Alaska</option>
+            <option value="-480">UTC−08:00 — Los Angeles, Vancouver, Tijuana (PST)</option>
+            <option value="-420">UTC−07:00 — Denver, Phoenix, Calgary (MST)</option>
+            <option value="-360">UTC−06:00 — Chicago, Mexico City, Houston (CST)</option>
+            <option value="-300">UTC−05:00 — New York, Toronto, Bogotá, Lima (EST)</option>
+            <option value="-240">UTC−04:00 — Santiago, La Paz, Caracas, Halifax</option>
+            <option value="-210">UTC−03:30 — Newfoundland</option>
+            <option value="-180">UTC−03:00 — São Paulo, Buenos Aires, Montevideo</option>
+            <option value="-120">UTC−02:00 — South Georgia</option>
+            <option value="-60"> UTC−01:00 — Azores, Cape Verde</option>
+          </optgroup>
+          <optgroup label="UTC">
+            <option value="0">UTC±00:00 — London (GMT), Dublin, Lisbon, Reykjavik, Accra</option>
+          </optgroup>
+          <optgroup label="UTC+">
+            <option value="60">  UTC+01:00 — Paris, Berlin, Rome, Madrid, Amsterdam, Warsaw</option>
+            <option value="120"> UTC+02:00 — Athens, Cairo, Helsinki, Kyiv, Johannesburg, Riga</option>
+            <option value="180"> UTC+03:00 — Moscow, Istanbul, Riyadh, Nairobi, Minsk, Kuwait</option>
+            <option value="210"> UTC+03:30 — Tehran</option>
+            <option value="240"> UTC+04:00 — Dubai, Baku, Yerevan, Tbilisi, Muscat</option>
+            <option value="270"> UTC+04:30 — Kabul</option>
+            <option value="300"> UTC+05:00 — Karachi, Tashkent, Yekaterinburg</option>
+            <option value="330"> UTC+05:30 — Mumbai, New Delhi, Colombo (IST)</option>
+            <option value="345"> UTC+05:45 — Kathmandu</option>
+            <option value="360"> UTC+06:00 — Dhaka, Almaty, Bishkek</option>
+            <option value="390"> UTC+06:30 — Yangon (Myanmar), Cocos Islands</option>
+            <option value="420" selected>UTC+07:00 — Bangkok, Hanoi, Jakarta, Ho Chi Minh City</option>
+            <option value="480"> UTC+08:00 — Beijing, Singapore, Kuala Lumpur, Hong Kong, Taipei, Manila, Perth</option>
+            <option value="525"> UTC+08:45 — Eucla (Australia)</option>
+            <option value="540"> UTC+09:00 — Tokyo, Seoul, Pyongyang</option>
+            <option value="570"> UTC+09:30 — Adelaide, Darwin</option>
+            <option value="600"> UTC+10:00 — Sydney, Melbourne, Brisbane, Guam</option>
+            <option value="630"> UTC+10:30 — Lord Howe Island</option>
+            <option value="660"> UTC+11:00 — Noumea, Solomon Islands, Magadan</option>
+            <option value="720"> UTC+12:00 — Auckland, Fiji, Marshall Islands</option>
+            <option value="765"> UTC+12:45 — Chatham Islands (NZ)</option>
+            <option value="780"> UTC+13:00 — Apia (Samoa), Nukuʻalofa (Tonga)</option>
+            <option value="840"> UTC+14:00 — Kiritimati (Line Islands)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field" style="grid-column: 1 / -1">
+        <label>Gender</label>
+        <div class="gender-group">
+          <label class="gender-opt sel-male" id="lbl-male">
+            <input type="radio" name="gender" id="gender-male" value="male" checked onchange="updateGenderUI()">
+            ♂ Male
+          </label>
+          <label class="gender-opt" id="lbl-female">
+            <input type="radio" name="gender" id="gender-female" value="female" onchange="updateGenderUI()">
+            ♀ Female
+          </label>
+        </div>
+      </div>
+    </div>
+    <p class="tz-note">* Select the timezone active at the place of birth. DST must be applied manually. Gender affects the direction of Major Luck Cycles (大運).</p>
+    <div id="error-msg" class="error-msg"></div>
+    <button class="btn-calculate" onclick="calculate()">Calculate Chart · 起命盤</button>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div class="solar-info" id="solar-info"></div>
+
+    <!-- 4-Pillar Table -->
+    <div class="pillars-wrap">
+      <table class="pillars-table" id="pillar-table">
+        <thead>
+          <tr>
+            <th class="col-header" style="width:60px"></th>
+            <th class="col-header">時柱<br><span style="font-size:0.55rem">Hour</span></th>
+            <th class="col-header">日柱<br><span style="font-size:0.55rem">Day</span></th>
+            <th class="col-header">月柱<br><span style="font-size:0.55rem">Month</span></th>
+            <th class="col-header">年柱<br><span style="font-size:0.55rem">Year</span></th>
+          </tr>
+        </thead>
+        <tbody id="pillar-body">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Day Master Summary -->
+    <div class="dm-summary" id="dm-summary"></div>
+
+    <!-- Ten Gods -->
+    <div class="ten-gods-section" id="ten-gods-section"></div>
+
+    <!-- Charts: 5 Structures + 10 Gods -->
+    <div class="charts-card" id="charts-section"></div>
+
+    <!-- Da Yun — Major Luck Cycles -->
+    <div class="dayun-section" id="dayun-section"></div>
+
+    <!-- Year Cycles (流年) -->
+    <div class="yearcycle-card" id="yearcycle-section"></div>
+
+  </div><!-- /results -->
+
+  <footer>
+    Bāzì 八字 · Four Pillars of Destiny &nbsp;·&nbsp; Pure client-side calculation
+  </footer>
+</div><!-- /container -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  BAZI CALCULATION ENGINE
+//  All logic runs entirely in the browser — no server calls.
+// ═══════════════════════════════════════════════════════════
+
+// ── Heavenly Stems (天干) ──────────────────────────────────
+const STEMS = [
+  { zh: '甲', pinyin: 'Jiǎ', element: 'wood',  yin: false },
+  { zh: '乙', pinyin: 'Yǐ',  element: 'wood',  yin: true  },
+  { zh: '丙', pinyin: 'Bǐng',element: 'fire',  yin: false },
+  { zh: '丁', pinyin: 'Dīng',element: 'fire',  yin: true  },
+  { zh: '戊', pinyin: 'Wù',  element: 'earth', yin: false },
+  { zh: '己', pinyin: 'Jǐ',  element: 'earth', yin: true  },
+  { zh: '庚', pinyin: 'Gēng',element: 'metal', yin: false },
+  { zh: '辛', pinyin: 'Xīn', element: 'metal', yin: true  },
+  { zh: '壬', pinyin: 'Rén', element: 'water', yin: false },
+  { zh: '癸', pinyin: 'Guǐ',element: 'water', yin: true  },
+];
+
+// ── Earthly Branches (地支) ────────────────────────────────
+const BRANCHES = [
+  { zh: '子', pinyin: 'Zǐ',   element: 'water', yin: false, animal: 'Rat'     },
+  { zh: '丑', pinyin: 'Chǒu', element: 'earth', yin: true,  animal: 'Ox'      },
+  { zh: '寅', pinyin: 'Yín',  element: 'wood',  yin: false, animal: 'Tiger'   },
+  { zh: '卯', pinyin: 'Mǎo',  element: 'wood',  yin: true,  animal: 'Rabbit'  },
+  { zh: '辰', pinyin: 'Chén', element: 'earth', yin: false, animal: 'Dragon'  },
+  { zh: '巳', pinyin: 'Sì',   element: 'fire',  yin: true,  animal: 'Snake'   },
+  { zh: '午', pinyin: 'Wǔ',   element: 'fire',  yin: false, animal: 'Horse'   },
+  { zh: '未', pinyin: 'Wèi',  element: 'earth', yin: true,  animal: 'Goat'    },
+  { zh: '申', pinyin: 'Shēn', element: 'metal', yin: false, animal: 'Monkey'  },
+  { zh: '酉', pinyin: 'Yǒu',  element: 'metal', yin: true,  animal: 'Rooster' },
+  { zh: '戌', pinyin: 'Xū',   element: 'earth', yin: false, animal: 'Dog'     },
+  { zh: '亥', pinyin: 'Hài',  element: 'water', yin: true,  animal: 'Pig'     },
+];
+
+// ── 24 Solar Terms — Approximate Julian Day offsets ───────
+// We calculate approximate solar term dates using the VSOP87
+// simplified formula. For practical Bazi use, we only need the
+// 12 "Jié" (節) terms that define the month pillars:
+//
+//  Month Branch | Jié (start term) | Approx Solar Longitude
+//  寅 (yin)     | 立春 Lì Chūn     | 315°
+//  卯 (mao)     | 驚蟄 Jīng Zhé    | 345°
+//  辰 (chen)    | 清明 Qīng Míng   | 15°
+//  巳 (si)      | 立夏 Lì Xià      | 45°
+//  午 (wu)      | 芒種 Máng Zhòng  | 75°
+//  未 (wei)     | 小暑 Xiǎo Shǔ    | 105°
+//  申 (shen)    | 立秋 Lì Qiū      | 135°
+//  酉 (you)     | 白露 Bái Lù      | 165°
+//  戌 (xu)      | 寒露 Hán Lù      | 195°
+//  亥 (hai)     | 立冬 Lì Dōng     | 225°
+//  子 (zi)      | 大雪 Dà Xuě      | 255°
+//  丑 (chou)    | 小寒 Xiǎo Hán    | 285°
+
+/**
+ * Calculate the approximate date of a solar term for a given year.
+ * Uses the simple formula: JDE = JDE0 + (longitude - L0) / 360 * year_length
+ * More practically, we use the Meeus-based lookup approach.
+ *
+ * @param {number} year - Gregorian year
+ * @param {number} solarLon - Target solar longitude (degrees, 0–360)
+ * @returns {Date} Approximate UTC date/time of that solar term
+ */
+function solarTermDate(year, solarLon) {
+  // Approximate using known epoch tables (Meeus, "Astronomical Algorithms")
+  // JDE of Sun reaching longitude λ ≈ JDE_J2000 + (λ/360)*365.25 + correction
+  // We use a simple iterative approach: estimate, then refine with Sun's
+  // approximate longitude formula.
+
+  // Step 1: Rough estimate of Julian Day Number
+  // Sun is at 0° (vernal equinox) around Mar 20 each year.
+  // JDE of vernal equinox ~= 2451623.80984 + 365.242189623*(year-2000)
+  //
+  // Key correction: solar terms with longitude ≥ 280° (小寒 285°, 大寒 300°,
+  // 立春 315°, 雨水 330°, 驚蟄 345°) occur in January–March, which is BEFORE
+  // the vernal equinox of calendar year `year`. We must anchor to the vernal
+  // equinox of (year − 1) so the result lands in `year`, not `year + 1`.
+  const refYear = (solarLon >= 280) ? year - 1 : year;
+  const JDE_VE = 2451623.80984 + 365.242189623 * (refYear - 2000);
+  // Days per degree of ecliptic longitude
+  const daysPerDeg = 365.242189623 / 360;
+  // Adjust target longitude: solar longitude increases from 0° at vernal equinox
+  let lon = ((solarLon - 0) + 360) % 360; // normalize
+  let jde = JDE_VE + lon * daysPerDeg;
+
+  // Step 2: Refine using Sun's approximate longitude
+  for (let i = 0; i < 3; i++) {
+    const sunLon = sunApparentLongitude(jde);
+    let diff = solarLon - sunLon;
+    // Normalize diff to [-180, 180]
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    jde += diff * daysPerDeg;
+  }
+
+  return jdeToDate(jde);
+}
+
+/**
+ * Approximate Sun apparent longitude (degrees) for a given JDE.
+ * Based on Meeus, Ch.25 low-precision formula. Accurate to ~0.01°.
+ */
+function sunApparentLongitude(jde) {
+  const T = (jde - 2451545.0) / 36525; // Julian centuries from J2000.0
+  // Geometric mean longitude of the Sun (degrees)
+  let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
+  L0 = L0 % 360; if (L0 < 0) L0 += 360;
+  // Mean anomaly of the Sun (degrees)
+  let M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T;
+  M = M % 360; if (M < 0) M += 360;
+  const Mrad = M * Math.PI / 180;
+  // Equation of center
+  const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(Mrad)
+          + (0.019993 - 0.000101 * T) * Math.sin(2 * Mrad)
+          + 0.000289 * Math.sin(3 * Mrad);
+  // Sun's true longitude
+  let sunLon = L0 + C;
+  // Apparent longitude (correcting for nutation & aberration)
+  const omega = 125.04 - 1934.136 * T;
+  sunLon = sunLon - 0.00569 - 0.00478 * Math.sin(omega * Math.PI / 180);
+  sunLon = sunLon % 360; if (sunLon < 0) sunLon += 360;
+  return sunLon;
+}
+
+/** Convert Julian Day Number to JavaScript Date (UTC). */
+function jdeToDate(jde) {
+  // JDE to Unix timestamp: JDE 2440587.5 = 1970-01-01T00:00:00Z
+  const ms = (jde - 2440587.5) * 86400000;
+  return new Date(ms);
+}
+
+/**
+ * Get the solar term dates (Jié) for a given year.
+ * Returns an array of 12 objects { branchIndex, date } sorted by date.
+ * branchIndex refers to BRANCHES index (寅=2, 卯=3, ... 丑=1).
+ */
+function getMonthTermDates(year) {
+  // The 12 Jié terms and the branch they initiate, with solar longitudes:
+  const jieTerms = [
+    { lon: 315, branchIdx: 2,  name: '立春' }, // 寅月 starts
+    { lon: 345, branchIdx: 3,  name: '驚蟄' }, // 卯月
+    { lon:  15, branchIdx: 4,  name: '清明' }, // 辰月
+    { lon:  45, branchIdx: 5,  name: '立夏' }, // 巳月
+    { lon:  75, branchIdx: 6,  name: '芒種' }, // 午月
+    { lon: 105, branchIdx: 7,  name: '小暑' }, // 未月
+    { lon: 135, branchIdx: 8,  name: '立秋' }, // 申月
+    { lon: 165, branchIdx: 9,  name: '白露' }, // 酉月
+    { lon: 195, branchIdx: 10, name: '寒露' }, // 戌月
+    { lon: 225, branchIdx: 11, name: '立冬' }, // 亥月
+    { lon: 255, branchIdx: 0,  name: '大雪' }, // 子月
+    { lon: 285, branchIdx: 1,  name: '小寒' }, // 丑月
+  ];
+
+  // For 小寒 (lon=285) and 立春 (lon=315), these occur in early January/February,
+  // which belong to the previous/current calendar year. We need terms from both
+  // year-1 and year to cover a full year's worth of dates.
+  const terms = [];
+  for (const t of jieTerms) {
+    // 小寒 (285°) and 立春 (315°) happen in Jan–Feb; 清明 onward in current year
+    // Approximate: lons 285-315 occur in Jan–Feb of *year*
+    // lons 345-255 occur Mar–Dec of *year*
+    const d = solarTermDate(year, t.lon);
+    terms.push({ ...t, date: d });
+  }
+  // Also fetch 小寒 for previous year (for dates in early Jan before 小寒)
+  const xiaohanPrev = solarTermDate(year - 1, 285);
+  terms.push({ lon: 285, branchIdx: 1, name: '小寒(前年)', date: xiaohanPrev });
+
+  // Sort by date
+  terms.sort((a, b) => a.date - b.date);
+  return terms;
+}
+
+/**
+ * Determine the Month Branch index for a given date.
+ * Returns the branch index (0–11) active on that date.
+ */
+function getMonthBranchIndex(date) {
+  const year = date.getUTCFullYear();
+  const terms = getMonthTermDates(year);
+
+  let activeBranch = 1; // Default to 丑 if before first known term
+  for (const t of terms) {
+    if (date >= t.date) {
+      activeBranch = t.branchIdx;
+    }
+  }
+  return activeBranch;
+}
+
+/**
+ * Determine Bazi Year, considering Li Chun (立春) cutoff.
+ * If the date is before Li Chun of that Gregorian year,
+ * the Bazi year is the previous year.
+ *
+ * @returns {number} Bazi year (solar year)
+ */
+function getBaziYear(date) {
+  const year = date.getUTCFullYear();
+  const liChun = solarTermDate(year, 315); // 立春 ≈ Feb 4
+  if (date < liChun) return year - 1;
+  return year;
+}
+
+// ── Year Pillar (年柱) ─────────────────────────────────────
+/**
+ * Calculate Year Pillar stem and branch indices.
+ * Formula: (year - 4) % 10 for stem, (year - 4) % 12 for branch.
+ * Year 4 CE = 甲子 (index 0, 0).
+ */
+function yearPillar(date) {
+  const y = getBaziYear(date);
+  const stemIdx   = ((y - 4) % 10 + 10) % 10;
+  const branchIdx = ((y - 4) % 12 + 12) % 12;
+  return { stemIdx, branchIdx };
+}
+
+// ── Month Pillar (月柱) ────────────────────────────────────
+/**
+ * Month Branch: determined by solar terms (above).
+ * Month Stem: 五虎遁年 (Five Tiger Escape Year) rule.
+ *
+ * The rule: given the Year Stem index (0–9), the stem of the
+ * first month (寅月, branch=2) is:
+ *   Year stem 0,1 (甲/乙年): 寅月 stem = 丙 (index 2)
+ *   Year stem 2,3 (丙/丁年): 寅月 stem = 戊 (index 4)
+ *   Year stem 4,5 (戊/己年): 寅月 stem = 庚 (index 6)
+ *   Year stem 6,7 (庚/辛年): 寅月 stem = 壬 (index 8)
+ *   Year stem 8,9 (壬/癸年): 寅月 stem = 甲 (index 0)
+ *
+ * For subsequent months, the stem advances by 1 each month.
+ * Month branch sequence: 寅(2),卯(3),辰(4),巳(5),午(6),未(7),申(8),酉(9),戌(10),亥(11),子(0),丑(1)
+ * 寅 is month index 0, 丑 is month index 11.
+ */
+function monthPillar(date, yearStemIdx) {
+  const branchIdx = getMonthBranchIndex(date);
+
+  // Map branch index to month offset from 寅 (branch=2)
+  // 寅=2 → offset 0, 卯=3 → 1, ..., 丑=1 → 11
+  const monthOffset = ((branchIdx - 2) + 12) % 12;
+
+  // Five Tiger base stem for this year's 寅月 — 五虎遁年 rule:
+  // Pairs: 甲己→丙寅, 乙庚→戊寅, 丙辛→庚寅, 丁壬→壬寅, 戊癸→甲寅
+  // The pairing is stemIdx % 5 (He-combination pairs), NOT floor(idx/2).
+  const yearGroup = yearStemIdx % 5;             // 0,1,2,3,4
+  const baseStemIdx = [2, 4, 6, 8, 0][yearGroup]; // 丙,戊,庚,壬,甲
+
+  const stemIdx = (baseStemIdx + monthOffset) % 10;
+  return { stemIdx, branchIdx };
+}
+
+// ── Day Pillar (日柱) ──────────────────────────────────────
+/**
+ * Calculate Day Pillar using a known reference.
+ * Reference: 2000-01-01 (UTC) = 甲辰 day = cycle index 40.
+ *
+ * We compute the integer day difference from the reference,
+ * then add 40 and mod 60 to get the cycle index.
+ */
+function dayPillar(date) {
+  // Reference: Jan 1 2000 UTC = index 40 in 60-cycle
+  // REF_JD = 2451545 → Math.floor gives 2451545 (noon Jan 1 2000, intentional anchor).
+  // REF_INDEX verified: diff from Apr 19 1980 (JD floor 2444348) = −7197;
+  // to get correct cycle 58 (壬戌) → REF_INDEX ≡ 58+7197 ≡ 55 (mod 60).
+  // Cross-checked against multiple known Bazi dates.
+  const REF_JD    = 2451545;
+  const REF_INDEX = 55;     // 己未 (cycle 55) on 2000-01-01
+
+  // Get Julian Day Number for the date (using UTC midnight)
+  const jd = dateToJD(date);
+  const diff = Math.floor(jd) - Math.floor(REF_JD);
+  const cycleIdx = ((diff + REF_INDEX) % 60 + 60) % 60;
+
+  const stemIdx   = cycleIdx % 10;
+  const branchIdx = cycleIdx % 12;
+  return { stemIdx, branchIdx, cycleIdx };
+}
+
+/** Convert a JavaScript Date to Julian Day Number (JD). */
+function dateToJD(date) {
+  // Algorithm from Meeus, "Astronomical Algorithms"
+  let y = date.getUTCFullYear();
+  let m = date.getUTCMonth() + 1; // 1-based
+  const d = date.getUTCDate() + (date.getUTCHours() + date.getUTCMinutes() / 60) / 24;
+  if (m <= 2) { y -= 1; m += 12; }
+  const A = Math.floor(y / 100);
+  const B = 2 - A + Math.floor(A / 4); // Gregorian calendar correction
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+}
+
+// ── Hour Pillar (時柱) ─────────────────────────────────────
+/**
+ * Determine Hour Branch index from solar time hour (0–23).
+ * The 12 two-hour periods:
+ *   子 23–01, 丑 01–03, 寅 03–05, 卯 05–07, 辰 07–09, 巳 09–11
+ *   午 11–13, 未 13–15, 申 15–17, 酉 17–19, 戌 19–21, 亥 21–23
+ */
+function hourBranchIndex(solarHour, solarMinute) {
+  // Convert to fractional hour
+  const h = solarHour + solarMinute / 60;
+  // 子時 starts at 23:00 of previous day
+  if (h >= 23 || h < 1)  return 0;  // 子
+  if (h < 3)  return 1;  // 丑
+  if (h < 5)  return 2;  // 寅
+  if (h < 7)  return 3;  // 卯
+  if (h < 9)  return 4;  // 辰
+  if (h < 11) return 5;  // 巳
+  if (h < 13) return 6;  // 午
+  if (h < 15) return 7;  // 未
+  if (h < 17) return 8;  // 申
+  if (h < 19) return 9;  // 酉
+  if (h < 21) return 10; // 戌
+  return 11; // 亥 21–23
+}
+
+/**
+ * Hour Stem: 五鼠遁日 (Five Rat Escape Day) rule.
+ * Given the Day Stem index, the stem of 子時 (hour branch 0) is:
+ *   Day stem 0,1 (甲/乙): 子時 stem = 甲 (0)
+ *   Day stem 2,3 (丙/丁): 子時 stem = 丙 (2)
+ *   Day stem 4,5 (戊/己): 子時 stem = 戊 (4)
+ *   Day stem 6,7 (庚/辛): 子時 stem = 庚 (6)
+ *   Day stem 8,9 (壬/癸): 子時 stem = 壬 (8)
+ * For each subsequent hour, the stem advances by 1.
+ */
+function hourPillar(solarDate, dayStemIdx) {
+  const h = solarDate.getUTCHours();
+  const m = solarDate.getUTCMinutes();
+  const branchIdx = hourBranchIndex(h, m);
+
+  // Five Rat base stem for this day's 子時 — 五鼠遁日 rule:
+  // Pairs: 甲己→甲子, 乙庚→丙子, 丙辛→戊子, 丁壬→庚子, 戊癸→壬子
+  // Same He-combination pairing: dayStemIdx % 5, NOT floor(idx/2).
+  const dayGroup = dayStemIdx % 5;               // 0–4
+  const baseStemIdx = [0, 2, 4, 6, 8][dayGroup]; // 甲,丙,戊,庚,壬
+
+  const stemIdx = (baseStemIdx + branchIdx) % 10;
+  return { stemIdx, branchIdx };
+}
+
+// ── Ten Gods (十神) ────────────────────────────────────────
+/**
+ * Calculate the Ten God relationship between Day Master (stem) and another stem.
+ *
+ * The Ten Gods depend on:
+ * 1. Element relationship (same, generating, controlling cycle)
+ * 2. Yin/Yang polarity (same or different)
+ *
+ * Element cycle: Wood → Fire → Earth → Metal → Water → Wood
+ * Control cycle: Wood → Earth, Earth → Water, Water → Fire, Fire → Metal, Metal → Wood
+ *
+ * Ten Gods:
+ *   Same element, same polarity   → 比肩 (Bǐ Jiān, Rob Wealth)
+ *   Same element, diff polarity   → 劫財 (Jié Cái, Competitor)
+ *   DM generates, same polarity   → 食神 (Shí Shén, Eating God)
+ *   DM generates, diff polarity   → 傷官 (Shāng Guān, Hurting Officer)
+ *   DM controls, same polarity    → 偏財 (Piān Cái, Indirect Wealth)
+ *   DM controls, diff polarity    → 正財 (Zhèng Cái, Direct Wealth)
+ *   Controls DM, same polarity    → 偏官 (Piān Guān, 7 Killings)
+ *   Controls DM, diff polarity    → 正官 (Zhèng Guān, Direct Officer)
+ *   Generates DM, same polarity   → 偏印 (Piān Yìn, Indirect Resource)
+ *   Generates DM, diff polarity   → 正印 (Zhèng Yìn, Direct Resource)
+ */
+const ELEMENTS = ['wood', 'fire', 'earth', 'metal', 'water'];
+const ELEM_IDX = { wood: 0, fire: 1, earth: 2, metal: 3, water: 4 };
+
+function generates(a) {
+  // Returns the element that a generates
+  return ELEMENTS[(ELEM_IDX[a] + 1) % 5];
+}
+function controls(a) {
+  // Returns the element that a controls
+  return ELEMENTS[(ELEM_IDX[a] + 2) % 5];
+}
+function generatedBy(a) {
+  return ELEMENTS[(ELEM_IDX[a] + 4) % 5];
+}
+function controlledBy(a) {
+  return ELEMENTS[(ELEM_IDX[a] + 3) % 5];
+}
+
+function tenGod(dmStem, otherStem) {
+  const dmEl  = STEMS[dmStem].element;
+  const otEl  = STEMS[otherStem].element;
+  const dmYin = STEMS[dmStem].yin;
+  const otYin = STEMS[otherStem].yin;
+  const samePolarity = dmYin === otYin;
+
+  if (dmEl === otEl) {
+    return samePolarity
+      ? { zh: '比肩', en: 'Rob Wealth',       pinyin: 'Bǐ Jiān'    }
+      : { zh: '劫財', en: 'Competitor',        pinyin: 'Jié Cái'   };
+  }
+  if (generates(dmEl) === otEl) {
+    return samePolarity
+      ? { zh: '食神', en: 'Eating God',        pinyin: 'Shí Shén'  }
+      : { zh: '傷官', en: 'Hurting Officer',   pinyin: 'Shāng Guān'};
+  }
+  if (controls(dmEl) === otEl) {
+    return samePolarity
+      ? { zh: '偏財', en: 'Indirect Wealth',   pinyin: 'Piān Cái'  }
+      : { zh: '正財', en: 'Direct Wealth',     pinyin: 'Zhèng Cái' };
+  }
+  if (controlledBy(dmEl) === otEl) {
+    return samePolarity
+      ? { zh: '偏官', en: '7 Killings',        pinyin: 'Piān Guān' }
+      : { zh: '正官', en: 'Direct Officer',    pinyin: 'Zhèng Guān'};
+  }
+  if (generatedBy(dmEl) === otEl) {
+    return samePolarity
+      ? { zh: '偏印', en: 'Indirect Resource', pinyin: 'Piān Yìn'  }
+      : { zh: '正印', en: 'Direct Resource',   pinyin: 'Zhèng Yìn' };
+  }
+  return { zh: '—', en: '—', pinyin: '—' };
+}
+
+// ── Da Yun (大運) Helpers ──────────────────────────────────
+
+/**
+ * Return all 12 Jié solar terms for a given calendar year as dated objects.
+ * These are the same 12 terms that define month-pillar boundaries.
+ */
+function getAllJie(year) {
+  const terms = [
+    { lon: 315, name: 'Lì Chūn 立春'  },
+    { lon: 345, name: 'Jīng Zhé 驚蟄' },
+    { lon:  15, name: 'Qīng Míng 清明' },
+    { lon:  45, name: 'Lì Xià 立夏'   },
+    { lon:  75, name: 'Máng Zhòng 芒種'},
+    { lon: 105, name: 'Xiǎo Shǔ 小暑' },
+    { lon: 135, name: 'Lì Qiū 立秋'   },
+    { lon: 165, name: 'Bái Lù 白露'   },
+    { lon: 195, name: 'Hán Lù 寒露'   },
+    { lon: 225, name: 'Lì Dōng 立冬'  },
+    { lon: 255, name: 'Dà Xuě 大雪'   },
+    { lon: 285, name: 'Xiǎo Hán 小寒' },
+  ];
+  return terms.map(t => ({ ...t, date: solarTermDate(year, t.lon) }));
+}
+
+/**
+ * Find the nearest Jié solar term to a given date.
+ * @param {Date}    date    - reference date
+ * @param {boolean} forward - true = find next term after date; false = find previous
+ * @returns {{ name, date, lon }} or null
+ */
+function findNearestJie(date, forward) {
+  const y = date.getUTCFullYear();
+  const all = [];
+  // Collect three years of terms to guarantee coverage near year boundaries
+  for (let yr = y - 1; yr <= y + 1; yr++) all.push(...getAllJie(yr));
+  all.sort((a, b) => a.date - b.date);
+
+  if (forward) {
+    return all.find(t => t.date > date) || null;
+  } else {
+    const before = all.filter(t => t.date < date);
+    return before.length ? before[before.length - 1] : null;
+  }
+}
+
+/**
+ * Convert a Ganzhi stem+branch pair to its index (0–59) in the 60-cycle.
+ * Uses the Chinese Remainder Theorem: x ≡ stemIdx (mod 10), x ≡ branchIdx (mod 12).
+ */
+function ganzhi2cycle(stemIdx, branchIdx) {
+  // CRT solution (valid because stem and branch always share the same parity)
+  const k = (Math.round((branchIdx - stemIdx) / 2) * 5 % 6 + 6) % 6;
+  return (stemIdx + 10 * k) % 60;
+}
+
+/**
+ * Compute the 10 Major Luck Cycle pillars (大運).
+ *
+ * Direction rule:
+ *   Yang year + Male   → Forward 順行 (count up from month pillar)
+ *   Yin  year + Female → Forward 順行
+ *   Yang year + Female → Backward 逆行
+ *   Yin  year + Male   → Backward 逆行
+ *
+ * Starting age: count days between birth and nearest Jié in the luck direction.
+ *   3 days = 1 year of life  (traditional ratio)
+ *   1 day  = 4 months
+ *
+ * @param {Date}   localDate       - local civil birth date/time
+ * @param {{ stemIdx, branchIdx }} monthPillar
+ * @param {number} yearStemIdx     - year pillar stem index
+ * @param {boolean} male           - true = male
+ * @returns {{ forward, startYears, startMonths, jie, pillars[] }}
+ */
+function computeDaYun(localDate, monthPillar, yearStemIdx, male) {
+  const yearStemYin = STEMS[yearStemIdx].yin;
+  // Forward when male+yang year OR female+yin year
+  const forward = male !== yearStemYin; // XOR: true when polarities match direction
+
+  const jie = findNearestJie(localDate, forward);
+  if (!jie) return null;
+
+  // Day difference (float)
+  const MS_PER_DAY = 86400000;
+  const daysDiff = Math.abs(jie.date - localDate) / MS_PER_DAY;
+
+  // Convert to years + months (3 days = 1 year, 1 day = 4 months)
+  const startYears  = Math.floor(daysDiff / 3);
+  const remainDays  = daysDiff % 3;
+  const startMonths = Math.min(11, Math.round(remainDays * 4));
+
+  // Month pillar cycle index — step from here forward or backward
+  const monthCycleIdx = ganzhi2cycle(monthPillar.stemIdx, monthPillar.branchIdx);
+  const birthYear = localDate.getUTCFullYear();
+
+  const pillars = [];
+  for (let i = 1; i <= 10; i++) {
+    const cycleIdx  = ((monthCycleIdx + (forward ? i : -i)) % 60 + 60) % 60;
+    const stemIdx   = cycleIdx % 10;
+    const branchIdx = cycleIdx % 12;
+    const ageStart  = startYears + (i - 1) * 10;
+    const ageEnd    = ageStart + 9;
+    pillars.push({
+      cycleIdx, stemIdx, branchIdx,
+      stem:   STEMS[stemIdx],
+      branch: BRANCHES[branchIdx],
+      ageStart, ageEnd,
+      yearStart: birthYear + ageStart,
+      yearEnd:   birthYear + ageEnd,
+    });
+  }
+
+  return { forward, startYears, startMonths, jie, pillars };
+}
+
+// ── Main Calculation Entry Point ───────────────────────────
+/**
+ * Given date (YYYY-MM-DD), time (HH:MM), and timezone offset in minutes,
+ * compute the full Four Pillars.
+ *
+ * Convention:
+ *   Year / Month / Day → use LOCAL civil date (UTC + tzOffset). Local civil
+ *     midnight is treated as the day boundary, matching standard Bazi practice.
+ *   Hour branch       → use UTC clock time after timezone conversion, so the
+ *     double-hour (時辰) is read from the raw UTC hour; the stem is then derived
+ *     from the local civil day's day-stem.
+ *
+ * @param {string}  dateStr    - "YYYY-MM-DD"
+ * @param {string}  timeStr    - "HH:MM"
+ * @param {number}  tzOffsetMin - timezone offset in minutes (e.g. +420 for UTC+7)
+ * @param {boolean} male       - true = male, false = female
+ */
+function computeBazi(dateStr, timeStr, tzOffsetMin, male) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+
+  // Use noon as proxy when time is unknown (avoids midnight day-boundary edge cases)
+  const [hr, mn] = timeStr ? timeStr.split(':').map(Number) : [12, 0];
+
+  // 1. Convert local time → UTC
+  const utcMs   = Date.UTC(y, mo - 1, d, hr, mn) - tzOffsetMin * 60 * 1000;
+  const utcDate = new Date(utcMs);
+
+  // 2. Local civil date/time — expressed in JS UTC fields for convenience.
+  //    localDate.getUTCFullYear/Month/Date/Hours give the local values directly.
+  const localDate = new Date(utcMs + tzOffsetMin * 60 * 1000);
+
+  // 3. Year / Month / Day pillars — use local civil date
+  const yp = yearPillar(localDate);
+  const mp = monthPillar(localDate, yp.stemIdx);
+  const dp = dayPillar(localDate);
+
+  // 4. Hour pillar — only when birth time is known
+  const hp = timeStr ? hourPillar(utcDate, dp.stemIdx) : null;
+
+  // 5. Da Yun — Major Luck Cycles
+  const daYun = computeDaYun(localDate, { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx }, yp.stemIdx, male);
+
+  // Formatted timezone label (e.g. "UTC+7:00" or "UTC−5:30")
+  const sign    = tzOffsetMin >= 0 ? '+' : '−';
+  const absMins = Math.abs(tzOffsetMin);
+  const tzLabel = `UTC${sign}${Math.floor(absMins / 60)}:${String(absMins % 60).padStart(2, '0')}`;
+
+  return {
+    utcDate,
+    localDate,
+    tzLabel,
+    daYun,
+    unknownTime: !timeStr,
+    pillars: {
+      hour:  hp ? { stem: STEMS[hp.stemIdx], branch: BRANCHES[hp.branchIdx], stemIdx: hp.stemIdx, branchIdx: hp.branchIdx } : null,
+      day:   { stem: STEMS[dp.stemIdx],  branch: BRANCHES[dp.branchIdx],  stemIdx: dp.stemIdx,  branchIdx: dp.branchIdx  },
+      month: { stem: STEMS[mp.stemIdx],  branch: BRANCHES[mp.branchIdx],  stemIdx: mp.stemIdx,  branchIdx: mp.branchIdx  },
+      year:  { stem: STEMS[yp.stemIdx],  branch: BRANCHES[yp.branchIdx],  stemIdx: yp.stemIdx,  branchIdx: yp.branchIdx  },
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDERING
+// ═══════════════════════════════════════════════════════════
+
+const EL_LABEL = {
+  wood:  { en: 'Wood',  zh: '木' },
+  fire:  { en: 'Fire',  zh: '火' },
+  earth: { en: 'Earth', zh: '土' },
+  metal: { en: 'Metal', zh: '金' },
+  water: { en: 'Water', zh: '水' },
+};
+
+function elClass(el) { return 'el-' + el; }
+
+function formatDateTime(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth()+1)}-${pad(date.getUTCDate())} `
+       + `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
+function renderPillarCell(pillar, label, isDayMaster) {
+  const s = pillar.stem;
+  const b = pillar.branch;
+  return `
+    <td class="pillar-cell${isDayMaster ? ' day-master' : ''}">
+      ${isDayMaster ? '<span class="day-master-badge">日主</span>' : ''}
+      <span class="ganzhi-zh ${elClass(s.element)}">${s.zh}</span>
+      <span class="ganzhi-pinyin">${s.pinyin}</span>
+      <span class="ganzhi-meta">${EL_LABEL[s.element].zh}${s.yin ? '陰' : '陽'} · ${EL_LABEL[s.element].en} ${s.yin ? 'Yin' : 'Yang'}</span>
+    </td>`;
+}
+
+function renderBranchCell(pillar, isDayMaster) {
+  const b = pillar.branch;
+  return `
+    <td class="pillar-cell${isDayMaster ? ' day-master' : ''}">
+      <span class="ganzhi-zh ${elClass(b.element)}">${b.zh}</span>
+      <span class="ganzhi-pinyin">${b.pinyin} · ${b.animal}</span>
+      <span class="ganzhi-meta">${EL_LABEL[b.element].zh}${b.yin ? '陰' : '陽'} · ${EL_LABEL[b.element].en} ${b.yin ? 'Yin' : 'Yang'}</span>
+    </td>`;
+}
+
+function renderUnknownCell() {
+  return `<td class="pillar-cell unknown-pillar">
+    <span class="ganzhi-zh unknown-zh">?</span>
+    <span class="ganzhi-pinyin">—</span>
+    <span class="ganzhi-meta">Unknown</span>
+  </td>`;
+}
+
+function renderResults(result) {
+  const { utcDate, localDate, tzLabel, pillars, unknownTime } = result;
+  const order = ['hour', 'day', 'month', 'year'];
+
+  // ── Time Info ──
+  document.getElementById('solar-info').innerHTML = unknownTime
+    ? `Local date: <span>${localDate.getUTCFullYear()}-${String(localDate.getUTCMonth()+1).padStart(2,'0')}-${String(localDate.getUTCDate()).padStart(2,'0')} (${tzLabel})</span> &nbsp;·&nbsp; Hour pillar not calculated`
+    : `Local time: <span>${formatDateTime(localDate)} (${tzLabel})</span> &nbsp;→&nbsp; UTC: <span>${formatDateTime(utcDate)}</span>`;
+
+  // ── Pillar Table ──
+  const tbody = document.getElementById('pillar-body');
+  tbody.innerHTML = `
+    <tr>
+      <td class="row-label">天干<br>Stem</td>
+      ${order.map(k => !pillars[k] ? renderUnknownCell() : renderPillarCell(pillars[k], k, k === 'day')).join('')}
+    </tr>
+    <tr>
+      <td class="row-label">地支<br>Branch</td>
+      ${order.map(k => !pillars[k] ? renderUnknownCell() : renderBranchCell(pillars[k], k, k === 'day')).join('')}
+    </tr>
+  `;
+
+  // ── Day Master Summary ──
+  const dm = pillars.day.stem;
+  const dmEl = EL_LABEL[dm.element];
+  document.getElementById('dm-summary').innerHTML = `
+    <h3>Day Master · 日主</h3>
+    <div class="dm-grid">
+      <div class="dm-item">
+        <span class="dm-label">Stem · 天干</span>
+        <span class="dm-value ${elClass(dm.element)}">${dm.zh} (${dm.pinyin})</span>
+      </div>
+      <div class="dm-item">
+        <span class="dm-label">Element · 五行</span>
+        <span class="dm-value ${elClass(dm.element)}">${dmEl.zh} ${dmEl.en}</span>
+      </div>
+      <div class="dm-item">
+        <span class="dm-label">Polarity · 陰陽</span>
+        <span class="dm-value">${dm.yin ? '陰 Yin' : '陽 Yang'}</span>
+      </div>
+      <div class="dm-item">
+        <span class="dm-label">Nature · 性格</span>
+        <span class="dm-value">${getDayMasterNote(dm)}</span>
+      </div>
+    </div>
+  `;
+
+  // ── Ten Gods ──
+  const dmIdx = pillars.day.stemIdx;
+  const tgOrder = unknownTime ? ['day', 'month', 'year'] : order;
+  const tgRows = tgOrder.map(k => {
+    const p = pillars[k];
+    const tgStem   = k === 'day' ? { zh: '—', en: 'Day Master', pinyin: '日主' } : tenGod(dmIdx, p.stemIdx);
+    // Also compute TG for branch's hidden stem (main qi only, simplified)
+    const branchMainStem = getBranchMainStem(p.branchIdx);
+    const tgBranch = k === 'day'
+      ? tenGod(dmIdx, branchMainStem)
+      : tenGod(dmIdx, branchMainStem);
+    const pillarLabel = { hour: '時柱 Hour', day: '日柱 Day', month: '月柱 Month', year: '年柱 Year' }[k];
+    return `
+      <tr>
+        <td>${pillarLabel}</td>
+        <td><span class="tg-zh ${elClass(STEMS[p.stemIdx].element)}">${STEMS[p.stemIdx].zh}</span></td>
+        <td class="${k==='day'?'tg-self':''}">
+          <span class="tg-zh">${tgStem.zh}</span>
+          <span style="font-size:0.7rem;color:var(--muted)">${tgStem.pinyin}</span>
+        </td>
+        <td><span class="tg-zh ${elClass(BRANCHES[p.branchIdx].element)}">${BRANCHES[p.branchIdx].zh}</span></td>
+        <td>
+          <span class="tg-zh">${tgBranch.zh}</span>
+          <span style="font-size:0.7rem;color:var(--muted)">${tgBranch.pinyin}</span>
+        </td>
+      </tr>`;
+  });
+
+  document.getElementById('ten-gods-section').innerHTML = `
+    <h3>Ten Gods · 十神 (relative to Day Master ${dm.zh} ${dm.pinyin})</h3>
+    <table class="tg-table">
+      <thead>
+        <tr>
+          <th>Pillar</th>
+          <th>Stem 天干</th>
+          <th>Stem God</th>
+          <th>Branch 地支</th>
+          <th>Branch God</th>
+        </tr>
+      </thead>
+      <tbody>${tgRows.join('')}</tbody>
+    </table>
+  `;
+
+  // ── Da Yun ──
+  renderDaYun(result.daYun, result.localDate.getUTCFullYear());
+  renderCharts(result);
+  renderYearCycles(result);
+
+  // Show results with animation
+  const el = document.getElementById('results');
+  el.classList.add('visible');
+}
+
+function renderDaYun(daYun, birthYear) {
+  if (!daYun) return;
+  const dir     = daYun.forward ? 'Forward 順行' : 'Backward 逆行';
+  const dirNote = daYun.forward
+    ? '(Yang year ♂ / Yin year ♀ — pillars advance with the cycle)'
+    : '(Yin year ♂ / Yang year ♀ — pillars retreat against the cycle)';
+  const startLabel = daYun.startMonths > 0
+    ? `${daYun.startYears} yrs ${daYun.startMonths} mths`
+    : `${daYun.startYears} yrs`;
+
+  const pillarHTML = daYun.pillars.map((p, i) => `
+    <div class="dayun-pillar">
+      <div class="dayun-num">Cycle ${i + 1}</div>
+      <div class="dayun-age">Age ${p.ageStart}–${p.ageEnd}</div>
+      <div class="dayun-year">${p.yearStart}–${p.yearEnd}</div>
+      <div class="dayun-stem  ${elClass(p.stem.element)}">${p.stem.zh}</div>
+      <div class="dayun-divider"></div>
+      <div class="dayun-branch ${elClass(p.branch.element)}">${p.branch.zh}</div>
+      <div class="dayun-branch-en">${p.stem.pinyin} / ${p.branch.pinyin}</div>
+    </div>`).join('');
+
+  document.getElementById('dayun-section').innerHTML = `
+    <h3>Major Luck Cycles · 大運</h3>
+    <div class="dayun-meta">
+      Direction: <span>${dir}</span> &nbsp;${dirNote}<br>
+      Nearest solar term: <span>${daYun.jie.name}</span> &nbsp;·&nbsp;
+      Luck begins at: <span>${startLabel}</span>
+    </div>
+    <div class="dayun-scroll">
+      <div class="dayun-strip">${pillarHTML}</div>
+    </div>`;
+}
+
+/**
+ * Get the primary (main qi) hidden stem index for a branch.
+ * Each branch has a main qi stem that represents its primary energy.
+ */
+function getBranchMainStem(branchIdx) {
+  // Branch → main qi stem index
+  // 子(0)=壬(8), 丑(1)=己(5), 寅(2)=甲(0), 卯(3)=乙(1),
+  // 辰(4)=戊(4), 巳(5)=丙(2), 午(6)=丁(3), 未(7)=己(5),
+  // 申(8)=庚(6), 酉(9)=辛(7), 戌(10)=戊(4), 亥(11)=壬(8)
+  const mainQi = [8, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8];
+  return mainQi[branchIdx];
+}
+
+/**
+ * Return a short character note about the Day Master.
+ */
+function getDayMasterNote(stem) {
+  const notes = {
+    '甲': 'Upright & Pioneering',
+    '乙': 'Flexible & Graceful',
+    '丙': 'Radiant & Generous',
+    '丁': 'Warm & Refined',
+    '戊': 'Solid & Reliable',
+    '己': 'Nurturing & Practical',
+    '庚': 'Decisive & Strong',
+    '辛': 'Perceptive & Elegant',
+    '壬': 'Intelligent & Adaptive',
+    '癸': 'Intuitive & Subtle',
+  };
+  return notes[stem.zh] || '—';
+}
+
+// ── Chart Helpers ─────────────────────────────────────────
+function elementToStructure(el, dmEl) {
+  if (el === dmEl)               return 'companion';
+  if (el === generates(dmEl))    return 'output';
+  if (el === controls(dmEl))     return 'wealth';
+  if (el === controlledBy(dmEl)) return 'influence';
+  if (el === generatedBy(dmEl))  return 'resource';
+  return 'companion';
+}
+
+function computeChartData(pillars, dmStemIdx, unknownTime) {
+  const dmEl = STEMS[dmStemIdx].element;
+  const structureCounts = { companion: 0, output: 0, wealth: 0, influence: 0, resource: 0 };
+  const structureEls = {
+    companion: dmEl,
+    output:    generates(dmEl),
+    wealth:    controls(dmEl),
+    influence: controlledBy(dmEl),
+    resource:  generatedBy(dmEl),
+  };
+  const tenGodsCount = {};
+  const order = unknownTime ? ['day', 'month', 'year'] : ['hour', 'day', 'month', 'year'];
+
+  order.forEach(k => {
+    const p = pillars[k];
+    if (!p) return;
+    // Stem
+    structureCounts[elementToStructure(p.stem.element, dmEl)]++;
+    if (k !== 'day') {
+      const tg = tenGod(dmStemIdx, p.stemIdx);
+      tenGodsCount[tg.zh] = (tenGodsCount[tg.zh] || 0) + 1;
+    }
+    // Branch main qi
+    const bmsIdx = getBranchMainStem(p.branchIdx);
+    structureCounts[elementToStructure(STEMS[bmsIdx].element, dmEl)]++;
+    const tgB = tenGod(dmStemIdx, bmsIdx);
+    tenGodsCount[tgB.zh] = (tenGodsCount[tgB.zh] || 0) + 1;
+  });
+
+  return { structureCounts, structureEls, tenGodsCount };
+}
+
+function renderRadarSVG(structureCounts, structureEls) {
+  const W = 280, H = 264;
+  const cx = 140, cy = 134;
+  const rMax = 72;
+  const toRad = d => d * Math.PI / 180;
+  const px = (d, r) => (cx + r * Math.cos(toRad(d))).toFixed(1);
+  const py = (d, r) => (cy + r * Math.sin(toRad(d))).toFixed(1);
+
+  const structs = [
+    { key: 'companion', name: 'Companion', angle: -90 },
+    { key: 'output',    name: 'Output',    angle: -18 },
+    { key: 'wealth',    name: 'Wealth',    angle:  54 },
+    { key: 'influence', name: 'Influence', angle: 126 },
+    { key: 'resource',  name: 'Resource',  angle: 198 },
+  ];
+  const elZh = { wood:'木', fire:'火', earth:'土', metal:'金', water:'水' };
+  const elEn = { wood:'Wood', fire:'Fire', earth:'Earth', metal:'Metal', water:'Water' };
+
+  const maxScale = Math.max(4, ...Object.values(structureCounts));
+
+  // Grid (4 levels)
+  let grid = '';
+  for (let l = 1; l <= 4; l++) {
+    const r = rMax * l / 4;
+    const pts = structs.map(s => `${px(s.angle,r)},${py(s.angle,r)}`).join(' ');
+    grid += `<polygon points="${pts}" fill="none" stroke="#E2E8F0" stroke-width="1"/>`;
+  }
+  // Axes
+  const axes = structs.map(s =>
+    `<line x1="${cx}" y1="${cy}" x2="${px(s.angle,rMax)}" y2="${py(s.angle,rMax)}" stroke="#E2E8F0" stroke-width="1"/>`
+  ).join('');
+  // Data polygon
+  const dataPts = structs.map(s => {
+    const v = structureCounts[s.key];
+    const r = v === 0 ? 0 : rMax * Math.min(v, maxScale) / maxScale;
+    return `${px(s.angle,r)},${py(s.angle,r)}`;
+  }).join(' ');
+  // Dots + value labels
+  const dots = structs.map(s => {
+    const v = structureCounts[s.key];
+    const r = rMax * Math.min(v, maxScale) / maxScale;
+    const vLabel = v > 0 ? `<text x="${px(s.angle,r)}" y="${(+py(s.angle,r)-6).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="#4F46E5">${v}</text>` : '';
+    return `<circle cx="${px(s.angle,r)}" cy="${py(s.angle,r)}" r="3.5" fill="#4F46E5" stroke="#fff" stroke-width="1.5"/>${vLabel}`;
+  }).join('');
+  // Axis labels
+  const anchorOf = d => Math.cos(toRad(d)) > 0.2 ? 'start' : Math.cos(toRad(d)) < -0.2 ? 'end' : 'middle';
+  const labelR = rMax + 26;
+  const labels = structs.map(s => {
+    const el = structureEls[s.key];
+    const anchor = anchorOf(s.angle);
+    return `<text x="${px(s.angle,labelR)}" y="${(+py(s.angle,labelR)-4).toFixed(1)}" text-anchor="${anchor}" font-size="9.5" font-weight="600" fill="#475569">${s.name}</text>
+            <text x="${px(s.angle,labelR)}" y="${(+py(s.angle,labelR)+8).toFixed(1)}" text-anchor="${anchor}" font-size="8.5" fill="#94A3B8">${elZh[el]} ${elEn[el]}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" font-family="Inter,sans-serif">
+    ${grid}${axes}
+    <polygon points="${dataPts}" fill="rgba(79,70,229,0.12)" stroke="#4F46E5" stroke-width="2" stroke-linejoin="round"/>
+    ${dots}${labels}
+  </svg>`;
+}
+
+function renderBarsSVG(tenGodsCount) {
+  const ALL_TG = [
+    { zh:'比肩', en:'Friend'           },
+    { zh:'劫財', en:'Rob Wealth'       },
+    { zh:'食神', en:'Eating God'       },
+    { zh:'傷官', en:'Hurting Officer'  },
+    { zh:'偏財', en:'Indirect Wealth'  },
+    { zh:'正財', en:'Direct Wealth'    },
+    { zh:'偏官', en:'Seven Killing'    },
+    { zh:'正官', en:'Direct Officer'   },
+    { zh:'偏印', en:'Indirect Resource'},
+    { zh:'正印', en:'Direct Resource'  },
+  ];
+  const sorted = [...ALL_TG].sort((a,b) => (tenGodsCount[b.zh]||0) - (tenGodsCount[a.zh]||0));
+  const maxVal = Math.max(...ALL_TG.map(t => tenGodsCount[t.zh]||0), 1);
+  const labelW = 148, barMaxW = 130, rowH = 24;
+  const H = sorted.length * rowH + 20;
+  const W = labelW + barMaxW + 24;
+
+  const rows = sorted.map((tg, i) => {
+    const count = tenGodsCount[tg.zh] || 0;
+    const bw = count === 0 ? 0 : Math.max(4, (count / maxVal) * barMaxW);
+    const y = i * rowH + 2;
+    const color = count >= 2 ? '#DC2626' : '#94A3B8';
+    return `<text x="${labelW-6}" y="${y+14}" text-anchor="end" font-size="10" fill="#475569">${tg.en} ${tg.zh}</text>
+      ${count > 0 ? `<rect x="${labelW}" y="${y+5}" width="${bw}" height="11" rx="2" fill="${color}"/>` : ''}`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" font-family="Inter,sans-serif">
+    ${rows}
+    <line x1="${labelW}" y1="${H-8}" x2="${labelW+barMaxW}" y2="${H-8}" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="${labelW}" y="${H-2}" font-size="8" fill="#94A3B8" text-anchor="middle">0</text>
+    <text x="${labelW+barMaxW}" y="${H-2}" font-size="8" fill="#94A3B8" text-anchor="middle">${maxVal}</text>
+  </svg>`;
+}
+
+function renderCharts(result) {
+  const { pillars, unknownTime } = result;
+  const { structureCounts, structureEls, tenGodsCount } = computeChartData(pillars, pillars.day.stemIdx, unknownTime);
+  document.getElementById('charts-section').innerHTML = `
+    <div class="charts-inner">
+      <div>
+        <div class="chart-title">5 Structures · 五行格局</div>
+        ${renderRadarSVG(structureCounts, structureEls)}
+      </div>
+      <div>
+        <div class="chart-title">10 Gods · 十神分布</div>
+        ${renderBarsSVG(tenGodsCount)}
+      </div>
+    </div>`;
+}
+
+// ── 12 Growth Stage ───────────────────────────────────────
+const TWELVE_STAGE_TABLE = {
+  //         子0      丑1      寅2      卯3      辰4      巳5      午6      未7      申8      酉9      戌10     亥11
+  wood:  ['沐浴','冠帶','臨官','帝旺','衰', '病', '死', '墓', '絕', '胎', '養', '長生'],
+  fire:  ['胎', '養', '長生','沐浴','冠帶','臨官','帝旺','衰', '病', '死', '墓', '絕'],
+  earth: ['胎', '養', '長生','沐浴','冠帶','臨官','帝旺','衰', '病', '死', '墓', '絕'],
+  metal: ['死', '墓', '絕', '胎', '養', '長生','沐浴','冠帶','臨官','帝旺','衰', '病'],
+  water: ['帝旺','衰', '病', '死', '墓', '絕', '胎', '養', '長生','沐浴','冠帶','臨官'],
+};
+const STAGE_EN = {
+  '長生':'ChangSheng','沐浴':'MuYu','冠帶':'GuanDai','臨官':'LinGuan',
+  '帝旺':'DiWang','衰':'Shuai','病':'Bing','死':'Si',
+  '墓':'Mu','絕':'Jue','胎':'Tai','養':'Yang',
+};
+function twelveStage(dmEl, branchIdx) {
+  const zh = TWELVE_STAGE_TABLE[dmEl][branchIdx];
+  return { zh, en: STAGE_EN[zh] };
+}
+
+const TG_ABBR = {
+  '比肩':'FR','劫財':'RW','食神':'EG','傷官':'HO',
+  '偏財':'IW','正財':'DW','偏官':'7K','正官':'DO','偏印':'IR','正印':'DR',
+};
+const TG_COLOR = {
+  FR:'#64748B', RW:'#64748B',
+  EG:'#D97706', HO:'#D97706',
+  IW:'#16A34A', DW:'#16A34A',
+  '7K':'#DC2626', DO:'#DC2626',
+  IR:'#7C3AED', DR:'#7C3AED',
+};
+
+function renderYearCycles(result) {
+  const { pillars } = result;
+  const dmStemIdx = pillars.day.stemIdx;
+  const dmEl = STEMS[dmStemIdx].element;
+  const birthYear = result.localDate.getUTCFullYear();
+  const currentYear = new Date().getFullYear();
+  const startYear = birthYear - 10;
+  const endYear   = birthYear + 80;
+
+  // Group years by heavenly stem (0–9)
+  const groups = Array.from({length: 10}, () => []);
+  for (let y = startYear; y <= endYear; y++) {
+    const si = ((y - 4) % 10 + 10) % 10;
+    const bi = ((y - 4) % 12 + 12) % 12;
+    groups[si].push({
+      year: y, beYear: y + 543, si, bi,
+      stage: twelveStage(dmEl, bi),
+      tgS: tenGod(dmStemIdx, si),
+      tgB: tenGod(dmStemIdx, getBranchMainStem(bi)),
+    });
+  }
+  // Newest year at top within each column
+  groups.forEach(g => g.sort((a, b) => b.year - a.year));
+
+  const mkBadge = tg => {
+    const ab = TG_ABBR[tg.zh] || '?';
+    const cl = TG_COLOR[ab] || '#94A3B8';
+    return `<span class="yc-badge" style="background:${cl}">${ab}</span>`;
+  };
+
+  const cols = groups.map((years, si) => {
+    const colTg   = tenGod(dmStemIdx, si);
+    const colAbbr = TG_ABBR[colTg.zh] || '?';
+    const colClr  = TG_COLOR[colAbbr] || '#94A3B8';
+
+    const cells = years.map(y => {
+      const cls = y.year === currentYear ? ' yc-current'
+                : y.year === birthYear   ? ' yc-birth' : '';
+      return `<div class="yc-cell${cls}">
+        <div class="yc-yr">${y.year}<br><span class="yc-be">${y.beYear}</span></div>
+        <div class="yc-gz">
+          ${mkBadge(y.tgS)}
+          <span class="${elClass(STEMS[y.si].element)}">${STEMS[y.si].zh}</span>
+          <span class="${elClass(BRANCHES[y.bi].element)}">${BRANCHES[y.bi].zh}</span>
+          ${mkBadge(y.tgB)}
+        </div>
+        <div class="yc-animal">${BRANCHES[y.bi].animal}</div>
+        <div class="yc-stage">${y.stage.en}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="yc-col">
+      <div class="yc-col-hd" style="border-top:2px solid ${colClr}">
+        <span class="yc-hd-stem ${elClass(STEMS[si].element)}">${STEMS[si].zh}</span>
+        <span class="yc-hd-tg" style="color:${colClr}">${colAbbr}</span>
+      </div>
+      ${cells}
+    </div>`;
+  }).join('');
+
+  document.getElementById('yearcycle-section').innerHTML = `
+    <div class="chart-title" style="text-align:left;margin-bottom:1rem">Year Cycles · 流年</div>
+    <div class="yc-grid">${cols}</div>`;
+}
+
+// ── Unknown Time toggle ───────────────────────────────────
+function toggleUnknownTime() {
+  const unknown = document.getElementById('unknown-time').checked;
+  document.getElementById('tob').disabled = unknown;
+}
+
+// ── Gender UI toggle ──────────────────────────────────────
+function updateGenderUI() {
+  const male = document.getElementById('gender-male').checked;
+  document.getElementById('lbl-male').className   = 'gender-opt' + (male  ? ' sel-male'   : '');
+  document.getElementById('lbl-female').className = 'gender-opt' + (!male ? ' sel-female' : '');
+}
+
+// ── Main calculate() called by button ─────────────────────
+function calculate() {
+  const dob         = document.getElementById('dob').value;
+  const tob         = document.getElementById('tob').value;
+  const tzMin       = parseInt(document.getElementById('tz').value, 10);
+  const male        = document.getElementById('gender-male').checked;
+  const unknownTime = document.getElementById('unknown-time').checked;
+  const errEl       = document.getElementById('error-msg');
+
+  if (!dob) {
+    errEl.textContent = 'Please enter date of birth.';
+    errEl.classList.add('show');
+    return;
+  }
+  if (!unknownTime && !tob) {
+    errEl.textContent = 'Please enter time of birth, or check "I don\'t know my birth time".';
+    errEl.classList.add('show');
+    return;
+  }
+  errEl.classList.remove('show');
+
+  try {
+    const result = computeBazi(dob, unknownTime ? null : tob, tzMin, male);
+    renderResults(result);
+  } catch (e) {
+    errEl.textContent = 'Calculation error: ' + e.message;
+    errEl.classList.add('show');
+    console.error(e);
+  }
+}
+
+// Auto-calculate on load with default values
+window.addEventListener('DOMContentLoaded', () => {
+  updateGenderUI();
+  calculate();
+});
+</script>
+</body>
+</html>
