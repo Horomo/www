@@ -190,15 +190,15 @@ function RenderMd({ text }: { text: string }) {
 
 // ── TST Info Card ──────────────────────────────────────────
 function TSTCard({ result }: { result: BaziResult }) {
-  const { tst, localDate, tstDate, tzLabel } = result;
+  const { tst, displayDate, tstDate, displayTzLabel } = result;
   if (!tst) return null;
 
   const pad = (n: number) => String(n).padStart(2, '0');
-  const clockStr = `${pad(localDate.getUTCHours())}:${pad(localDate.getUTCMinutes())}`;
+  const clockStr = `${pad(displayDate.getUTCHours())}:${pad(displayDate.getUTCMinutes())}`;
   const tstStr   = `${pad(tstDate.getUTCHours())}:${pad(tstDate.getUTCMinutes())}`;
 
   const rows = [
-    { label: 'Clock Time (birth certificate)', value: clockStr, note: tzLabel + (tst.dstApplied ? ' incl. DST' : ''), color: 'text-slate-700' },
+    { label: 'Clock Time (birth certificate)', value: clockStr, note: displayTzLabel + (tst.dstApplied ? ' (DST in effect)' : ''), color: 'text-slate-700' },
     { label: 'Step 1 · DST Correction',        value: fmtMin(tst.dstCorrectionMin), note: tst.dstApplied ? 'DST detected — reverted to standard time' : 'No DST in effect', color: tst.dstApplied ? 'text-amber-600' : 'text-slate-400' },
     { label: 'Step 2 · Longitude Correction',  value: fmtMin(tst.lonCorrectionMin), note: '(longitude − std meridian) × 4 min/°', color: 'text-indigo-600' },
     { label: 'Step 3 · Equation of Time',      value: fmtMin(tst.eotMin),           note: 'Earth orbital eccentricity correction', color: 'text-teal-600' },
@@ -685,8 +685,8 @@ export default function BaziCalculator() {
             {/* Solar Info */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
               {result.unknownTime
-                ? <>Local date: <span className="font-medium text-slate-800">{result.localDate.getUTCFullYear()}-{String(result.localDate.getUTCMonth() + 1).padStart(2, '0')}-{String(result.localDate.getUTCDate()).padStart(2, '0')} ({result.tzLabel})</span> &nbsp;·&nbsp; Hour pillar not calculated</>
-                : <>Clock time: <span className="font-medium text-slate-800">{fmtDate(result.localDate)} ({result.tzLabel})</span> &nbsp;→&nbsp; True Solar Time: <span className="font-medium text-indigo-700">{fmtDate(result.tstDate)}</span></>
+                ? <>Local date: <span className="font-medium text-slate-800">{result.displayDate.getUTCFullYear()}-{String(result.displayDate.getUTCMonth() + 1).padStart(2, '0')}-{String(result.displayDate.getUTCDate()).padStart(2, '0')} ({result.displayTzLabel})</span> &nbsp;·&nbsp; Hour pillar not calculated</>
+                : <>Clock time: <span className="font-medium text-slate-800">{fmtDate(result.displayDate)} ({result.displayTzLabel})</span> &nbsp;→&nbsp; True Solar Time: <span className="font-medium text-indigo-700">{fmtDate(result.tstDate)}</span></>
               }
             </div>
 

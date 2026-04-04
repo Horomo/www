@@ -58,8 +58,10 @@ export interface TSTInfo {
 export interface BaziResult {
   utcDate: Date;
   localDate: Date;
+  displayDate: Date;
   tstDate: Date;
   tzLabel: string;
+  displayTzLabel: string;
   stdOffsetMin: number;
   tst: TSTInfo | null;
   daYun: DaYun | null;
@@ -104,7 +106,7 @@ export const BRANCHES: Branch[] = [
 
 // All hidden stems per branch (main qi first, then mid, then residual)
 export const BRANCH_HIDDEN_STEMS: number[][] = [
-  [8],           // 子(0): 壬
+  [9],           // 子(0): 癸
   [5, 7, 9],     // 丑(1): 己, 辛, 癸
   [0, 2, 4],     // 寅(2): 甲, 丙, 戊
   [1],           // 卯(3): 乙
@@ -446,22 +448,17 @@ export function computeDaYun(
  * Positive = ahead of UTC (e.g., Asia/Bangkok = +420).
  */
 export function getUtcOffsetMinutes(date: Date, ianaTimezone: string): number {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: ianaTimezone,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(date);
-    const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0');
-    let hour = get('hour');
-    if (hour === 24) hour = 0;
-    const localMs = Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
-    return Math.round((localMs - date.getTime()) / 60000);
-  } catch {
-    return 0;
-  }
+  const formatter = createDateTimeFormatter(ianaTimezone);
+  const localParts = getLocalDateTimeParts(date, formatter);
+  const localMs = Date.UTC(
+    localParts.year,
+    localParts.month - 1,
+    localParts.day,
+    localParts.hour,
+    localParts.minute,
+    localParts.second,
+  );
+  return Math.round((localMs - date.getTime()) / 60000);
 }
 
 /**
@@ -490,13 +487,29 @@ export function isDST(date: Date, ianaTimezone: string): boolean {
  * Handles DST correctly via two-pass approximation.
  */
 export function clockTimeToUtc(y: number, mo: number, d: number, hr: number, mn: number, ianaTimezone: string): Date {
+  const formatter = createDateTimeFormatter(ianaTimezone);
   // First pass: treat clock time as approximate UTC, get the timezone offset at that moment
   const approx1 = new Date(Date.UTC(y, mo - 1, d, hr, mn));
   const off1 = getUtcOffsetMinutes(approx1, ianaTimezone);
   // Second pass: better UTC estimate
   const approx2 = new Date(Date.UTC(y, mo - 1, d, hr, mn) - off1 * 60 * 1000);
   const off2 = getUtcOffsetMinutes(approx2, ianaTimezone);
-  return new Date(Date.UTC(y, mo - 1, d, hr, mn) - off2 * 60 * 1000);
+  const approxUtc = new Date(Date.UTC(y, mo - 1, d, hr, mn) - off2 * 60 * 1000);
+  const matches = findMatchingUtcInstants(
+    { year: y, month: mo, day: d, hour: hr, minute: mn, second: 0 },
+    formatter,
+    approxUtc,
+  );
+
+  if (matches.length === 0) {
+    throw new Error('The selected local time does not exist in this timezone because of a DST transition.');
+  }
+
+  if (matches.length > 1) {
+    throw new Error('The selected local time is ambiguous in this timezone because of a DST transition. Please choose a different time.');
+  }
+
+  return matches[0];
 }
 
 /**
@@ -542,13 +555,15 @@ export function computeBazi(
 ): BaziResult {
   const [y, mo, d] = dateStr.split('-').map(Number);
   const [hr, mn]   = timeStr ? timeStr.split(':').map(Number) : [12, 0];
+  createDateTimeFormatter(ianaTimezone);
 
   // Convert clock time → UTC (accounts for DST in the IANA timezone)
   const utcDate = timeStr
     ? clockTimeToUtc(y, mo, d, hr, mn, ianaTimezone)
-    : new Date(Date.UTC(y, mo - 1, d, 5, 0)); // Use 05:00 UTC as neutral noon-ish
+    : clockTimeToUtc(y, mo, d, 12, 0, ianaTimezone);
 
   const stdOffsetMin = getStdOffsetMinutes(y, ianaTimezone);
+  const displayOffsetMin = getUtcOffsetMinutes(utcDate, ianaTimezone);
 
   // ── True Solar Time calculation ──────────────────────────
   let tstDate: Date;
@@ -607,15 +622,19 @@ export function computeBazi(
   const sign    = stdOffsetMin >= 0 ? '+' : '−';
   const absMins = Math.abs(stdOffsetMin);
   const tzLabel = `UTC${sign}${Math.floor(absMins / 60)}:${String(absMins % 60).padStart(2, '0')}`;
+  const displayTzLabel = formatUtcOffsetLabel(displayOffsetMin);
 
   // localDate = clock's standard-time representation (for display)
   const localDate = new Date(utcDate.getTime() + stdOffsetMin * 60 * 1000);
+  const displayDate = new Date(utcDate.getTime() + displayOffsetMin * 60 * 1000);
 
   return {
     utcDate,
     localDate,
+    displayDate,
     tstDate,
     tzLabel,
+    displayTzLabel,
     stdOffsetMin,
     tst,
     daYun,
@@ -631,8 +650,81 @@ export function computeBazi(
 
 // ── Hidden Stem / Chart Helpers ────────────────────────────
 export function getBranchMainStem(branchIdx: number): number {
-  const mainQi = [8, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8];
+  const mainQi = [9, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8];
   return mainQi[branchIdx];
+}
+
+type LocalDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function createDateTimeFormatter(ianaTimezone: string): Intl.DateTimeFormat {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    throw new Error(`Invalid IANA timezone: ${ianaTimezone}`);
+  }
+}
+
+function getLocalDateTimeParts(date: Date, formatter: Intl.DateTimeFormat): LocalDateTimeParts {
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10);
+  let hour = get('hour');
+  if (hour === 24) hour = 0;
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour,
+    minute: get('minute'),
+    second: get('second'),
+  };
+}
+
+function sameLocalDateTime(a: LocalDateTimeParts, b: LocalDateTimeParts): boolean {
+  return a.year === b.year
+    && a.month === b.month
+    && a.day === b.day
+    && a.hour === b.hour
+    && a.minute === b.minute
+    && a.second === b.second;
+}
+
+function findMatchingUtcInstants(
+  requestedLocalTime: LocalDateTimeParts,
+  formatter: Intl.DateTimeFormat,
+  approxUtc: Date,
+): Date[] {
+  const matches: Date[] = [];
+
+  for (let delta = -180; delta <= 180; delta++) {
+    const candidate = new Date(approxUtc.getTime() + delta * 60000);
+    if (sameLocalDateTime(getLocalDateTimeParts(candidate, formatter), requestedLocalTime)) {
+      matches.push(candidate);
+    }
+  }
+
+  return matches;
+}
+
+function formatUtcOffsetLabel(offsetMin: number): string {
+  const sign = offsetMin >= 0 ? '+' : '−';
+  const absMins = Math.abs(offsetMin);
+  return `UTC${sign}${Math.floor(absMins / 60)}:${String(absMins % 60).padStart(2, '0')}`;
 }
 
 export function elementToStructure(el: string, dmEl: string): string {

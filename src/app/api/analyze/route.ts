@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { authOptions } from '@/lib/auth';
 import { buildAnalysisLogInsert, insertAnalysisLog } from '@/lib/analysis-log';
-import { parseAnalyzeRequestBody } from '@/lib/analysis-payload';
+import {
+  analyzeRequestMatchesServerComputation,
+  parseAnalyzeRequestBody,
+  recomputeAnalysisChartPayload,
+} from '@/lib/analysis-payload';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const AI_MODEL = 'gpt-4o-mini';
@@ -29,7 +33,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { birthInfo, computedChart } = parsedBody;
+  let computedChart;
+  try {
+    computedChart = recomputeAnalysisChartPayload(parsedBody.birthInfo);
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Invalid analysis payload.' },
+      { status: 400 },
+    );
+  }
+
+  if (!analyzeRequestMatchesServerComputation(parsedBody)) {
+    return NextResponse.json(
+      { error: 'Computed chart payload does not match the supplied birth information.' },
+      { status: 400 },
+    );
+  }
+
+  const { birthInfo } = parsedBody;
   const { pillars, chartData } = computedChart;
   const requestId = crypto.randomUUID();
   const mode = parsedBody.mode ?? 'initial';
