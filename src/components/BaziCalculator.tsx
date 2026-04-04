@@ -3,6 +3,7 @@
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { buildAnalyzeRequestBody, type AnalysisFormPayload } from '@/lib/analysis-payload';
+import BirthPlaceSearch from '@/components/BirthPlaceSearch';
 import {
   computeBazi,
   computeChartData,
@@ -16,58 +17,7 @@ import {
   getBranchMainStem,
   getDayMasterNote,
 } from '@/lib/bazi';
-
-// ── IANA Timezone list ─────────────────────────────────────
-const TIMEZONES: { value: string; label: string }[] = [
-  // Asia
-  { value: 'Asia/Bangkok',                    label: 'UTC+7  — Bangkok, Hanoi, Jakarta'             },
-  { value: 'Asia/Ho_Chi_Minh',                label: 'UTC+7  — Ho Chi Minh City'                   },
-  { value: 'Asia/Jakarta',                    label: 'UTC+7  — Jakarta, Surabaya'                   },
-  { value: 'Asia/Yangon',                     label: 'UTC+6:30 — Yangon'                            },
-  { value: 'Asia/Dhaka',                      label: 'UTC+6  — Dhaka'                               },
-  { value: 'Asia/Kolkata',                    label: 'UTC+5:30 — Mumbai, New Delhi'                 },
-  { value: 'Asia/Karachi',                    label: 'UTC+5  — Karachi, Islamabad'                  },
-  { value: 'Asia/Dubai',                      label: 'UTC+4  — Dubai, Abu Dhabi'                    },
-  { value: 'Asia/Tehran',                     label: 'UTC+3:30/4:30 — Tehran'                       },
-  { value: 'Asia/Baghdad',                    label: 'UTC+3  — Baghdad'                             },
-  { value: 'Asia/Riyadh',                     label: 'UTC+3  — Riyadh, Kuwait, Nairobi'             },
-  { value: 'Asia/Beirut',                     label: 'UTC+2/3 — Beirut, Amman'                      },
-  { value: 'Asia/Jerusalem',                  label: 'UTC+2/3 — Jerusalem, Tel Aviv'                },
-  { value: 'Asia/Singapore',                  label: 'UTC+8  — Singapore, Kuala Lumpur'             },
-  { value: 'Asia/Shanghai',                   label: 'UTC+8  — Beijing, Shanghai, Chongqing'        },
-  { value: 'Asia/Taipei',                     label: 'UTC+8  — Taipei'                              },
-  { value: 'Asia/Hong_Kong',                  label: 'UTC+8  — Hong Kong'                           },
-  { value: 'Asia/Manila',                     label: 'UTC+8  — Manila'                              },
-  { value: 'Asia/Seoul',                      label: 'UTC+9  — Seoul'                               },
-  { value: 'Asia/Tokyo',                      label: 'UTC+9  — Tokyo, Osaka'                        },
-  // Europe
-  { value: 'UTC',                             label: 'UTC±0  — Coordinated Universal Time'          },
-  { value: 'Europe/London',                   label: 'UTC+0/1 — London, Dublin, Lisbon'             },
-  { value: 'Europe/Paris',                    label: 'UTC+1/2 — Paris, Berlin, Rome, Madrid'        },
-  { value: 'Europe/Helsinki',                 label: 'UTC+2/3 — Helsinki, Riga, Tallinn'            },
-  { value: 'Europe/Athens',                   label: 'UTC+2/3 — Athens, Bucharest, Cairo'           },
-  { value: 'Europe/Moscow',                   label: 'UTC+3  — Moscow, Minsk'                       },
-  { value: 'Europe/Istanbul',                 label: 'UTC+3  — Istanbul, Ankara'                    },
-  // Americas
-  { value: 'America/New_York',                label: 'UTC−5/4 — New York, Toronto, Miami'           },
-  { value: 'America/Chicago',                 label: 'UTC−6/5 — Chicago, Houston, Mexico City'      },
-  { value: 'America/Denver',                  label: 'UTC−7/6 — Denver, Phoenix'                   },
-  { value: 'America/Los_Angeles',             label: 'UTC−8/7 — Los Angeles, Seattle, Vancouver'   },
-  { value: 'America/Anchorage',               label: 'UTC−9/8 — Anchorage'                         },
-  { value: 'Pacific/Honolulu',                label: 'UTC−10 — Honolulu'                            },
-  { value: 'America/Bogota',                  label: 'UTC−5  — Bogotá, Lima, Quito'                 },
-  { value: 'America/Caracas',                 label: 'UTC−4  — Caracas'                             },
-  { value: 'America/Santiago',                label: 'UTC−4/3 — Santiago'                           },
-  { value: 'America/Sao_Paulo',               label: 'UTC−3/2 — São Paulo, Rio de Janeiro'          },
-  { value: 'America/Argentina/Buenos_Aires',  label: 'UTC−3  — Buenos Aires, Montevideo'            },
-  // Pacific & Oceania
-  { value: 'Australia/Sydney',                label: 'UTC+10/11 — Sydney, Melbourne, Canberra'      },
-  { value: 'Australia/Perth',                 label: 'UTC+8  — Perth'                               },
-  { value: 'Pacific/Auckland',                label: 'UTC+12/13 — Auckland, Wellington'             },
-  // Africa
-  { value: 'Africa/Lagos',                    label: 'UTC+1  — Lagos, Kinshasa, Accra'              },
-  { value: 'Africa/Johannesburg',             label: 'UTC+2  — Johannesburg, Harare'                },
-];
+import type { PlaceSearchResult } from '@/lib/places';
 
 // ── Element color helper ───────────────────────────────────
 function elColor(el: string): string {
@@ -299,6 +249,8 @@ const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
 export default function BaziCalculator() {
   const [dob, setDob]             = useState('1990-06-15');
   const [tob, setTob]             = useState('08:30');
+  const [birthPlaceQuery, setBirthPlaceQuery] = useState('Bangkok, Thailand');
+  const [birthPlace, setBirthPlace] = useState<PlaceSearchResult | null>(null);
   const [timezone, setTimezone]   = useState('Asia/Bangkok');
   const [longitude, setLongitude] = useState('100.52');
   const [latitude, setLatitude]   = useState('13.75');
@@ -317,6 +269,8 @@ export default function BaziCalculator() {
   const formValues: FormValues = {
     dob,
     tob,
+    birthPlaceQuery,
+    birthPlace,
     timezone,
     longitude,
     latitude,
@@ -327,6 +281,8 @@ export default function BaziCalculator() {
   function syncFormState(values: FormValues) {
     setDob(values.dob);
     setTob(values.tob);
+    setBirthPlaceQuery(values.birthPlaceQuery);
+    setBirthPlace(values.birthPlace);
     setTimezone(values.timezone);
     setLongitude(values.longitude);
     setLatitude(values.latitude);
@@ -340,6 +296,9 @@ export default function BaziCalculator() {
     if (!values.unknownTime && !values.tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
     const lng = parseFloat(values.longitude);
     if (isNaN(lng) || lng < -180 || lng > 180) { setCalcError('Longitude must be between −180 and 180.'); return; }
+    const lat = parseFloat(values.latitude);
+    if (isNaN(lat) || lat < -90 || lat > 90) { setCalcError('Latitude must be between −90 and 90.'); return; }
+    if (!values.timezone) { setCalcError('Please choose a birth place or enter a timezone manually.'); return; }
     setCalcError(null);
     try {
       const r = computeBazi(
@@ -386,6 +345,11 @@ export default function BaziCalculator() {
         const lng = parseFloat(restoredValues.longitude);
         if (isNaN(lng) || lng < -180 || lng > 180) {
           setCalcError('Longitude must be between −180 and 180.');
+          return;
+        }
+        const lat = parseFloat(restoredValues.latitude);
+        if (isNaN(lat) || lat < -90 || lat > 90) {
+          setCalcError('Latitude must be between −90 and 90.');
           return;
         }
 
@@ -495,6 +459,19 @@ export default function BaziCalculator() {
     }
   }
 
+  function handleBirthPlaceQueryChange(value: string) {
+    setBirthPlaceQuery(value);
+    setBirthPlace(null);
+  }
+
+  function handleBirthPlaceSelect(place: PlaceSearchResult) {
+    setBirthPlace(place);
+    setBirthPlaceQuery([place.name, place.admin1, place.country].filter(Boolean).join(', '));
+    setTimezone(place.timezone);
+    setLongitude(place.longitude.toFixed(4));
+    setLatitude(place.latitude.toFixed(4));
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="max-w-4xl mx-auto space-y-4">
@@ -509,6 +486,16 @@ export default function BaziCalculator() {
         {/* Form */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
           <div className="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-4">Birth Information · 生辰八字</div>
+          <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-slate-600">
+            <div className="font-medium text-slate-800">How to fill this in</div>
+            <p className="mt-1">
+              Enter the birth date and clock time from the birth certificate, then search for the place of birth.
+              We&apos;ll automatically fill the timezone and coordinates used for the chart.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              If the place search is not exact, open Advanced Location Details and adjust timezone or coordinates manually.
+            </p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Date */}
@@ -532,51 +519,73 @@ export default function BaziCalculator() {
                 onChange={e => setTob(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
               />
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.
+              </p>
               <label className="flex items-center gap-2 text-xs text-slate-500 mt-1 cursor-pointer">
                 <input type="checkbox" checked={unknownTime} onChange={e => setUnknownTime(e.target.checked)} />
                 <span>I don&apos;t know my birth time</span>
               </label>
             </div>
 
-            {/* Timezone */}
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Timezone (DST detected automatically)</label>
-              <select
-                value={timezone}
-                onChange={e => setTimezone(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              >
-                {TIMEZONES.map(tz => (
-                  <option key={tz.value} value={tz.value}>{tz.label}</option>
-                ))}
-              </select>
-            </div>
+            <BirthPlaceSearch
+              value={birthPlaceQuery}
+              onChange={handleBirthPlaceQueryChange}
+              onSelect={handleBirthPlaceSelect}
+              selectedPlace={birthPlace}
+            />
 
-            {/* Coordinates */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Longitude (°E positive, °W negative)</label>
-              <input
-                type="number"
-                value={longitude}
-                onChange={e => setLongitude(e.target.value)}
-                min="-180" max="180" step="0.01"
-                placeholder="e.g. 100.52"
-                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
+            <details className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+              <summary className="cursor-pointer text-xs font-semibold tracking-widest text-slate-500 uppercase">
+                Advanced Location Details
+              </summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-medium text-slate-600">Timezone (DST detected automatically)</label>
+                  <input
+                    type="text"
+                    value={timezone}
+                    onChange={e => {
+                      setBirthPlace(null);
+                      setTimezone(e.target.value);
+                    }}
+                    placeholder="e.g. Asia/Bangkok"
+                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Latitude (°N positive, °S negative)</label>
-              <input
-                type="number"
-                value={latitude}
-                onChange={e => setLatitude(e.target.value)}
-                min="-90" max="90" step="0.01"
-                placeholder="e.g. 13.75"
-                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              />
-              <p className="text-[10px] text-slate-400 mt-0.5">Used for reference — only longitude affects True Solar Time</p>
-            </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">Longitude (°E positive, °W negative)</label>
+                  <input
+                    type="number"
+                    value={longitude}
+                    onChange={e => {
+                      setBirthPlace(null);
+                      setLongitude(e.target.value);
+                    }}
+                    min="-180" max="180" step="0.01"
+                    placeholder="e.g. 100.52"
+                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-600">Latitude (°N positive, °S negative)</label>
+                  <input
+                    type="number"
+                    value={latitude}
+                    onChange={e => {
+                      setBirthPlace(null);
+                      setLatitude(e.target.value);
+                    }}
+                    min="-90" max="90" step="0.01"
+                    placeholder="e.g. 13.75"
+                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Only longitude affects True Solar Time. Latitude is kept for reference and logging.</p>
+                </div>
+              </div>
+            </details>
 
             {/* Gender */}
             <div className="flex flex-col gap-1 sm:col-span-2">

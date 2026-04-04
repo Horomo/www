@@ -1,4 +1,5 @@
 import type { BaziResult, ChartData, DaYun, TSTInfo } from '@/lib/bazi';
+import type { PlaceSearchResult } from '@/lib/places';
 
 export type AnalysisFormPayload = {
   dob: string;
@@ -8,6 +9,8 @@ export type AnalysisFormPayload = {
   latitude: string;
   gender: 'male' | 'female';
   unknownTime: boolean;
+  birthPlaceQuery: string;
+  birthPlace: PlaceSearchResult | null;
 };
 
 type SerializedJie = {
@@ -108,7 +111,9 @@ export function parseAnalyzeRequestBody(body: unknown): AnalyzeRequestBody | nul
     isString(birthInfo.longitude) &&
     isString(birthInfo.latitude) &&
     (birthInfo.gender === 'male' || birthInfo.gender === 'female') &&
-    isBoolean(birthInfo.unknownTime);
+    isBoolean(birthInfo.unknownTime) &&
+    isString(birthInfo.birthPlaceQuery) &&
+    (birthInfo.birthPlace === null || isRecord(birthInfo.birthPlace));
 
   const hasValidComputedChart =
     isString(computedChart.utcDate) &&
