@@ -546,9 +546,6 @@ export default function BaziCalculator() {
               </div>
             )}
 
-            {/* Year Cycles Section */}
-            <YearCyclesSection result={result} currentYear={currentYear} />
-
             {/* AI Analysis Section */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
               <h3 className="text-sm font-semibold text-slate-700 mb-1">AI Reading · 八字解析</h3>
@@ -586,80 +583,4 @@ export default function BaziCalculator() {
   );
 }
 
-// ── Year Cycles Section ────────────────────────────────────
-function YearCyclesSection({ result, currentYear }: { result: BaziResult; currentYear: number }) {
-  const dmStemIdx = result.pillars.day.stemIdx;
-  const dmEl = STEMS[dmStemIdx].element;
-  const birthYear = result.localDate.getUTCFullYear();
-  const startYear = birthYear - 10;
-  const endYear   = birthYear + 80;
 
-  const groups: Array<Array<{
-    year: number; beYear: number; si: number; bi: number;
-    stage: { zh: string; en: string };
-    tgS: ReturnType<typeof tenGod>;
-    tgB: ReturnType<typeof tenGod>;
-  }>> = Array.from({ length: 10 }, () => []);
-
-  for (let y = startYear; y <= endYear; y++) {
-    const si = ((y - 4) % 10 + 10) % 10;
-    const bi = ((y - 4) % 12 + 12) % 12;
-    groups[si].push({
-      year: y, beYear: y + 543, si, bi,
-      stage: twelveStage(dmEl, bi),
-      tgS: tenGod(dmStemIdx, si),
-      tgB: tenGod(dmStemIdx, getBranchMainStem(bi)),
-    });
-  }
-  groups.forEach(g => g.sort((a, b) => b.year - a.year));
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Year Cycles · 流年</div>
-      <div className="overflow-x-auto">
-        <div className="flex gap-2 min-w-max">
-          {groups.map((years, si) => {
-            const colTg = tenGod(dmStemIdx, si);
-            const colAbbr = TG_ABBR[colTg.zh] || '?';
-            const colClr = TG_COLOR[colAbbr] || '#94A3B8';
-            return (
-              <div key={si} className="flex flex-col min-w-[72px]">
-                <div className="rounded-t-lg px-1.5 py-1.5 text-center mb-1 border-t-2" style={{ borderTopColor: colClr }}>
-                  <span className={`font-zh text-lg font-bold block ${elColor(STEMS[si].element)}`}>{STEMS[si].zh}</span>
-                  <span className="text-[10px] font-bold" style={{ color: colClr }}>{colAbbr}</span>
-                </div>
-                {years.map(y => {
-                  const isCurrent = y.year === currentYear;
-                  const isBirth = y.year === birthYear;
-                  const tgSAbbr = TG_ABBR[y.tgS.zh] || '?';
-                  const tgBAbbr = TG_ABBR[y.tgB.zh] || '?';
-                  return (
-                    <div
-                      key={y.year}
-                      className={`rounded px-1 py-1 mb-0.5 text-center text-[10px] ${
-                        isCurrent ? 'ring-2 ring-indigo-500 bg-indigo-50' :
-                        isBirth   ? 'ring-2 ring-red-400 bg-red-50' :
-                        'bg-slate-50'
-                      }`}
-                    >
-                      <div className="font-medium text-slate-700">{y.year}</div>
-                      <div className="text-slate-400">{y.beYear}</div>
-                      <div className="flex items-center justify-center gap-0.5 my-0.5">
-                        <span className={`text-[8px] font-bold text-white px-0.5 py-px rounded`} style={{ background: TG_COLOR[tgSAbbr] || '#94A3B8' }}>{tgSAbbr}</span>
-                        <span className={`font-zh font-bold ${elColor(STEMS[y.si].element)}`}>{STEMS[y.si].zh}</span>
-                        <span className={`font-zh font-bold ${elColor(BRANCHES[y.bi].element)}`}>{BRANCHES[y.bi].zh}</span>
-                        <span className={`text-[8px] font-bold text-white px-0.5 py-px rounded`} style={{ background: TG_COLOR[tgBAbbr] || '#94A3B8' }}>{tgBAbbr}</span>
-                      </div>
-                      <div className="text-slate-500">{BRANCHES[y.bi].animal}</div>
-                      <div className="text-slate-400">{y.stage.en}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
