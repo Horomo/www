@@ -415,6 +415,13 @@ export default function BaziCalculator() {
       setAnalysis(null);
       setFollowUps(EMPTY_FOLLOW_UPS);
       setAnalysisError(null);
+
+      // Log chart calculation to Supabase (fire-and-forget, non-blocking)
+      fetch('/api/log-chart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAnalyzeRequestBody({ formValues: normalizedValues, result: r, chartData: cd })),
+      }).catch(() => {});
     } catch (e: unknown) {
       setCalcError('Calculation error: ' + (e instanceof Error ? e.message : String(e)));
     }

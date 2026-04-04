@@ -4,10 +4,10 @@ import type { AnalyzeRequestBody, AnalysisFormPayload } from '@/lib/analysis-pay
 
 const ANALYSIS_LOG_TABLE = 'analysis_logs';
 
-export type AnalysisStatus = 'requested';
+export type AnalysisStatus = 'requested' | 'calculated';
 
 export type AnalysisDebugMetadata = {
-  route: '/api/analyze';
+  route: string;
   requestId: string;
   receivedAt: string;
   clientGeneratedAt: string;
@@ -45,9 +45,16 @@ export function buildAnalysisLogInsert(params: {
   userId: string | null;
   userAgent: string | null;
   requestId: string;
-  aiModel: string;
+  route?: string;
+  aiModel?: string;
+  analysisStatus?: AnalysisStatus;
 }): AnalysisLogInsert {
-  const { requestBody, userId, userAgent, requestId, aiModel } = params;
+  const {
+    requestBody, userId, userAgent, requestId,
+    route = '/api/analyze',
+    aiModel = '',
+    analysisStatus = 'requested',
+  } = params;
 
   return {
     user_id: userId,
@@ -56,7 +63,7 @@ export function buildAnalysisLogInsert(params: {
     chart_data: requestBody.computedChart.chartData,
     request_payload: requestBody,
     debug_metadata: {
-      route: '/api/analyze',
+      route,
       requestId,
       receivedAt: new Date().toISOString(),
       clientGeneratedAt: requestBody.requestMetadata.clientGeneratedAt,
@@ -65,7 +72,7 @@ export function buildAnalysisLogInsert(params: {
       timezone: requestBody.birthInfo.timezone,
       unknownTime: requestBody.birthInfo.unknownTime,
     },
-    analysis_status: 'requested',
+    analysis_status: analysisStatus,
     app_version: packageJson.version ?? null,
     logging_error: null,
   };
