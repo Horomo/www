@@ -10,11 +10,38 @@ import {
   recomputeAnalysisChartPayload,
 } from '@/lib/analysis-payload';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const AI_MODEL = 'gpt-4o-mini';
+let client: OpenAI | null = null;
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+function getOpenAiClient(): OpenAI {
+  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return client;
+}
+
+type AnalyzeRouteDependencies = {
+  getSession: () => Promise<{ user?: { email?: string | null } } | null>;
+  insertLog: typeof insertAnalysisLog;
+  buildLogInsert: typeof buildAnalysisLogInsert;
+  createCompletion: (payload: {
+    model: string;
+    messages: Array<{ role: 'system' | 'user'; content: string }>;
+    max_tokens: number;
+    temperature: number;
+  }) => Promise<{ choices: Array<{ message: { content: string | null } }> }>;
+};
+
+const defaultDependencies: AnalyzeRouteDependencies = {
+  getSession: () => getServerSession(authOptions),
+  insertLog: insertAnalysisLog,
+  buildLogInsert: buildAnalysisLogInsert,
+  createCompletion: (payload) => getOpenAiClient().chat.completions.create(payload),
+};
+
+export async function handleAnalyzeRequest(
+  req: Request,
+  dependencies: AnalyzeRouteDependencies = defaultDependencies,
+) {
+  const session = await dependencies.getSession();
 
   if (!session?.user?.email) {
     return NextResponse.json(
@@ -103,8 +130,8 @@ Keep it under 500 words total.`;
 
   try {
     try {
-      await insertAnalysisLog(
-        buildAnalysisLogInsert({
+      await dependencies.insertLog(
+        dependencies.buildLogInsert({
           requestBody: parsedBody,
           userId: session.user.email,
           userAgent: req.headers.get('user-agent'),
@@ -117,7 +144,7 @@ Keep it under 500 words total.`;
       console.error('Analysis log insert failed', { requestId, userId: session.user.email, message });
     }
 
-    const response = await client.chat.completions.create({
+    const response = await dependencies.createCompletion({
       model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -132,4 +159,8 @@ Keep it under 500 words total.`;
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return handleAnalyzeRequest(req);
 }

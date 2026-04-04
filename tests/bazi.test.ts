@@ -99,3 +99,41 @@ test('derived chart values use the corrected 子 hidden stem', () => {
   assert.equal(chartData.tenGodsCount['正印'], 1);
   assert.equal(chartData.tenGodsCount['偏印'] ?? 0, 0);
 });
+
+test('year pillar flips at the Li Chun boundary after true-solar-time correction', () => {
+  const before = bazi.computeBazi('2024-02-04', '08:35', 'UTC', 0, true);
+  const after = bazi.computeBazi('2024-02-04', '08:36', 'UTC', 0, true);
+
+  assert.equal(before.pillars.year.stem.zh + before.pillars.year.branch.zh, '癸卯');
+  assert.equal(before.pillars.month.stem.zh + before.pillars.month.branch.zh, '乙丑');
+  assert.equal(after.pillars.year.stem.zh + after.pillars.year.branch.zh, '甲辰');
+  assert.equal(after.pillars.month.stem.zh + after.pillars.month.branch.zh, '丙寅');
+});
+
+test('month pillar flips at the Jing Zhe boundary after true-solar-time correction', () => {
+  const before = bazi.computeBazi('2024-03-05', '02:27', 'UTC', 0, true);
+  const after = bazi.computeBazi('2024-03-05', '02:28', 'UTC', 0, true);
+
+  assert.equal(before.pillars.month.stem.zh + before.pillars.month.branch.zh, '丙寅');
+  assert.equal(after.pillars.month.stem.zh + after.pillars.month.branch.zh, '丁卯');
+  assert.equal(before.pillars.year.stem.zh + before.pillars.year.branch.zh, '甲辰');
+  assert.equal(after.pillars.year.stem.zh + after.pillars.year.branch.zh, '甲辰');
+});
+
+test('local display date survives UTC year rollover in far-east timezones', () => {
+  const result = bazi.computeBazi('2024-01-01', '00:30', 'Pacific/Kiritimati', -157.4, true);
+
+  assert.equal(result.utcDate.toISOString(), '2023-12-31T10:30:00.000Z');
+  assert.equal(formatPseudoUtc(result.displayDate), '2024-01-01 00:30');
+  assert.equal(result.displayTzLabel, 'UTC+14:00');
+  assert.equal(isoDate(result.displayDate), '2024-01-01');
+});
+
+test('local display date survives UTC month rollover in eastern timezones', () => {
+  const result = bazi.computeBazi('2024-03-01', '00:30', 'Asia/Tokyo', 139.6917, true);
+
+  assert.equal(result.utcDate.toISOString(), '2024-02-29T15:30:00.000Z');
+  assert.equal(formatPseudoUtc(result.displayDate), '2024-03-01 00:30');
+  assert.equal(result.displayTzLabel, 'UTC+9:00');
+  assert.equal(isoDate(result.displayDate), '2024-03-01');
+});
