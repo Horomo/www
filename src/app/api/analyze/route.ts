@@ -3,8 +3,11 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { authOptions } from '@/lib/auth';
+import { buildAnalysisLogInsert, insertAnalysisLog } from '@/lib/analysis-log';
+import { parseAnalyzeRequestBody } from '@/lib/analysis-payload';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const AI_MODEL = 'gpt-4o-mini';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -16,13 +19,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await req.json();
-  const { pillars, chartData, birthInfo } = body;
+  const body = await req.json().catch(() => null);
+  const parsedBody = parseAnalyzeRequestBody(body);
+
+  if (!parsedBody) {
+    return NextResponse.json(
+      { error: 'Invalid analysis payload.' },
+      { status: 400 },
+    );
+  }
+
+  const { birthInfo, computedChart } = parsedBody;
+  const { pillars, chartData } = computedChart;
+  const requestId = crypto.randomUUID();
 
   const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.`;
 
   const chartSummary = `
-Birth: ${birthInfo.date}${birthInfo.time ? ' ' + birthInfo.time : ' (unknown time)'}, ${birthInfo.gender}
+Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}, ${birthInfo.gender}
 
 Four Pillars (四柱):
 - Year 年柱: ${pillars.year.stem.zh}${pillars.year.branch.zh} (${pillars.year.stem.pinyin}/${pillars.year.branch.pinyin}) — ${pillars.year.stem.element} ${pillars.year.stem.yin?'Yin':'Yang'} / ${pillars.year.branch.element} ${pillars.year.branch.yin?'Yin':'Yang'}
@@ -50,8 +64,23 @@ Provide analysis in these sections:
 Keep it under 500 words total.`;
 
   try {
+    try {
+      await insertAnalysisLog(
+        buildAnalysisLogInsert({
+          requestBody: parsedBody,
+          userId: session.user.email,
+          userAgent: req.headers.get('user-agent'),
+          requestId,
+          aiModel: AI_MODEL,
+        }),
+      );
+    } catch (logError: unknown) {
+      const message = logError instanceof Error ? logError.message : 'Unknown logging error';
+      console.error('Analysis log insert failed', { requestId, userId: session.user.email, message });
+    }
+
     const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

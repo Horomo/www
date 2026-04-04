@@ -2,6 +2,7 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import { buildAnalyzeRequestBody, type AnalysisFormPayload } from '@/lib/analysis-payload';
 import {
   computeBazi,
   computeChartData,
@@ -290,15 +291,7 @@ function TSTCard({ result }: { result: BaziResult }) {
   );
 }
 
-type FormValues = {
-  dob: string;
-  tob: string;
-  timezone: string;
-  longitude: string;
-  latitude: string;
-  gender: 'male' | 'female';
-  unknownTime: boolean;
-};
+type FormValues = AnalysisFormPayload;
 
 const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
 
@@ -477,15 +470,15 @@ export default function BaziCalculator() {
     setAnalysisError(null);
     setAnalysis(null);
     try {
+      const requestBody = buildAnalyzeRequestBody({
+        formValues,
+        result,
+        chartData,
+      });
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pillars: result.pillars,
-          daYun: result.daYun,
-          chartData,
-          birthInfo: { date: dob, time: unknownTime ? null : tob, gender },
-        }),
+        body: JSON.stringify(requestBody),
       });
       const data = await res.json();
 
