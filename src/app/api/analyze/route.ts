@@ -1,9 +1,21 @@
 import OpenAI from 'openai';
+import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
+
+import { authOptions } from '@/lib/auth';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return NextResponse.json(
+      { error: 'Unauthorized. Please sign in with Google to use AI analysis.' },
+      { status: 401 },
+    );
+  }
+
   const body = await req.json();
   const { pillars, daYun, chartData, birthInfo } = body;
 
