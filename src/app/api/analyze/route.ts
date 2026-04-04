@@ -89,7 +89,7 @@ export async function handleAnalyzeRequest(
   const chartSummary = `
 Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}
 Gender identity: ${formatGenderIdentity(birthInfo.genderIdentity, birthInfo.genderOtherText)}
-Calculation mode for classical rules: ${formatCalculationGenderMode(birthInfo.calculationMode)}
+Luck cycle energy polarity (Da Yun direction rule): ${formatCalculationGenderMode(birthInfo.calculationMode)}
 
 Four Pillars (四柱):
 - Year 年柱: ${pillars.year.stem.zh}${pillars.year.branch.zh} (${pillars.year.stem.pinyin}/${pillars.year.branch.pinyin}) — ${pillars.year.stem.element} ${pillars.year.stem.yin?'Yin':'Yang'} / ${pillars.year.branch.element} ${pillars.year.branch.yin?'Yin':'Yang'}

@@ -14,13 +14,15 @@ test('analyze route accepts a genuine payload and uses the server-validated char
     timezone: 'Asia/Bangkok',
     longitude: '100.52',
     latitude: '13.75',
-    gender: 'male' as const,
+    genderIdentity: 'male' as const,
+    genderOtherText: '',
+    calculationMode: 'male' as const,
     unknownTime: false,
     birthPlaceQuery: 'Bangkok, Thailand',
     birthPlace: null,
   };
 
-  const result = bazi.computeBazi(formValues.dob, formValues.tob, formValues.timezone, 100.52, true);
+  const result = bazi.computeBazi(formValues.dob, formValues.tob, formValues.timezone, 100.52, formValues.calculationMode);
   const chartData = bazi.computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
   const body = buildAnalyzeRequestBody({ formValues, result, chartData });
 
@@ -79,13 +81,15 @@ test('analyze route rejects forged computed charts before calling OpenAI', async
     timezone: 'Asia/Bangkok',
     longitude: '100.52',
     latitude: '13.75',
-    gender: 'male' as const,
+    genderIdentity: 'male' as const,
+    genderOtherText: '',
+    calculationMode: 'male' as const,
     unknownTime: false,
     birthPlaceQuery: 'Bangkok, Thailand',
     birthPlace: null,
   };
 
-  const result = bazi.computeBazi(formValues.dob, formValues.tob, formValues.timezone, 100.52, true);
+  const result = bazi.computeBazi(formValues.dob, formValues.tob, formValues.timezone, 100.52, formValues.calculationMode);
   const chartData = bazi.computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
   const body = JSON.parse(JSON.stringify(buildAnalyzeRequestBody({ formValues, result, chartData })));
   body.computedChart.pillars.day.stem.zh = '甲';

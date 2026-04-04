@@ -58,8 +58,26 @@ export function formatGenderIdentity(identity: GenderIdentity, otherText?: strin
   }
 }
 
+/**
+ * Precise technical label used in AI prompts and server-side logging.
+ * Includes both the traditional rule name and the Yin/Yang energy framing
+ * so AI models and logs have full context.
+ */
 export function formatCalculationGenderMode(mode: CalculationGenderMode): string {
-  return mode === 'male' ? 'Treat as male' : 'Treat as female';
+  return mode === 'male'
+    ? 'Treat as male (Yang/陽 — active energy rule)'
+    : 'Treat as female (Yin/陰 — receptive energy rule)';
+}
+
+/**
+ * User-facing display label for the calculation mode.
+ * Uses Yin/Yang language rather than male/female to keep the UI
+ * inclusive and rooted in the actual energetic principle.
+ */
+export function formatCalculationGenderModeDisplay(mode: CalculationGenderMode): string {
+  return mode === 'male'
+    ? 'Yang (陽) · Active energy'
+    : 'Yin (陰) · Receptive energy';
 }
 
 export function normalizeGenderDraft(

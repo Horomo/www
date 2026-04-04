@@ -24,7 +24,7 @@ import {
   getDayMasterNote,
 } from '@/lib/bazi';
 import {
-  formatCalculationGenderMode,
+  formatCalculationGenderModeDisplay,
   formatGenderIdentity,
   type CalculationGenderMode,
   type GenderIdentity,
@@ -32,16 +32,50 @@ import {
 import type { PlaceSearchResult } from '@/lib/places';
 
 const GENDER_IDENTITY_OPTIONS: Array<{ value: GenderIdentity; label: string; description: string }> = [
-  { value: 'male', label: 'Male', description: 'Gender identity' },
-  { value: 'female', label: 'Female', description: 'Gender identity' },
-  { value: 'non_binary', label: 'Non-binary', description: 'Gender identity' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: 'Gender identity' },
-  { value: 'other', label: 'Other', description: 'Optional custom text' },
+  { value: 'male',              label: 'Male',              description: 'Auto-sets energy polarity to Yang'         },
+  { value: 'female',            label: 'Female',            description: 'Auto-sets energy polarity to Yin'          },
+  { value: 'non_binary',        label: 'Non-binary',        description: 'You\'ll choose your energy polarity below' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: 'You\'ll choose your energy polarity below' },
+  { value: 'other',             label: 'Other',             description: 'You\'ll choose your energy polarity below' },
 ];
 
-const CALCULATION_MODE_OPTIONS: Array<{ value: CalculationGenderMode; label: string; description: string }> = [
-  { value: 'male', label: 'Treat as male', description: 'Uses the classical male Da Yun direction rule' },
-  { value: 'female', label: 'Treat as female', description: 'Uses the classical female Da Yun direction rule' },
+/**
+ * Calculation mode options using Yin/Yang language.
+ *
+ * The underlying values stay 'male'/'female' to keep backward compatibility
+ * with the calculation engine and API; only the user-facing copy changes.
+ *
+ * Background: Da Yun direction = (treatedAsMale) XOR (yearStemIsYin).
+ * "Yang mode" means the chart is treated with the classical male rule;
+ * the actual forward/backward direction also depends on the year stem.
+ */
+const CALCULATION_MODE_OPTIONS: Array<{
+  value: CalculationGenderMode;
+  yinYang: string;
+  pinyinLabel: string;
+  label: string;
+  tagline: string;
+  description: string;
+  advancedNote: string;
+}> = [
+  {
+    value:        'male',
+    yinYang:      '陽',
+    pinyinLabel:  'Yáng',
+    label:        'Yang — Active Energy',
+    tagline:      'Outward, forward-moving',
+    description:  'Your 10-year luck cycles progress in the active direction from your birth.',
+    advancedNote: 'Traditional male calculation rule',
+  },
+  {
+    value:        'female',
+    yinYang:      '陰',
+    pinyinLabel:  'Yīn',
+    label:        'Yin — Receptive Energy',
+    tagline:      'Inward, reflective',
+    description:  'Your 10-year luck cycles progress in the complementary direction from your birth.',
+    advancedNote: 'Traditional female calculation rule',
+  },
 ];
 
 // ── Element color helper ───────────────────────────────────
@@ -722,11 +756,10 @@ export default function BaziCalculator() {
                 {GENDER_IDENTITY_OPTIONS.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors ${
-                      genderIdentity === option.value
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
-                    }`}
+                    data-selected={String(genderIdentity === option.value)}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors
+                      border-slate-200 bg-white text-slate-700 hover:border-indigo-300
+                      data-[selected=true]:border-indigo-500 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-900"
                   >
                     <input
                       type="radio"
@@ -761,36 +794,83 @@ export default function BaziCalculator() {
               )}
             </div>
 
-            {/* Calculation Mode */}
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Calculation Mode</label>
-              <p className="text-[11px] text-slate-500">
-                Classical Da Yun direction still uses a male/female treatment rule. This setting is separate from gender identity.
-              </p>
+            {/* Calculation Mode — Yin/Yang energy polarity */}
+            <div className="flex flex-col gap-2 sm:col-span-2">
+
+              {/* Section header */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-600">Luck Cycle Direction · 大運方向</span>
+                {/* Native tooltip keeps the component dependency-free */}
+                <span
+                  className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-500 hover:bg-slate-300"
+                  title="This affects which 10-year luck cycle (大運) you enter first and the direction they progress. It is derived from your year pillar's Yin/Yang polarity combined with this setting — it is completely separate from your gender identity."
+                  aria-label="Help: luck cycle direction"
+                >
+                  ?
+                </span>
+              </div>
+
+              {/* Contextual helper — adapts to gender identity selection */}
+              {(genderIdentity === 'non_binary' || genderIdentity === 'prefer_not_to_say' || genderIdentity === 'other') ? (
+                <p className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+                  Traditional BaZi uses a binary energy polarity for this one calculation only.
+                  Choose the pattern that feels most resonant with your experience — there is no wrong choice.
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-400">
+                  Auto-set from your gender identity above. Override here if you wish.
+                </p>
+              )}
+
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {CALCULATION_MODE_OPTIONS.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors ${
-                      calculationMode === option.value
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="calculationMode"
-                      value={option.value}
-                      checked={calculationMode === option.value}
-                      onChange={() => setCalculationMode(option.value)}
-                      className="mt-0.5 h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>
-                      <span className="block font-medium">{option.label}</span>
-                      <span className="block text-xs text-slate-500">{option.description}</span>
-                    </span>
-                  </label>
-                ))}
+                {CALCULATION_MODE_OPTIONS.map((option) => {
+                  const isSelected = calculationMode === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      data-selected={String(isSelected)}
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors
+                        border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40
+                        data-[selected=true]:border-emerald-500 data-[selected=true]:bg-emerald-50 data-[selected=true]:text-emerald-900"
+                    >
+                      <input
+                        type="radio"
+                        name="calculationMode"
+                        value={option.value}
+                        checked={isSelected}
+                        onChange={() => setCalculationMode(option.value)}
+                        className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="flex-1 min-w-0">
+                        {/* Chinese character badge + English label */}
+                        <span className="mb-1 flex items-baseline gap-2">
+                          <span
+                            data-selected={String(isSelected)}
+                            className="font-zh text-2xl font-bold leading-none text-slate-400 data-[selected=true]:text-emerald-700"
+                          >
+                            {option.yinYang}
+                          </span>
+                          <span className="text-sm font-semibold leading-tight">{option.label}</span>
+                        </span>
+                        {/* One-line tagline */}
+                        <span
+                          data-selected={String(isSelected)}
+                          className="block text-xs font-medium mb-1 text-slate-400 data-[selected=true]:text-emerald-600"
+                        >
+                          {option.tagline}
+                        </span>
+                        {/* Plain-language description */}
+                        <span className="block text-[11px] leading-relaxed text-slate-500">
+                          {option.description}
+                        </span>
+                        {/* Advanced note — very subtle, for practitioners */}
+                        <span className="mt-2 block border-t border-slate-100 pt-1.5 text-[10px] text-slate-300">
+                          {option.advancedNote}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 
@@ -811,7 +891,7 @@ export default function BaziCalculator() {
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
                 Gender identity: <span className="font-medium text-slate-800">{formatGenderIdentity(calculatedFormValues.genderIdentity, calculatedFormValues.genderOtherText)}</span>
                 &nbsp;·&nbsp;
-                Calculation mode: <span className="font-medium text-slate-800">{formatCalculationGenderMode(calculatedFormValues.calculationMode)}</span>
+                Luck cycle direction: <span className="font-medium text-slate-800">{formatCalculationGenderModeDisplay(calculatedFormValues.calculationMode)}</span>
               </div>
             )}
 
@@ -982,7 +1062,7 @@ export default function BaziCalculator() {
                     ? ' (classical rule advances from the month pillar)'
                     : ' (classical rule moves backward from the month pillar)'}
                   <br />
-                  Calculation mode: <span className="font-medium text-slate-700">{formatCalculationGenderMode(result.daYun.calculationMode)}</span>
+                  Energy polarity: <span className="font-medium text-slate-700">{formatCalculationGenderModeDisplay(result.daYun.calculationMode)}</span>
                   &nbsp;·&nbsp; <span>{result.daYun.ruleNote}</span>
                   <br />
                   Nearest solar term: <span className="font-medium text-slate-700">{result.daYun.jie.name}</span>

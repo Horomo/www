@@ -16,7 +16,9 @@ const formValues: AnalysisFormPayload = {
   timezone: 'Asia/Bangkok',
   longitude: '100.52',
   latitude: '13.75',
-  gender: 'male',
+  genderIdentity: 'male',
+  genderOtherText: '',
+  calculationMode: 'male',
   unknownTime: false,
   birthPlaceQuery: 'Bangkok, Thailand',
   birthPlace: null,
@@ -61,7 +63,7 @@ test('server-side validation accepts a genuine computed chart payload', () => {
     formValues.tob,
     formValues.timezone,
     parseFloat(formValues.longitude),
-    true,
+    formValues.calculationMode,
   );
   const chartData = bazi.computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
   const requestBody = buildAnalyzeRequestBody({ formValues, result, chartData });
@@ -77,7 +79,7 @@ test('server-side validation rejects forged computed chart payloads', () => {
     formValues.tob,
     formValues.timezone,
     parseFloat(formValues.longitude),
-    true,
+    formValues.calculationMode,
   );
   const chartData = bazi.computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
   const requestBody = buildAnalyzeRequestBody({ formValues, result, chartData });
