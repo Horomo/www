@@ -39,7 +39,11 @@ export type AnalysisRequestMetadata = {
   clientGeneratedAt: string;
 };
 
+export type AnalysisMode = 'initial' | 'follow_up';
+
 export type AnalyzeRequestBody = {
+  mode?: AnalysisMode;
+  followUpQuestion?: string;
   birthInfo: AnalysisFormPayload;
   computedChart: AnalysisComputedChartPayload;
   requestMetadata: AnalysisRequestMetadata;
@@ -126,8 +130,14 @@ export function parseAnalyzeRequestBody(body: unknown): AnalyzeRequestBody | nul
     isRecord(computedChart.chartData);
 
   const hasValidMetadata = isString(requestMetadata.clientGeneratedAt);
+  const hasValidMode =
+    body.mode === undefined ||
+    body.mode === 'initial' ||
+    body.mode === 'follow_up';
+  const hasValidFollowUpQuestion =
+    body.followUpQuestion === undefined || isString(body.followUpQuestion);
 
-  if (!hasValidBirthInfo || !hasValidComputedChart || !hasValidMetadata) {
+  if (!hasValidBirthInfo || !hasValidComputedChart || !hasValidMetadata || !hasValidMode || !hasValidFollowUpQuestion) {
     return null;
   }
 

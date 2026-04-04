@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   const { birthInfo, computedChart } = parsedBody;
   const { pillars, chartData } = computedChart;
   const requestId = crypto.randomUUID();
+  const mode = parsedBody.mode ?? 'initial';
+  const followUpQuestion = parsedBody.followUpQuestion?.trim() ?? '';
 
   const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.`;
 
@@ -50,7 +52,22 @@ ${Object.entries(chartData.structureCounts).map(([k,v]) => `- ${k}: ${v}`).join(
 Dominant Ten Gods: ${Object.entries(chartData.tenGodsCount).sort((a: [string, unknown], b: [string, unknown]) => (b[1] as number) - (a[1] as number)).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}
 `;
 
-  const userPrompt = `Please analyze this Bazi chart:
+  if (mode === 'follow_up' && !followUpQuestion) {
+    return NextResponse.json(
+      { error: 'Please enter a follow-up question.' },
+      { status: 400 },
+    );
+  }
+
+  const userPrompt = mode === 'follow_up'
+    ? `Please answer this follow-up question about the same Bazi chart:
+
+${chartSummary}
+
+Question: ${followUpQuestion}
+
+Keep the answer focused, practical, and under 220 words.`
+    : `Please analyze this Bazi chart:
 
 ${chartSummary}
 

@@ -242,6 +242,18 @@ function TSTCard({ result }: { result: BaziResult }) {
 }
 
 type FormValues = AnalysisFormPayload;
+type FollowUpItem = {
+  question: string;
+  answer: string | null;
+  loading: boolean;
+  error: string | null;
+};
+
+const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
+  { question: '', answer: null, loading: false, error: null },
+  { question: '', answer: null, loading: false, error: null },
+  { question: '', answer: null, loading: false, error: null },
+];
 
 const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
 
@@ -259,6 +271,7 @@ export default function BaziCalculator() {
   const [result, setResult]       = useState<BaziResult | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [analysis, setAnalysis]   = useState<string | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUpItem[]>(EMPTY_FOLLOW_UPS);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [analysisError, setAnalysisError]     = useState<string | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
@@ -312,6 +325,7 @@ export default function BaziCalculator() {
       setResult(r);
       setChartData(cd);
       setAnalysis(null);
+      setFollowUps(EMPTY_FOLLOW_UPS);
       setAnalysisError(null);
     } catch (e: unknown) {
       setCalcError('Calculation error: ' + (e instanceof Error ? e.message : String(e)));
@@ -372,6 +386,7 @@ export default function BaziCalculator() {
           setResult(restoredResult);
           setChartData(restoredChartData);
           setAnalysis(null);
+          setFollowUps(EMPTY_FOLLOW_UPS);
           setAnalysisError(null);
         } catch (error: unknown) {
           setCalcError(`Calculation error: ${error instanceof Error ? error.message : String(error)}`);
@@ -452,10 +467,60 @@ export default function BaziCalculator() {
 
       if (data.error) throw new Error(data.error);
       setAnalysis(data.analysis);
+      setFollowUps(EMPTY_FOLLOW_UPS);
     } catch (e: unknown) {
       setAnalysisError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setLoadingAnalysis(false);
+    }
+  }
+
+  function updateFollowUp(index: number, patch: Partial<FollowUpItem>) {
+    setFollowUps((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, ...patch } : item
+    )));
+  }
+
+  async function runFollowUp(index: number) {
+    if (!result || !chartData) return;
+
+    const question = followUps[index]?.question.trim() ?? '';
+    if (!question) {
+      updateFollowUp(index, { error: 'Please enter a question first.' });
+      return;
+    }
+
+    updateFollowUp(index, { loading: true, error: null, answer: null });
+
+    try {
+      const requestBody = {
+        ...buildAnalyzeRequestBody({
+          formValues,
+          result,
+          chartData,
+        }),
+        mode: 'follow_up' as const,
+        followUpQuestion: question,
+      };
+
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Unable to answer this question right now.');
+      }
+
+      if (data.error) throw new Error(data.error);
+      updateFollowUp(index, { answer: data.analysis, loading: false });
+    } catch (error: unknown) {
+      updateFollowUp(index, {
+        loading: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
@@ -874,13 +939,66 @@ export default function BaziCalculator() {
               {loginError && <div className="text-red-600 text-sm mt-3">{loginError}</div>}
               {analysisError && <div className="text-red-600 text-sm mt-3">{analysisError}</div>}
               {analysis && (
-                <div className="mt-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap border-t border-slate-100 pt-4">
-                  {analysis.split('\n').map((line, i) => (
-                    <p key={i} className={line.trim() === '' ? 'mt-3' : ''}>
-                      <RenderMd text={line} />
-                    </p>
-                  ))}
-                </div>
+                <>
+                  <div className="mt-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap border-t border-slate-100 pt-4">
+                    {analysis.split('\n').map((line, i) => (
+                      <p key={i} className={line.trim() === '' ? 'mt-3' : ''}>
+                        <RenderMd text={line} />
+                      </p>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-700">Ask 3 More Questions</h4>
+                        <p className="text-xs text-slate-400">Ask about career, relationships, timing, strengths, or any other point in this chart.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {followUps.map((item, index) => (
+                        <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            Question {index + 1}
+                          </label>
+                          <textarea
+                            value={item.question}
+                            onChange={(event) => updateFollowUp(index, {
+                              question: event.target.value,
+                              error: null,
+                            })}
+                            rows={2}
+                            placeholder="e.g. What does this chart suggest about career direction over the next 3 years?"
+                            className="w-full resize-y bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          />
+                          <div className="mt-2 flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => runFollowUp(index)}
+                              disabled={item.loading}
+                              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-900 disabled:opacity-60"
+                            >
+                              {item.loading ? 'Asking…' : `Ask Question ${index + 1}`}
+                            </button>
+                            <span className="text-[10px] text-slate-400">Each question is answered separately and does not change the main reading above.</span>
+                          </div>
+
+                          {item.error && <div className="text-red-600 text-sm mt-2">{item.error}</div>}
+                          {item.answer && (
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                              {item.answer.split('\n').map((line, lineIndex) => (
+                                <p key={lineIndex} className={line.trim() === '' ? 'mt-3' : ''}>
+                                  <RenderMd text={line} />
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </>
