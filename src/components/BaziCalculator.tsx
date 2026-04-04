@@ -13,9 +13,60 @@ import {
   TG_COLOR,
   tenGod,
   getBranchMainStem,
-  twelveStage,
   getDayMasterNote,
 } from '@/lib/bazi';
+
+// ── IANA Timezone list ─────────────────────────────────────
+const TIMEZONES: { value: string; label: string }[] = [
+  // Asia
+  { value: 'Asia/Bangkok',                    label: 'UTC+7  — Bangkok, Hanoi, Jakarta'             },
+  { value: 'Asia/Ho_Chi_Minh',                label: 'UTC+7  — Ho Chi Minh City'                   },
+  { value: 'Asia/Jakarta',                    label: 'UTC+7  — Jakarta, Surabaya'                   },
+  { value: 'Asia/Yangon',                     label: 'UTC+6:30 — Yangon'                            },
+  { value: 'Asia/Dhaka',                      label: 'UTC+6  — Dhaka'                               },
+  { value: 'Asia/Kolkata',                    label: 'UTC+5:30 — Mumbai, New Delhi'                 },
+  { value: 'Asia/Karachi',                    label: 'UTC+5  — Karachi, Islamabad'                  },
+  { value: 'Asia/Dubai',                      label: 'UTC+4  — Dubai, Abu Dhabi'                    },
+  { value: 'Asia/Tehran',                     label: 'UTC+3:30/4:30 — Tehran'                       },
+  { value: 'Asia/Baghdad',                    label: 'UTC+3  — Baghdad'                             },
+  { value: 'Asia/Riyadh',                     label: 'UTC+3  — Riyadh, Kuwait, Nairobi'             },
+  { value: 'Asia/Beirut',                     label: 'UTC+2/3 — Beirut, Amman'                      },
+  { value: 'Asia/Jerusalem',                  label: 'UTC+2/3 — Jerusalem, Tel Aviv'                },
+  { value: 'Asia/Singapore',                  label: 'UTC+8  — Singapore, Kuala Lumpur'             },
+  { value: 'Asia/Shanghai',                   label: 'UTC+8  — Beijing, Shanghai, Chongqing'        },
+  { value: 'Asia/Taipei',                     label: 'UTC+8  — Taipei'                              },
+  { value: 'Asia/Hong_Kong',                  label: 'UTC+8  — Hong Kong'                           },
+  { value: 'Asia/Manila',                     label: 'UTC+8  — Manila'                              },
+  { value: 'Asia/Seoul',                      label: 'UTC+9  — Seoul'                               },
+  { value: 'Asia/Tokyo',                      label: 'UTC+9  — Tokyo, Osaka'                        },
+  // Europe
+  { value: 'UTC',                             label: 'UTC±0  — Coordinated Universal Time'          },
+  { value: 'Europe/London',                   label: 'UTC+0/1 — London, Dublin, Lisbon'             },
+  { value: 'Europe/Paris',                    label: 'UTC+1/2 — Paris, Berlin, Rome, Madrid'        },
+  { value: 'Europe/Helsinki',                 label: 'UTC+2/3 — Helsinki, Riga, Tallinn'            },
+  { value: 'Europe/Athens',                   label: 'UTC+2/3 — Athens, Bucharest, Cairo'           },
+  { value: 'Europe/Moscow',                   label: 'UTC+3  — Moscow, Minsk'                       },
+  { value: 'Europe/Istanbul',                 label: 'UTC+3  — Istanbul, Ankara'                    },
+  // Americas
+  { value: 'America/New_York',                label: 'UTC−5/4 — New York, Toronto, Miami'           },
+  { value: 'America/Chicago',                 label: 'UTC−6/5 — Chicago, Houston, Mexico City'      },
+  { value: 'America/Denver',                  label: 'UTC−7/6 — Denver, Phoenix'                   },
+  { value: 'America/Los_Angeles',             label: 'UTC−8/7 — Los Angeles, Seattle, Vancouver'   },
+  { value: 'America/Anchorage',               label: 'UTC−9/8 — Anchorage'                         },
+  { value: 'Pacific/Honolulu',                label: 'UTC−10 — Honolulu'                            },
+  { value: 'America/Bogota',                  label: 'UTC−5  — Bogotá, Lima, Quito'                 },
+  { value: 'America/Caracas',                 label: 'UTC−4  — Caracas'                             },
+  { value: 'America/Santiago',                label: 'UTC−4/3 — Santiago'                           },
+  { value: 'America/Sao_Paulo',               label: 'UTC−3/2 — São Paulo, Rio de Janeiro'          },
+  { value: 'America/Argentina/Buenos_Aires',  label: 'UTC−3  — Buenos Aires, Montevideo'            },
+  // Pacific & Oceania
+  { value: 'Australia/Sydney',                label: 'UTC+10/11 — Sydney, Melbourne, Canberra'      },
+  { value: 'Australia/Perth',                 label: 'UTC+8  — Perth'                               },
+  { value: 'Pacific/Auckland',                label: 'UTC+12/13 — Auckland, Wellington'             },
+  // Africa
+  { value: 'Africa/Lagos',                    label: 'UTC+1  — Lagos, Kinshasa, Accra'              },
+  { value: 'Africa/Johannesburg',             label: 'UTC+2  — Johannesburg, Harare'                },
+];
 
 // ── Element color helper ───────────────────────────────────
 function elColor(el: string): string {
@@ -46,6 +97,13 @@ function fmtDate(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} `
        + `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
+function fmtMin(min: number): string {
+  const sign = min >= 0 ? '+' : '−';
+  const abs  = Math.abs(min);
+  const m    = Math.round(abs);
+  return `${sign}${m} min`;
 }
 
 // ── SVG Radar Chart ────────────────────────────────────────
@@ -179,26 +237,83 @@ function RenderMd({ text }: { text: string }) {
   );
 }
 
+// ── TST Info Card ──────────────────────────────────────────
+function TSTCard({ result }: { result: BaziResult }) {
+  const { tst, localDate, tstDate, tzLabel } = result;
+  if (!tst) return null;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const clockStr = `${pad(localDate.getUTCHours())}:${pad(localDate.getUTCMinutes())}`;
+  const tstStr   = `${pad(tstDate.getUTCHours())}:${pad(tstDate.getUTCMinutes())}`;
+
+  const rows = [
+    { label: 'Clock Time (birth certificate)', value: clockStr, note: tzLabel + (tst.dstApplied ? ' incl. DST' : ''), color: 'text-slate-700' },
+    { label: 'Step 1 · DST Correction',        value: fmtMin(tst.dstCorrectionMin), note: tst.dstApplied ? 'DST detected — reverted to standard time' : 'No DST in effect', color: tst.dstApplied ? 'text-amber-600' : 'text-slate-400' },
+    { label: 'Step 2 · Longitude Correction',  value: fmtMin(tst.lonCorrectionMin), note: '(longitude − std meridian) × 4 min/°', color: 'text-indigo-600' },
+    { label: 'Step 3 · Equation of Time',      value: fmtMin(tst.eotMin),           note: 'Earth orbital eccentricity correction', color: 'text-teal-600' },
+  ];
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+      <h3 className="text-sm font-semibold text-slate-700 mb-1">True Solar Time · 真太陽時</h3>
+      <p className="text-xs text-slate-400 mb-4">3-step astronomical correction applied to clock time</p>
+
+      <div className="space-y-2">
+        {rows.map(r => (
+          <div key={r.label} className="flex items-start justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0">
+            <div>
+              <div className="text-xs font-medium text-slate-600">{r.label}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{r.note}</div>
+            </div>
+            <div className={`text-sm font-bold tabular-nums shrink-0 ${r.color}`}>{r.value}</div>
+          </div>
+        ))}
+
+        {/* Result */}
+        <div className="flex items-center justify-between pt-2 mt-1">
+          <div>
+            <div className="text-xs font-semibold text-slate-700">True Solar Time</div>
+            <div className="text-[10px] text-slate-400">Total correction: {fmtMin(tst.totalCorrectionMin)}</div>
+          </div>
+          <div className="text-lg font-bold text-indigo-700 tabular-nums">{tstStr}</div>
+        </div>
+      </div>
+
+      {tst.dayChanged && (
+        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+          <span className="font-semibold">Day transition detected:</span> True Solar Time crosses midnight —
+          astrological date shifts to the {tst.dayChangedDir === 'next' ? 'following' : 'previous'} day.
+          All pillars have been recalculated accordingly.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────
 export default function BaziCalculator() {
-  const [dob, setDob] = useState('1990-06-15');
-  const [tob, setTob] = useState('08:30');
-  const [tz, setTz] = useState('420');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [dob, setDob]             = useState('1990-06-15');
+  const [tob, setTob]             = useState('08:30');
+  const [timezone, setTimezone]   = useState('Asia/Bangkok');
+  const [longitude, setLongitude] = useState('100.52');
+  const [latitude, setLatitude]   = useState('13.75');
+  const [gender, setGender]       = useState<'male' | 'female'>('male');
   const [unknownTime, setUnknownTime] = useState(false);
-  const [result, setResult] = useState<BaziResult | null>(null);
+  const [result, setResult]       = useState<BaziResult | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [analysis, setAnalysis]   = useState<string | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError]     = useState<string | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
 
   function calculate() {
     if (!dob) { setCalcError('Please enter date of birth.'); return; }
     if (!unknownTime && !tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
+    const lng = parseFloat(longitude);
+    if (isNaN(lng) || lng < -180 || lng > 180) { setCalcError('Longitude must be between −180 and 180.'); return; }
     setCalcError(null);
     try {
-      const r = computeBazi(dob, unknownTime ? null : tob, parseInt(tz, 10), gender === 'male');
+      const r  = computeBazi(dob, unknownTime ? null : tob, timezone, lng, gender === 'male');
       const cd = computeChartData(r.pillars, r.pillars.day.stemIdx, r.unknownTime);
       setResult(r);
       setChartData(cd);
@@ -234,8 +349,6 @@ export default function BaziCalculator() {
     }
   }
 
-  const currentYear = new Date().getFullYear();
-
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="max-w-4xl mx-auto space-y-4">
@@ -251,6 +364,7 @@ export default function BaziCalculator() {
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
           <div className="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-4">Birth Information · 生辰八字</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
             {/* Date */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Date of Birth</label>
@@ -261,9 +375,10 @@ export default function BaziCalculator() {
                 className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               />
             </div>
+
             {/* Time */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Time of Birth</label>
+              <label className="text-xs font-medium text-slate-600">Time of Birth (clock time on certificate)</label>
               <input
                 type="time"
                 value={tob}
@@ -276,60 +391,47 @@ export default function BaziCalculator() {
                 <span>I don&apos;t know my birth time</span>
               </label>
             </div>
+
             {/* Timezone */}
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Timezone</label>
+              <label className="text-xs font-medium text-slate-600">Timezone (DST detected automatically)</label>
               <select
-                value={tz}
-                onChange={e => setTz(e.target.value)}
+                value={timezone}
+                onChange={e => setTimezone(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
               >
-                <optgroup label="UTC−">
-                  <option value="-720">UTC−12:00 — Baker Island, Howland Island</option>
-                  <option value="-660">UTC−11:00 — American Samoa, Niue</option>
-                  <option value="-600">UTC−10:00 — Hawaii, Cook Islands</option>
-                  <option value="-570">UTC−09:30 — Marquesas Islands</option>
-                  <option value="-540">UTC−09:00 — Alaska</option>
-                  <option value="-480">UTC−08:00 — Los Angeles, Vancouver, Tijuana (PST)</option>
-                  <option value="-420">UTC−07:00 — Denver, Phoenix, Calgary (MST)</option>
-                  <option value="-360">UTC−06:00 — Chicago, Mexico City, Houston (CST)</option>
-                  <option value="-300">UTC−05:00 — New York, Toronto, Bogotá, Lima (EST)</option>
-                  <option value="-240">UTC−04:00 — Santiago, La Paz, Caracas, Halifax</option>
-                  <option value="-210">UTC−03:30 — Newfoundland</option>
-                  <option value="-180">UTC−03:00 — São Paulo, Buenos Aires, Montevideo</option>
-                  <option value="-120">UTC−02:00 — South Georgia</option>
-                  <option value="-60">UTC−01:00 — Azores, Cape Verde</option>
-                </optgroup>
-                <optgroup label="UTC">
-                  <option value="0">UTC±00:00 — London (GMT), Dublin, Lisbon, Reykjavik, Accra</option>
-                </optgroup>
-                <optgroup label="UTC+">
-                  <option value="60">UTC+01:00 — Paris, Berlin, Rome, Madrid, Amsterdam, Warsaw</option>
-                  <option value="120">UTC+02:00 — Athens, Cairo, Helsinki, Kyiv, Johannesburg, Riga</option>
-                  <option value="180">UTC+03:00 — Moscow, Istanbul, Riyadh, Nairobi, Minsk, Kuwait</option>
-                  <option value="210">UTC+03:30 — Tehran</option>
-                  <option value="240">UTC+04:00 — Dubai, Baku, Yerevan, Tbilisi, Muscat</option>
-                  <option value="270">UTC+04:30 — Kabul</option>
-                  <option value="300">UTC+05:00 — Karachi, Tashkent, Yekaterinburg</option>
-                  <option value="330">UTC+05:30 — Mumbai, New Delhi, Colombo (IST)</option>
-                  <option value="345">UTC+05:45 — Kathmandu</option>
-                  <option value="360">UTC+06:00 — Dhaka, Almaty, Bishkek</option>
-                  <option value="390">UTC+06:30 — Yangon (Myanmar), Cocos Islands</option>
-                  <option value="420">UTC+07:00 — Bangkok, Hanoi, Jakarta, Ho Chi Minh City</option>
-                  <option value="480">UTC+08:00 — Beijing, Singapore, Kuala Lumpur, Hong Kong, Taipei, Manila, Perth</option>
-                  <option value="525">UTC+08:45 — Eucla (Australia)</option>
-                  <option value="540">UTC+09:00 — Tokyo, Seoul, Pyongyang</option>
-                  <option value="570">UTC+09:30 — Adelaide, Darwin</option>
-                  <option value="600">UTC+10:00 — Sydney, Melbourne, Brisbane, Guam</option>
-                  <option value="630">UTC+10:30 — Lord Howe Island</option>
-                  <option value="660">UTC+11:00 — Noumea, Solomon Islands, Magadan</option>
-                  <option value="720">UTC+12:00 — Auckland, Fiji, Marshall Islands</option>
-                  <option value="765">UTC+12:45 — Chatham Islands (NZ)</option>
-                  <option value="780">UTC+13:00 — Apia (Samoa), Nukuʻalofa (Tonga)</option>
-                  <option value="840">UTC+14:00 — Kiritimati (Line Islands)</option>
-                </optgroup>
+                {TIMEZONES.map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
               </select>
             </div>
+
+            {/* Coordinates */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Longitude (°E positive, °W negative)</label>
+              <input
+                type="number"
+                value={longitude}
+                onChange={e => setLongitude(e.target.value)}
+                min="-180" max="180" step="0.01"
+                placeholder="e.g. 100.52"
+                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Latitude (°N positive, °S negative)</label>
+              <input
+                type="number"
+                value={latitude}
+                onChange={e => setLatitude(e.target.value)}
+                min="-90" max="90" step="0.01"
+                placeholder="e.g. 13.75"
+                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">Used for reference — only longitude affects True Solar Time</p>
+            </div>
+
             {/* Gender */}
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-xs font-medium text-slate-600">Gender</label>
@@ -346,9 +448,10 @@ export default function BaziCalculator() {
                 >♀ Female</button>
               </div>
             </div>
+
           </div>
-          <p className="text-xs text-slate-400 mt-3">* Select the timezone active at the place of birth. DST must be applied manually. Gender affects the direction of Major Luck Cycles (大運).</p>
-          {calcError && <div className="text-red-600 text-sm mt-2">{calcError}</div>}
+
+          {calcError && <div className="text-red-600 text-sm mt-3">{calcError}</div>}
           <button
             onClick={calculate}
             className="mt-4 block w-full sm:w-auto sm:mx-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-8 py-2.5 rounded-lg transition-colors"
@@ -363,9 +466,12 @@ export default function BaziCalculator() {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
               {result.unknownTime
                 ? <>Local date: <span className="font-medium text-slate-800">{result.localDate.getUTCFullYear()}-{String(result.localDate.getUTCMonth() + 1).padStart(2, '0')}-{String(result.localDate.getUTCDate()).padStart(2, '0')} ({result.tzLabel})</span> &nbsp;·&nbsp; Hour pillar not calculated</>
-                : <>Local time: <span className="font-medium text-slate-800">{fmtDate(result.localDate)} ({result.tzLabel})</span> &nbsp;→&nbsp; UTC: <span className="font-medium text-slate-800">{fmtDate(result.utcDate)}</span></>
+                : <>Clock time: <span className="font-medium text-slate-800">{fmtDate(result.localDate)} ({result.tzLabel})</span> &nbsp;→&nbsp; True Solar Time: <span className="font-medium text-indigo-700">{fmtDate(result.tstDate)}</span></>
               }
             </div>
+
+            {/* True Solar Time Card */}
+            {!result.unknownTime && <TSTCard result={result} />}
 
             {/* Pillar Table */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
@@ -582,5 +688,3 @@ export default function BaziCalculator() {
     </main>
   );
 }
-
-

@@ -45,10 +45,23 @@ export interface DaYun {
   pillars: DaYunPillar[];
 }
 
+export interface TSTInfo {
+  dstApplied: boolean;
+  dstCorrectionMin: number;
+  lonCorrectionMin: number;
+  eotMin: number;
+  totalCorrectionMin: number;
+  dayChanged: boolean;
+  dayChangedDir: 'prev' | 'next' | null;
+}
+
 export interface BaziResult {
   utcDate: Date;
   localDate: Date;
+  tstDate: Date;
   tzLabel: string;
+  stdOffsetMin: number;
+  tst: TSTInfo | null;
   daYun: DaYun | null;
   unknownTime: boolean;
   pillars: {
@@ -335,9 +348,9 @@ export function hourBranchIndex(solarHour: number, solarMinute: number): number 
   return 11;
 }
 
-export function hourPillar(solarDate: Date, dayStemIdx: number): { stemIdx: number; branchIdx: number } {
-  const h = solarDate.getUTCHours();
-  const m = solarDate.getUTCMinutes();
+export function hourPillar(tstDate: Date, dayStemIdx: number): { stemIdx: number; branchIdx: number } {
+  const h = tstDate.getUTCHours();
+  const m = tstDate.getUTCMinutes();
   const branchIdx = hourBranchIndex(h, m);
   const dayGroup = dayStemIdx % 5;
   const baseStemIdx = [0, 2, 4, 6, 8][dayGroup];
@@ -426,36 +439,185 @@ export function computeDaYun(
   return { forward, startYears, startMonths, jie, pillars };
 }
 
+// ── True Solar Time Helpers ────────────────────────────────
+
+/**
+ * Get the UTC offset in minutes for a given date in an IANA timezone.
+ * Positive = ahead of UTC (e.g., Asia/Bangkok = +420).
+ */
+export function getUtcOffsetMinutes(date: Date, ianaTimezone: string): number {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaTimezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0');
+    let hour = get('hour');
+    if (hour === 24) hour = 0;
+    const localMs = Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
+    return Math.round((localMs - date.getTime()) / 60000);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Get the standard (non-DST) UTC offset in minutes for a timezone in a given year.
+ * Uses January and July offsets; standard time = the smaller of the two.
+ */
+export function getStdOffsetMinutes(year: number, ianaTimezone: string): number {
+  const jan = new Date(Date.UTC(year, 0, 15));
+  const jul = new Date(Date.UTC(year, 6, 15));
+  const janOff = getUtcOffsetMinutes(jan, ianaTimezone);
+  const julOff = getUtcOffsetMinutes(jul, ianaTimezone);
+  return Math.min(janOff, julOff);
+}
+
+/**
+ * Returns true if DST is in effect for the given date and timezone.
+ */
+export function isDST(date: Date, ianaTimezone: string): boolean {
+  const stdOff = getStdOffsetMinutes(date.getUTCFullYear(), ianaTimezone);
+  const curOff = getUtcOffsetMinutes(date, ianaTimezone);
+  return curOff > stdOff;
+}
+
+/**
+ * Convert a locally-entered clock time (HH:mm) on a given date in an IANA timezone to UTC.
+ * Handles DST correctly via two-pass approximation.
+ */
+export function clockTimeToUtc(y: number, mo: number, d: number, hr: number, mn: number, ianaTimezone: string): Date {
+  // First pass: treat clock time as approximate UTC, get the timezone offset at that moment
+  const approx1 = new Date(Date.UTC(y, mo - 1, d, hr, mn));
+  const off1 = getUtcOffsetMinutes(approx1, ianaTimezone);
+  // Second pass: better UTC estimate
+  const approx2 = new Date(Date.UTC(y, mo - 1, d, hr, mn) - off1 * 60 * 1000);
+  const off2 = getUtcOffsetMinutes(approx2, ianaTimezone);
+  return new Date(Date.UTC(y, mo - 1, d, hr, mn) - off2 * 60 * 1000);
+}
+
+/**
+ * Equation of Time (EOT) in minutes using Meeus algorithm.
+ * Range: approximately −14 to +16 minutes.
+ */
+export function equationOfTime(jd: number): number {
+  const T = (jd - 2451545.0) / 36525;
+
+  let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
+  L0 = L0 % 360; if (L0 < 0) L0 += 360;
+
+  let M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T;
+  M = M % 360; if (M < 0) M += 360;
+
+  const e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T * T;
+
+  const eps0 = 23 + 26 / 60 + 21.448 / 3600;
+  const eps = eps0 - (46.8150 / 3600) * T - (0.00059 / 3600) * T * T + (0.001813 / 3600) * T * T * T;
+  const epsRad = eps * Math.PI / 180;
+
+  const y = Math.pow(Math.tan(epsRad / 2), 2);
+  const L0rad = L0 * Math.PI / 180;
+  const Mrad  = M  * Math.PI / 180;
+
+  const eotRad = y * Math.sin(2 * L0rad)
+               - 2 * e * Math.sin(Mrad)
+               + 4 * e * y * Math.sin(Mrad) * Math.cos(2 * L0rad)
+               - 0.5 * y * y * Math.sin(4 * L0rad)
+               - 1.25 * e * e * Math.sin(2 * Mrad);
+
+  // Convert radians → degrees → minutes (1° = 4 min)
+  return eotRad * (180 / Math.PI) * 4;
+}
+
 // ── Main Calculation Entry Point ───────────────────────────
 export function computeBazi(
   dateStr: string,
   timeStr: string | null,
-  tzOffsetMin: number,
+  ianaTimezone: string,
+  longitude: number,
   male: boolean
 ): BaziResult {
   const [y, mo, d] = dateStr.split('-').map(Number);
-  const [hr, mn] = timeStr ? timeStr.split(':').map(Number) : [12, 0];
+  const [hr, mn]   = timeStr ? timeStr.split(':').map(Number) : [12, 0];
 
-  const utcMs   = Date.UTC(y, mo - 1, d, hr, mn) - tzOffsetMin * 60 * 1000;
-  const utcDate = new Date(utcMs);
-  const localDate = new Date(utcMs + tzOffsetMin * 60 * 1000);
+  // Convert clock time → UTC (accounts for DST in the IANA timezone)
+  const utcDate = timeStr
+    ? clockTimeToUtc(y, mo, d, hr, mn, ianaTimezone)
+    : new Date(Date.UTC(y, mo - 1, d, 5, 0)); // Use 05:00 UTC as neutral noon-ish
 
-  const yp = yearPillar(localDate);
-  const mp = monthPillar(localDate, yp.stemIdx);
-  const dp = dayPillar(localDate);
+  const stdOffsetMin = getStdOffsetMinutes(y, ianaTimezone);
 
-  const hp = timeStr ? hourPillar(utcDate, dp.stemIdx) : null;
+  // ── True Solar Time calculation ──────────────────────────
+  let tstDate: Date;
+  let tst: TSTInfo | null = null;
 
-  const daYun = computeDaYun(localDate, { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx }, yp.stemIdx, male);
+  if (timeStr) {
+    // Step 1: DST correction (revert to Standard Time)
+    const dstApplied = isDST(utcDate, ianaTimezone);
+    const dstCorrectionMin = dstApplied ? -60 : 0;
 
-  const sign    = tzOffsetMin >= 0 ? '+' : '−';
-  const absMins = Math.abs(tzOffsetMin);
+    // Step 2: Longitude correction
+    const stdMeridian    = stdOffsetMin / 60 * 15; // degrees
+    const lonCorrectionMin = (longitude - stdMeridian) * 4;
+
+    // Step 3: Equation of Time
+    const jd     = dateToJD(utcDate);
+    const eotMin = equationOfTime(jd);
+
+    // TST = stdLocalTime + lonCorrection + EOT
+    // In UTC terms: tstMs = utcMs + stdOffset + lonCorrection + EOT
+    const totalCorrectionMin = stdOffsetMin + dstCorrectionMin + lonCorrectionMin + eotMin;
+    const tstMs = utcDate.getTime() + totalCorrectionMin * 60 * 1000;
+    tstDate = new Date(tstMs);
+
+    // Clock's local date (standard time, without DST)
+    const clockStdMs = utcDate.getTime() + stdOffsetMin * 60 * 1000;
+    const clockStdDate = new Date(clockStdMs);
+    const dayChanged =
+      tstDate.getUTCFullYear() !== clockStdDate.getUTCFullYear() ||
+      tstDate.getUTCMonth()    !== clockStdDate.getUTCMonth()    ||
+      tstDate.getUTCDate()     !== clockStdDate.getUTCDate();
+
+    tst = {
+      dstApplied,
+      dstCorrectionMin,
+      lonCorrectionMin,
+      eotMin,
+      totalCorrectionMin,
+      dayChanged,
+      dayChangedDir: dayChanged ? (tstDate > clockStdDate ? 'next' : 'prev') : null,
+    };
+  } else {
+    // Unknown time: use standard local date at noon for pillar calculation
+    tstDate = new Date(utcDate.getTime() + stdOffsetMin * 60 * 1000);
+  }
+
+  // All pillars use True Solar Time date
+  const yp = yearPillar(tstDate);
+  const mp = monthPillar(tstDate, yp.stemIdx);
+  const dp = dayPillar(tstDate);
+  const hp = timeStr ? hourPillar(tstDate, dp.stemIdx) : null;
+
+  const daYun = computeDaYun(tstDate, { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx }, yp.stemIdx, male);
+
+  // Build timezone label (standard offset)
+  const sign    = stdOffsetMin >= 0 ? '+' : '−';
+  const absMins = Math.abs(stdOffsetMin);
   const tzLabel = `UTC${sign}${Math.floor(absMins / 60)}:${String(absMins % 60).padStart(2, '0')}`;
+
+  // localDate = clock's standard-time representation (for display)
+  const localDate = new Date(utcDate.getTime() + stdOffsetMin * 60 * 1000);
 
   return {
     utcDate,
     localDate,
+    tstDate,
     tzLabel,
+    stdOffsetMin,
+    tst,
     daYun,
     unknownTime: !timeStr,
     pillars: {
@@ -501,13 +663,11 @@ export function computeChartData(
   order.forEach(k => {
     const p = pillars[k];
     if (!p) return;
-    // Surface stem (including Day Master self as companion)
     structureCounts[elementToStructure(p.stem.element, dmEl)]++;
     if (k !== 'day') {
       const tg = tenGod(dmStemIdx, p.stemIdx);
       tenGodsCount[tg.zh] = (tenGodsCount[tg.zh] || 0) + 1;
     }
-    // ALL hidden stems in branch
     const hiddenStems = BRANCH_HIDDEN_STEMS[p.branchIdx];
     hiddenStems.forEach(hsIdx => {
       structureCounts[elementToStructure(STEMS[hsIdx].element, dmEl)]++;
