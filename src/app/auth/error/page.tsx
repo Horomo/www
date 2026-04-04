@@ -1,7 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 
 const ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: 'Google sign-in was denied. Please try again and grant access to continue.',
@@ -14,10 +11,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   default: 'Google sign-in failed. Please try again.',
 };
 
-export default function AuthErrorPage() {
-  const searchParams = useSearchParams();
-  const errorCode = searchParams.get('error') ?? 'default';
-  const message = ERROR_MESSAGES[errorCode] ?? ERROR_MESSAGES.default;
+export default async function AuthErrorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const rawError = resolvedSearchParams.error;
+  const errorCode = Array.isArray(rawError) ? rawError[0] : rawError;
+  const message = ERROR_MESSAGES[errorCode ?? 'default'] ?? ERROR_MESSAGES.default;
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>

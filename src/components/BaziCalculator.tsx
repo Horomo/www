@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { signIn, signOut, useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 import {
   computeBazi,
   computeChartData,
@@ -10,7 +11,6 @@ import {
   BRANCHES,
   EL_LABEL,
   TG_ABBR,
-  TG_COLOR,
   tenGod,
   getBranchMainStem,
   getDayMasterNote,
@@ -290,6 +290,18 @@ function TSTCard({ result }: { result: BaziResult }) {
   );
 }
 
+type FormValues = {
+  dob: string;
+  tob: string;
+  timezone: string;
+  longitude: string;
+  latitude: string;
+  gender: 'male' | 'female';
+  unknownTime: boolean;
+};
+
+const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
+
 // ── Main Component ─────────────────────────────────────────
 export default function BaziCalculator() {
   const [dob, setDob]             = useState('1990-06-15');
@@ -305,15 +317,45 @@ export default function BaziCalculator() {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [analysisError, setAnalysisError]     = useState<string | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const { data: session, status: sessionStatus } = useSession();
 
-  function calculate() {
-    if (!dob) { setCalcError('Please enter date of birth.'); return; }
-    if (!unknownTime && !tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
-    const lng = parseFloat(longitude);
+  const formValues: FormValues = {
+    dob,
+    tob,
+    timezone,
+    longitude,
+    latitude,
+    gender,
+    unknownTime,
+  };
+
+  function syncFormState(values: FormValues) {
+    setDob(values.dob);
+    setTob(values.tob);
+    setTimezone(values.timezone);
+    setLongitude(values.longitude);
+    setLatitude(values.latitude);
+    setGender(values.gender);
+    setUnknownTime(values.unknownTime);
+  }
+
+  function calculate(values: FormValues, options?: { syncInputs?: boolean }) {
+    if (options?.syncInputs) syncFormState(values);
+    if (!values.dob) { setCalcError('Please enter date of birth.'); return; }
+    if (!values.unknownTime && !values.tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
+    const lng = parseFloat(values.longitude);
     if (isNaN(lng) || lng < -180 || lng > 180) { setCalcError('Longitude must be between −180 and 180.'); return; }
     setCalcError(null);
     try {
-      const r  = computeBazi(dob, unknownTime ? null : tob, timezone, lng, gender === 'male');
+      const r = computeBazi(
+        values.dob,
+        values.unknownTime ? null : values.tob,
+        values.timezone,
+        lng,
+        values.gender === 'male',
+      );
       const cd = computeChartData(r.pillars, r.pillars.day.stemIdx, r.unknownTime);
       setResult(r);
       setChartData(cd);
@@ -324,10 +366,116 @@ export default function BaziCalculator() {
     }
   }
 
+  useEffect(() => {
+    const rawSavedState = sessionStorage.getItem(AUTH_STATE_KEY);
+    if (!rawSavedState) return;
+
+    sessionStorage.removeItem(AUTH_STATE_KEY);
+
+    try {
+      const savedState = JSON.parse(rawSavedState) as {
+        formValues?: FormValues;
+        restoreChart?: boolean;
+      };
+
+      if (!savedState.formValues) return;
+
+      if (savedState.restoreChart) {
+        const restoredValues = savedState.formValues;
+        syncFormState(restoredValues);
+
+        if (!restoredValues.dob) { setCalcError('Please enter date of birth.'); return; }
+        if (!restoredValues.unknownTime && !restoredValues.tob) {
+          setCalcError('Please enter time of birth, or check "I don\'t know my birth time".');
+          return;
+        }
+
+        const lng = parseFloat(restoredValues.longitude);
+        if (isNaN(lng) || lng < -180 || lng > 180) {
+          setCalcError('Longitude must be between −180 and 180.');
+          return;
+        }
+
+        setCalcError(null);
+
+        try {
+          const restoredResult = computeBazi(
+            restoredValues.dob,
+            restoredValues.unknownTime ? null : restoredValues.tob,
+            restoredValues.timezone,
+            lng,
+            restoredValues.gender === 'male',
+          );
+          const restoredChartData = computeChartData(
+            restoredResult.pillars,
+            restoredResult.pillars.day.stemIdx,
+            restoredResult.unknownTime,
+          );
+
+          setResult(restoredResult);
+          setChartData(restoredChartData);
+          setAnalysis(null);
+          setAnalysisError(null);
+        } catch (error: unknown) {
+          setCalcError(`Calculation error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return;
+      }
+
+      syncFormState(savedState.formValues);
+    } catch {
+      sessionStorage.removeItem(AUTH_STATE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionStatus === 'authenticated') {
+      setSigningIn(false);
+      setLoginError(null);
+    }
+  }, [sessionStatus]);
+
+  async function handleGoogleSignIn() {
+    setLoginError(null);
+    setSigningIn(true);
+
+    sessionStorage.setItem(
+      AUTH_STATE_KEY,
+      JSON.stringify({
+        formValues,
+        restoreChart: Boolean(result && chartData),
+      }),
+    );
+
+    try {
+      const response = await signIn('google', {
+        callbackUrl: window.location.href,
+        redirect: false,
+      });
+
+      if (!response?.url) {
+        throw new Error('Unable to start Google sign-in. Please try again.');
+      }
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      window.location.assign(response.url);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unable to sign in with Google.';
+      setLoginError(message === 'Configuration'
+        ? 'Google sign-in is not configured correctly on the server.'
+        : 'Google sign-in failed. Please try again.');
+      setSigningIn(false);
+    }
+  }
+
   async function runAnalysis() {
     if (!result || !chartData) return;
     setLoadingAnalysis(true);
     setAnalysisError(null);
+    setAnalysis(null);
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -340,6 +488,11 @@ export default function BaziCalculator() {
         }),
       });
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Unable to analyze this chart right now.');
+      }
+
       if (data.error) throw new Error(data.error);
       setAnalysis(data.analysis);
     } catch (e: unknown) {
@@ -453,7 +606,7 @@ export default function BaziCalculator() {
 
           {calcError && <div className="text-red-600 text-sm mt-3">{calcError}</div>}
           <button
-            onClick={calculate}
+            onClick={() => calculate(formValues)}
             className="mt-4 block w-full sm:w-auto sm:mx-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-8 py-2.5 rounded-lg transition-colors"
           >
             Calculate Chart · 起命盤
@@ -655,22 +808,68 @@ export default function BaziCalculator() {
             {/* AI Analysis Section */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
               <h3 className="text-sm font-semibold text-slate-700 mb-1">AI Reading · 八字解析</h3>
-              <p className="text-xs text-slate-400 mb-3">Requires OPENAI_API_KEY in .env.local</p>
-              <button
-                onClick={runAnalysis}
-                disabled={loadingAnalysis}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold text-sm px-5 py-2 rounded-lg transition-colors"
-              >
-                {loadingAnalysis ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Analyzing…
-                  </>
-                ) : 'Analyze with AI · 用AI解析'}
-              </button>
+              <p className="text-xs text-slate-400 mb-3">Google sign-in is required before AI analysis can run.</p>
+
+              {sessionStatus === 'authenticated' && session.user && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span>Signed in as <span className="font-medium text-slate-700">{session.user.email ?? session.user.name ?? 'Google user'}</span></span>
+                  <button
+                    type="button"
+                    onClick={() => signOut({ callbackUrl: '/' })}
+                    className="rounded-md border border-slate-200 px-2 py-1 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+
+              {sessionStatus === 'loading' ? (
+                <button
+                  disabled
+                  className="flex items-center gap-2 rounded-lg bg-slate-300 px-5 py-2 text-sm font-semibold text-white"
+                >
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Checking sign-in…
+                </button>
+              ) : sessionStatus === 'authenticated' ? (
+                <button
+                  onClick={runAnalysis}
+                  disabled={loadingAnalysis}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold text-sm px-5 py-2 rounded-lg transition-colors"
+                >
+                  {loadingAnalysis ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Analyzing…
+                    </>
+                  ) : 'Analyze with AI · 用AI解析'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={signingIn}
+                  className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-slate-700 border border-slate-300 transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {signingIn ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Redirecting to Google…
+                    </>
+                  ) : 'Sign in with Google'}
+                </button>
+              )}
+
+              {loginError && <div className="text-red-600 text-sm mt-3">{loginError}</div>}
               {analysisError && <div className="text-red-600 text-sm mt-3">{analysisError}</div>}
               {analysis && (
                 <div className="mt-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap border-t border-slate-100 pt-4">
