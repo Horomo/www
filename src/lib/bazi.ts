@@ -2,6 +2,8 @@
 //  BAZI CALCULATION ENGINE — TypeScript port
 // ═══════════════════════════════════════════════════════════
 
+import type { CalculationGenderMode } from '@/lib/gender';
+
 // ── Types ──────────────────────────────────────────────────
 export interface Stem {
   zh: string;
@@ -39,6 +41,8 @@ export interface DaYunPillar {
 
 export interface DaYun {
   forward: boolean;
+  calculationMode: CalculationGenderMode;
+  ruleNote: string;
   startYears: number;
   startMonths: number;
   jie: { name: string; date: Date };
@@ -403,10 +407,13 @@ export function computeDaYun(
   localDate: Date,
   mp: { stemIdx: number; branchIdx: number },
   yearStemIdx: number,
-  male: boolean
+  calculationMode: CalculationGenderMode,
 ): DaYun | null {
   const yearStemYin = STEMS[yearStemIdx].yin;
-  const forward = male !== yearStemYin;
+  // Classical Da Yun direction still depends on a binary treatment rule.
+  // Callers must pass an explicit calculation mode that is separate from gender identity.
+  const treatedAsMale = calculationMode === 'male';
+  const forward = treatedAsMale !== yearStemYin;
 
   const jie = findNearestJie(localDate, forward);
   if (!jie) return null;
@@ -438,7 +445,15 @@ export function computeDaYun(
     });
   }
 
-  return { forward, startYears, startMonths, jie, pillars };
+  return {
+    forward,
+    calculationMode,
+    ruleNote: 'Da Yun direction uses the classical rule of treating the chart as male or female. This parameter is separate from gender identity.',
+    startYears,
+    startMonths,
+    jie,
+    pillars,
+  };
 }
 
 // ── True Solar Time Helpers ────────────────────────────────
@@ -551,7 +566,7 @@ export function computeBazi(
   timeStr: string | null,
   ianaTimezone: string,
   longitude: number,
-  male: boolean
+  calculationMode: CalculationGenderMode,
 ): BaziResult {
   const [y, mo, d] = dateStr.split('-').map(Number);
   const [hr, mn]   = timeStr ? timeStr.split(':').map(Number) : [12, 0];
@@ -616,7 +631,12 @@ export function computeBazi(
   const dp = dayPillar(tstDate);
   const hp = timeStr ? hourPillar(tstDate, dp.stemIdx) : null;
 
-  const daYun = computeDaYun(tstDate, { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx }, yp.stemIdx, male);
+  const daYun = computeDaYun(
+    tstDate,
+    { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx },
+    yp.stemIdx,
+    calculationMode,
+  );
 
   // Build timezone label (standard offset)
   const sign    = stdOffsetMin >= 0 ? '+' : '−';

@@ -2,7 +2,13 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { buildAnalyzeRequestBody, type AnalysisFormPayload } from '@/lib/analysis-payload';
+import {
+  buildAnalyzeRequestBody,
+  finalizeAnalysisFormPayload,
+  normalizeAnalysisFormDraft,
+  type AnalysisFormDraft,
+  type AnalysisFormPayload,
+} from '@/lib/analysis-payload';
 import BirthPlaceSearch from '@/components/BirthPlaceSearch';
 import {
   computeBazi,
@@ -17,7 +23,26 @@ import {
   getBranchMainStem,
   getDayMasterNote,
 } from '@/lib/bazi';
+import {
+  formatCalculationGenderMode,
+  formatGenderIdentity,
+  type CalculationGenderMode,
+  type GenderIdentity,
+} from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
+
+const GENDER_IDENTITY_OPTIONS: Array<{ value: GenderIdentity; label: string; description: string }> = [
+  { value: 'male', label: 'Male', description: 'Gender identity' },
+  { value: 'female', label: 'Female', description: 'Gender identity' },
+  { value: 'non_binary', label: 'Non-binary', description: 'Gender identity' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: 'Gender identity' },
+  { value: 'other', label: 'Other', description: 'Optional custom text' },
+];
+
+const CALCULATION_MODE_OPTIONS: Array<{ value: CalculationGenderMode; label: string; description: string }> = [
+  { value: 'male', label: 'Treat as male', description: 'Uses the classical male Da Yun direction rule' },
+  { value: 'female', label: 'Treat as female', description: 'Uses the classical female Da Yun direction rule' },
+];
 
 // ── Element color helper ───────────────────────────────────
 function elColor(el: string): string {
@@ -241,7 +266,7 @@ function TSTCard({ result }: { result: BaziResult }) {
   );
 }
 
-type FormValues = AnalysisFormPayload;
+type FormValues = AnalysisFormDraft;
 type FollowUpItem = {
   question: string;
   answer: string | null;
@@ -266,10 +291,13 @@ export default function BaziCalculator() {
   const [timezone, setTimezone]   = useState('Asia/Bangkok');
   const [longitude, setLongitude] = useState('100.52');
   const [latitude, setLatitude]   = useState('13.75');
-  const [gender, setGender]       = useState<'male' | 'female'>('male');
+  const [genderIdentity, setGenderIdentity] = useState<GenderIdentity>('male');
+  const [genderOtherText, setGenderOtherText] = useState('');
+  const [calculationMode, setCalculationMode] = useState<CalculationGenderMode | ''>('male');
   const [unknownTime, setUnknownTime] = useState(false);
   const [result, setResult]       = useState<BaziResult | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [calculatedFormValues, setCalculatedFormValues] = useState<AnalysisFormPayload | null>(null);
   const [analysis, setAnalysis]   = useState<string | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpItem[]>(EMPTY_FOLLOW_UPS);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -287,7 +315,9 @@ export default function BaziCalculator() {
     timezone,
     longitude,
     latitude,
-    gender,
+    genderIdentity,
+    genderOtherText,
+    calculationMode,
     unknownTime,
   };
 
@@ -299,31 +329,55 @@ export default function BaziCalculator() {
     setTimezone(values.timezone);
     setLongitude(values.longitude);
     setLatitude(values.latitude);
-    setGender(values.gender);
+    setGenderIdentity(values.genderIdentity);
+    setGenderOtherText(values.genderOtherText);
+    setCalculationMode(values.calculationMode);
     setUnknownTime(values.unknownTime);
   }
 
+  function handleGenderIdentityChange(nextIdentity: GenderIdentity) {
+    setGenderIdentity(nextIdentity);
+
+    if (nextIdentity === 'male' || nextIdentity === 'female') {
+      setCalculationMode(nextIdentity);
+      return;
+    }
+
+    setCalculationMode('');
+  }
+
   function calculate(values: FormValues, options?: { syncInputs?: boolean }) {
+    const normalizedValues = finalizeAnalysisFormPayload(values);
     if (options?.syncInputs) syncFormState(values);
     if (!values.dob) { setCalcError('Please enter date of birth.'); return; }
     if (!values.unknownTime && !values.tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
+    if (!values.calculationMode) {
+      setCalcError('Please choose a calculation mode for classical Da Yun rules.');
+      return;
+    }
     const lng = parseFloat(values.longitude);
     if (isNaN(lng) || lng < -180 || lng > 180) { setCalcError('Longitude must be between −180 and 180.'); return; }
     const lat = parseFloat(values.latitude);
     if (isNaN(lat) || lat < -90 || lat > 90) { setCalcError('Latitude must be between −90 and 90.'); return; }
     if (!values.timezone) { setCalcError('Please choose a birth place or enter a timezone manually.'); return; }
+    if (!normalizedValues) {
+      setCalcError('Please review the gender identity and calculation fields.');
+      return;
+    }
     setCalcError(null);
     try {
       const r = computeBazi(
-        values.dob,
-        values.unknownTime ? null : values.tob,
-        values.timezone,
+        normalizedValues.dob,
+        normalizedValues.unknownTime ? null : normalizedValues.tob,
+        normalizedValues.timezone,
         lng,
-        values.gender === 'male',
+        normalizedValues.calculationMode,
       );
       const cd = computeChartData(r.pillars, r.pillars.day.stemIdx, r.unknownTime);
+      syncFormState(normalizedValues);
       setResult(r);
       setChartData(cd);
+      setCalculatedFormValues(normalizedValues);
       setAnalysis(null);
       setFollowUps(EMPTY_FOLLOW_UPS);
       setAnalysisError(null);
@@ -346,13 +400,21 @@ export default function BaziCalculator() {
 
       if (!savedState.formValues) return;
 
+      const restoredDraft = normalizeAnalysisFormDraft(savedState.formValues);
+      if (!restoredDraft) return;
+
       if (savedState.restoreChart) {
-        const restoredValues = savedState.formValues;
+        const restoredValues = restoredDraft;
+        const finalizedRestoredValues = finalizeAnalysisFormPayload(restoredValues);
         syncFormState(restoredValues);
 
         if (!restoredValues.dob) { setCalcError('Please enter date of birth.'); return; }
         if (!restoredValues.unknownTime && !restoredValues.tob) {
           setCalcError('Please enter time of birth, or check "I don\'t know my birth time".');
+          return;
+        }
+        if (!restoredValues.calculationMode || !finalizedRestoredValues) {
+          setCalcError('Please choose a calculation mode for classical Da Yun rules.');
           return;
         }
 
@@ -371,11 +433,11 @@ export default function BaziCalculator() {
 
         try {
           const restoredResult = computeBazi(
-            restoredValues.dob,
-            restoredValues.unknownTime ? null : restoredValues.tob,
-            restoredValues.timezone,
+            finalizedRestoredValues.dob,
+            finalizedRestoredValues.unknownTime ? null : finalizedRestoredValues.tob,
+            finalizedRestoredValues.timezone,
             lng,
-            restoredValues.gender === 'male',
+            finalizedRestoredValues.calculationMode,
           );
           const restoredChartData = computeChartData(
             restoredResult.pillars,
@@ -385,6 +447,7 @@ export default function BaziCalculator() {
 
           setResult(restoredResult);
           setChartData(restoredChartData);
+          setCalculatedFormValues(finalizedRestoredValues);
           setAnalysis(null);
           setFollowUps(EMPTY_FOLLOW_UPS);
           setAnalysisError(null);
@@ -394,7 +457,7 @@ export default function BaziCalculator() {
         return;
       }
 
-      syncFormState(savedState.formValues);
+      syncFormState(restoredDraft);
     } catch {
       sessionStorage.removeItem(AUTH_STATE_KEY);
     }
@@ -444,13 +507,13 @@ export default function BaziCalculator() {
   }
 
   async function runAnalysis() {
-    if (!result || !chartData) return;
+    if (!result || !chartData || !calculatedFormValues) return;
     setLoadingAnalysis(true);
     setAnalysisError(null);
     setAnalysis(null);
     try {
       const requestBody = buildAnalyzeRequestBody({
-        formValues,
+        formValues: calculatedFormValues,
         result,
         chartData,
       });
@@ -482,7 +545,7 @@ export default function BaziCalculator() {
   }
 
   async function runFollowUp(index: number) {
-    if (!result || !chartData) return;
+    if (!result || !chartData || !calculatedFormValues) return;
 
     const question = followUps[index]?.question.trim() ?? '';
     if (!question) {
@@ -495,7 +558,7 @@ export default function BaziCalculator() {
     try {
       const requestBody = {
         ...buildAnalyzeRequestBody({
-          formValues,
+          formValues: calculatedFormValues,
           result,
           chartData,
         }),
@@ -652,20 +715,82 @@ export default function BaziCalculator() {
               </div>
             </details>
 
-            {/* Gender */}
+            {/* Gender Identity */}
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Gender</label>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setGender('male')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${gender === 'male' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}
-                >♂ Male</button>
-                <button
-                  type="button"
-                  onClick={() => setGender('female')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${gender === 'female' ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
-                >♀ Female</button>
+              <label className="text-xs font-medium text-slate-600">Gender Identity</label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {GENDER_IDENTITY_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors ${
+                      genderIdentity === option.value
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="genderIdentity"
+                      value={option.value}
+                      checked={genderIdentity === option.value}
+                      onChange={() => handleGenderIdentityChange(option.value)}
+                      className="mt-0.5 h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>
+                      <span className="block font-medium">{option.label}</span>
+                      <span className="block text-xs text-slate-500">{option.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {genderIdentity === 'other' && (
+                <div className="mt-2">
+                  <label htmlFor="gender-other-text" className="text-xs font-medium text-slate-600">
+                    Optional self-description
+                  </label>
+                  <input
+                    id="gender-other-text"
+                    type="text"
+                    value={genderOtherText}
+                    onChange={(event) => setGenderOtherText(event.target.value)}
+                    placeholder="Enter a label if you want to share one"
+                    className="mt-1 w-full bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Calculation Mode */}
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-xs font-medium text-slate-600">Calculation Mode</label>
+              <p className="text-[11px] text-slate-500">
+                Classical Da Yun direction still uses a male/female treatment rule. This setting is separate from gender identity.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {CALCULATION_MODE_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors ${
+                      calculationMode === option.value
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calculationMode"
+                      value={option.value}
+                      checked={calculationMode === option.value}
+                      onChange={() => setCalculationMode(option.value)}
+                      className="mt-0.5 h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>
+                      <span className="block font-medium">{option.label}</span>
+                      <span className="block text-xs text-slate-500">{option.description}</span>
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -682,6 +807,14 @@ export default function BaziCalculator() {
 
         {result && chartData && (
           <>
+            {calculatedFormValues && (
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
+                Gender identity: <span className="font-medium text-slate-800">{formatGenderIdentity(calculatedFormValues.genderIdentity, calculatedFormValues.genderOtherText)}</span>
+                &nbsp;·&nbsp;
+                Calculation mode: <span className="font-medium text-slate-800">{formatCalculationGenderMode(calculatedFormValues.calculationMode)}</span>
+              </div>
+            )}
+
             {/* Solar Info */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
               {result.unknownTime
@@ -846,8 +979,11 @@ export default function BaziCalculator() {
                 <div className="text-xs text-slate-500 mb-3">
                   Direction: <span className="font-medium text-slate-700">{result.daYun.forward ? 'Forward 順行' : 'Backward 逆行'}</span>
                   {result.daYun.forward
-                    ? ' (Yang year ♂ / Yin year ♀ — pillars advance with the cycle)'
-                    : ' (Yin year ♂ / Yang year ♀ — pillars retreat against the cycle)'}
+                    ? ' (classical rule advances from the month pillar)'
+                    : ' (classical rule moves backward from the month pillar)'}
+                  <br />
+                  Calculation mode: <span className="font-medium text-slate-700">{formatCalculationGenderMode(result.daYun.calculationMode)}</span>
+                  &nbsp;·&nbsp; <span>{result.daYun.ruleNote}</span>
                   <br />
                   Nearest solar term: <span className="font-medium text-slate-700">{result.daYun.jie.name}</span>
                   &nbsp;·&nbsp; Luck begins at: <span className="font-medium text-slate-700">

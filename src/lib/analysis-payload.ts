@@ -6,19 +6,29 @@ import {
   type DaYun,
   type TSTInfo,
 } from '@/lib/bazi';
+import {
+  finalizeGenderFields,
+  normalizeGenderDraft,
+  type GenderDraftFields,
+  type GenderFields,
+  type LegacyGenderFields,
+} from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
 
-export type AnalysisFormPayload = {
+type AnalysisFormBase = {
   dob: string;
   tob: string;
   timezone: string;
   longitude: string;
   latitude: string;
-  gender: 'male' | 'female';
   unknownTime: boolean;
   birthPlaceQuery: string;
   birthPlace: PlaceSearchResult | null;
 };
+
+export type AnalysisFormPayload = AnalysisFormBase & GenderFields;
+
+export type AnalysisFormDraft = AnalysisFormBase & GenderDraftFields & LegacyGenderFields;
 
 type SerializedJie = {
   name: string;
@@ -83,6 +93,56 @@ export function buildComputedChartPayload(result: BaziResult, chartData: ChartDa
   };
 }
 
+export function finalizeAnalysisFormPayload(formValues: AnalysisFormDraft): AnalysisFormPayload | null {
+  const normalizedGender = finalizeGenderFields(formValues);
+  if (!normalizedGender) return null;
+
+  return {
+    dob: formValues.dob,
+    tob: formValues.tob,
+    timezone: formValues.timezone,
+    longitude: formValues.longitude,
+    latitude: formValues.latitude,
+    unknownTime: formValues.unknownTime,
+    birthPlaceQuery: formValues.birthPlaceQuery,
+    birthPlace: formValues.birthPlace,
+    ...normalizedGender,
+  };
+}
+
+export function normalizeAnalysisFormDraft(value: unknown): AnalysisFormDraft | null {
+  if (!isRecord(value)) return null;
+
+  const normalizedGender = normalizeGenderDraft(value as Partial<GenderDraftFields & LegacyGenderFields>);
+  if (!normalizedGender) return null;
+
+  if (
+    !isString(value.dob)
+    || !isString(value.tob)
+    || !isString(value.timezone)
+    || !isString(value.longitude)
+    || !isString(value.latitude)
+    || !isBoolean(value.unknownTime)
+    || !isString(value.birthPlaceQuery)
+    || (value.birthPlace !== null && value.birthPlace !== undefined && !isRecord(value.birthPlace))
+  ) {
+    return null;
+  }
+
+  return {
+    dob: value.dob,
+    tob: value.tob,
+    timezone: value.timezone,
+    longitude: value.longitude,
+    latitude: value.latitude,
+    unknownTime: value.unknownTime,
+    birthPlaceQuery: value.birthPlaceQuery,
+    birthPlace: (value.birthPlace as PlaceSearchResult | null | undefined) ?? null,
+    gender: value.gender === 'male' || value.gender === 'female' ? value.gender : undefined,
+    ...normalizedGender,
+  };
+}
+
 export function recomputeAnalysisChartPayload(formValues: AnalysisFormPayload): AnalysisComputedChartPayload {
   if (!formValues.dob) {
     throw new Error('Date of birth is required.');
@@ -102,7 +162,7 @@ export function recomputeAnalysisChartPayload(formValues: AnalysisFormPayload): 
     formValues.unknownTime ? null : formValues.tob,
     formValues.timezone,
     longitude,
-    formValues.gender === 'male',
+    formValues.calculationMode,
   );
   const chartData = computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
   return buildComputedChartPayload(result, chartData);
@@ -237,17 +297,10 @@ export function parseAnalyzeRequestBody(body: unknown): AnalyzeRequestBody | nul
   }
 
   const { birthInfo, computedChart, requestMetadata } = body;
-
-  const hasValidBirthInfo =
-    isString(birthInfo.dob) &&
-    isString(birthInfo.tob) &&
-    isString(birthInfo.timezone) &&
-    isString(birthInfo.longitude) &&
-    isString(birthInfo.latitude) &&
-    (birthInfo.gender === 'male' || birthInfo.gender === 'female') &&
-    isBoolean(birthInfo.unknownTime) &&
-    isString(birthInfo.birthPlaceQuery) &&
-    (birthInfo.birthPlace === null || isRecord(birthInfo.birthPlace));
+  const normalizedBirthInfoDraft = normalizeAnalysisFormDraft(birthInfo);
+  const normalizedBirthInfo = normalizedBirthInfoDraft
+    ? finalizeAnalysisFormPayload(normalizedBirthInfoDraft)
+    : null;
 
   const hasValidComputedChart =
     isComputedChartPayload(computedChart);
@@ -260,11 +313,19 @@ export function parseAnalyzeRequestBody(body: unknown): AnalyzeRequestBody | nul
   const hasValidFollowUpQuestion =
     body.followUpQuestion === undefined || isString(body.followUpQuestion);
 
-  if (!hasValidBirthInfo || !hasValidComputedChart || !hasValidMetadata || !hasValidMode || !hasValidFollowUpQuestion) {
+  if (!normalizedBirthInfo || !hasValidComputedChart || !hasValidMetadata || !hasValidMode || !hasValidFollowUpQuestion) {
     return null;
   }
 
-  return body as AnalyzeRequestBody;
+  return {
+    mode: body.mode === 'initial' || body.mode === 'follow_up' ? body.mode : undefined,
+    followUpQuestion: typeof body.followUpQuestion === 'string' ? body.followUpQuestion : undefined,
+    birthInfo: normalizedBirthInfo,
+    computedChart,
+    requestMetadata: {
+      clientGeneratedAt: String(requestMetadata.clientGeneratedAt),
+    },
+  };
 }
 
 export function analyzeRequestMatchesServerComputation(body: AnalyzeRequestBody): boolean {

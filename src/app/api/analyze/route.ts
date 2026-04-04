@@ -9,6 +9,7 @@ import {
   parseAnalyzeRequestBody,
   recomputeAnalysisChartPayload,
 } from '@/lib/analysis-payload';
+import { formatCalculationGenderMode, formatGenderIdentity } from '@/lib/gender';
 
 const AI_MODEL = 'gpt-4o-mini';
 let client: OpenAI | null = null;
@@ -86,7 +87,9 @@ export async function handleAnalyzeRequest(
   const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.`;
 
   const chartSummary = `
-Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}, ${birthInfo.gender}
+Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}
+Gender identity: ${formatGenderIdentity(birthInfo.genderIdentity, birthInfo.genderOtherText)}
+Calculation mode for classical rules: ${formatCalculationGenderMode(birthInfo.calculationMode)}
 
 Four Pillars (四柱):
 - Year 年柱: ${pillars.year.stem.zh}${pillars.year.branch.zh} (${pillars.year.stem.pinyin}/${pillars.year.branch.pinyin}) — ${pillars.year.stem.element} ${pillars.year.stem.yin?'Yin':'Yang'} / ${pillars.year.branch.element} ${pillars.year.branch.yin?'Yin':'Yang'}
