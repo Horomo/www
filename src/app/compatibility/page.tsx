@@ -287,6 +287,7 @@ export default function CompatibilityPage() {
           tier,
           dayBranchInteraction,
           dayMasterRelationship,
+          elementBalance,
         }),
       }).catch(err => console.error('Compatibility log failed', err));
 

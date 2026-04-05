@@ -2,7 +2,8 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { authOptions } from '@/lib/auth';
-import { insertAnalysisLog, type CompatibilityLogInsert } from '@/lib/analysis-log';
+import { insertCompatibilityLog } from '@/lib/analysis-log';
+import packageJson from '../../../../package.json';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -13,41 +14,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 });
   }
 
-  const { personA, personB, pillarsA, pillarsB, tier, dayBranchInteraction, dayMasterRelationship } = body as Record<string, unknown>;
+  const {
+    personA,
+    personB,
+    pillarsA,
+    pillarsB,
+    tier,
+    dayBranchInteraction,
+    dayMasterRelationship,
+    elementBalance,
+  } = body as Record<string, unknown>;
 
-  const logPayload: CompatibilityLogInsert = {
-    user_id: userId,
-    birth_info: {
-      person_a: {
-        name: (personA as Record<string, string>)?.name ?? '',
-        date: (personA as Record<string, string>)?.date ?? '',
-        time: (personA as Record<string, string>)?.time ?? '',
-      },
-      person_b: {
-        name: (personB as Record<string, string>)?.name ?? '',
-        date: (personB as Record<string, string>)?.date ?? '',
-        time: (personB as Record<string, string>)?.time ?? '',
-      },
-    },
-    pillars: {
-      person_a: pillarsA ?? null,
-      person_b: pillarsB ?? null,
-    },
-    chart_data: null,
-    request_payload: body,
-    debug_metadata: {
-      type: 'compatibility',
-      rating: typeof tier === 'string' ? tier : '',
-      day_branch_interaction: (dayBranchInteraction as 'six_harmony' | 'six_clash' | 'neutral') ?? 'neutral',
-      day_master_relationship: typeof dayMasterRelationship === 'string' ? dayMasterRelationship : '',
-    },
-    analysis_status: 'calculated',
-    app_version: null,
-    logging_error: null,
-  };
+  const a = personA as Record<string, string> | null;
+  const b = personB as Record<string, string> | null;
 
   try {
-    await insertAnalysisLog(logPayload);
+    await insertCompatibilityLog({
+      user_id:                userId,
+      name_a:                 a?.name || null,
+      birth_date_a:           a?.date ?? '',
+      birth_time_a:           a?.time || null,
+      pillars_a:              pillarsA ?? null,
+      name_b:                 b?.name || null,
+      birth_date_b:           b?.date ?? '',
+      birth_time_b:           b?.time || null,
+      pillars_b:              pillarsB ?? null,
+      tier:                   typeof tier === 'string' ? tier : '',
+      day_branch_interaction: typeof dayBranchInteraction === 'string' ? dayBranchInteraction : '',
+      day_master_relationship: typeof dayMasterRelationship === 'string' ? dayMasterRelationship : '',
+      element_balance:        elementBalance ?? null,
+      app_version:            packageJson.version ?? null,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown logging error';
     console.error('Compatibility log insert failed', { message });

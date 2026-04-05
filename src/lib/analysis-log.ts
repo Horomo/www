@@ -17,30 +17,23 @@ export type AnalysisDebugMetadata = {
   unknownTime: boolean;
 };
 
-// ── Compatibility logging types ────────────────────────────
+// ── Compatibility log types ────────────────────────────────
 
-export type CompatibilityBirthInfo = {
-  person_a: { name: string; date: string; time: string };
-  person_b: { name: string; date: string; time: string };
-};
-
-export type CompatibilityDebugMetadata = {
-  type: 'compatibility';
-  rating: string;
-  day_branch_interaction: 'six_harmony' | 'six_clash' | 'neutral';
-  day_master_relationship: string;
-};
-
-export type CompatibilityLogInsert = {
+export type CompatibilityLogRow = {
   user_id: string | null;
-  birth_info: CompatibilityBirthInfo;
-  pillars: { person_a: unknown; person_b: unknown };
-  chart_data: null;
-  request_payload: unknown;
-  debug_metadata: CompatibilityDebugMetadata;
-  analysis_status: AnalysisStatus;
-  app_version: null;
-  logging_error: null;
+  name_a: string | null;
+  birth_date_a: string;
+  birth_time_a: string | null;
+  pillars_a: unknown;
+  name_b: string | null;
+  birth_date_b: string;
+  birth_time_b: string | null;
+  pillars_b: unknown;
+  tier: string;
+  day_branch_interaction: string;
+  day_master_relationship: string;
+  element_balance: unknown;
+  app_version: string | null;
 };
 
 export type AnalysisLogInsert = {
@@ -104,7 +97,7 @@ export function buildAnalysisLogInsert(params: {
   };
 }
 
-export async function insertAnalysisLog(payload: AnalysisLogInsert | CompatibilityLogInsert): Promise<void> {
+export async function insertAnalysisLog(payload: AnalysisLogInsert): Promise<void> {
   const { url, serviceRoleKey } = getSupabaseConfig();
   const response = await fetch(`${url}/rest/v1/${ANALYSIS_LOG_TABLE}`, {
     method: 'POST',
@@ -115,6 +108,27 @@ export async function insertAnalysisLog(payload: AnalysisLogInsert | Compatibili
       Prefer: 'return=minimal',
     },
     body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase insert failed (${response.status}): ${errorText.slice(0, 300)}`);
+  }
+}
+
+const COMPATIBILITY_LOG_TABLE = 'compatibility_logs';
+
+export async function insertCompatibilityLog(row: CompatibilityLogRow): Promise<void> {
+  const { url, serviceRoleKey } = getSupabaseConfig();
+  const response = await fetch(`${url}/rest/v1/${COMPATIBILITY_LOG_TABLE}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
   });
 
   if (!response.ok) {
