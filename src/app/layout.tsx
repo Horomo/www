@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Script from 'next/script';
 import Link from 'next/link';
 
 import Providers from './providers';
@@ -30,6 +31,20 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-V0RH6KHWH9"
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-V0RH6KHWH9');
+          `}
+        </Script>
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           <nav className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-6">
