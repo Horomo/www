@@ -42,6 +42,15 @@ const nextConfig: NextConfig = {
     ];
     return config;
   },
+
+  async redirects() {
+    return [
+      { source: '/compatibility', destination: '/', permanent: false },
+      { source: '/match', destination: '/', permanent: false },
+      { source: '/relationship', destination: '/', permanent: false },
+      { source: '/compare', destination: '/', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

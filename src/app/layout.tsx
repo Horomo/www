@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Horomo Bazi Calculator',
-  description: 'Calculate Four Pillars of Destiny charts and unlock AI analysis after signing in with Google.',
+  description: 'Calculate a single-person Four Pillars of Destiny chart with true solar time, element analysis, and optional AI interpretation.',
 };
 
 export default function RootLayout({
@@ -50,9 +50,6 @@ export default function RootLayout({
           <nav className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-6">
             <Link href="/" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
               Bazi Calculator
-            </Link>
-            <Link href="/compatibility" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
-              Compatibility
             </Link>
           </nav>
           {children}

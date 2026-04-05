@@ -17,25 +17,6 @@ export type AnalysisDebugMetadata = {
   unknownTime: boolean;
 };
 
-// ── Compatibility log types ────────────────────────────────
-
-export type CompatibilityLogRow = {
-  user_id: string | null;
-  name_a: string | null;
-  birth_date_a: string;
-  birth_time_a: string | null;
-  pillars_a: unknown;
-  name_b: string | null;
-  birth_date_b: string;
-  birth_time_b: string | null;
-  pillars_b: unknown;
-  tier: string;
-  day_branch_interaction: string;
-  day_master_relationship: string;
-  element_balance: unknown;
-  app_version: string | null;
-};
-
 export type AnalysisLogInsert = {
   user_id: string | null;
   birth_info: AnalysisFormPayload;
@@ -108,27 +89,6 @@ export async function insertAnalysisLog(payload: AnalysisLogInsert): Promise<voi
       Prefer: 'return=minimal',
     },
     body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase insert failed (${response.status}): ${errorText.slice(0, 300)}`);
-  }
-}
-
-const COMPATIBILITY_LOG_TABLE = 'compatibility_logs';
-
-export async function insertCompatibilityLog(row: CompatibilityLogRow): Promise<void> {
-  const { url, serviceRoleKey } = getSupabaseConfig();
-  const response = await fetch(`${url}/rest/v1/${COMPATIBILITY_LOG_TABLE}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(row),
   });
 
   if (!response.ok) {
