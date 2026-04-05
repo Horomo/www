@@ -30,6 +30,7 @@ import {
   type GenderIdentity,
 } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
+import { trackEvent } from '@/lib/analytics';
 
 const GENDER_IDENTITY_OPTIONS: Array<{ value: GenderIdentity; label: string; description: string }> = [
   { value: 'male',              label: 'Male',              description: 'Auto-sets energy polarity to Yang'         },
@@ -369,6 +370,11 @@ export default function BaziCalculator() {
     setUnknownTime(values.unknownTime);
   }
 
+  // ── GA4: fire calculation_mode_view once on mount ─────────
+  useEffect(() => {
+    trackEvent('calculation_mode_view', { screen_name: 'bazi_form' });
+  }, []);
+
   function handleGenderIdentityChange(nextIdentity: GenderIdentity) {
     setGenderIdentity(nextIdentity);
 
@@ -378,6 +384,28 @@ export default function BaziCalculator() {
     }
 
     setCalculationMode('');
+  }
+
+  function handleCalculationModeChange(next: CalculationGenderMode) {
+    if (next !== calculationMode) {
+      trackEvent('selection_changed', {
+        previous_energy_type: calculationMode || undefined,
+        energy_type: next,
+        screen_name: 'bazi_form',
+      });
+    }
+    trackEvent('calculation_mode_selected', {
+      energy_type: next,
+      screen_name: 'bazi_form',
+    });
+    setCalculationMode(next);
+  }
+
+  function handleTooltipOpen() {
+    trackEvent('tooltip_opened', {
+      interaction_type: 'tooltip',
+      screen_name: 'bazi_form',
+    });
   }
 
   function calculate(values: FormValues, options?: { syncInputs?: boolean }) {
@@ -812,6 +840,8 @@ export default function BaziCalculator() {
                   className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-500 hover:bg-slate-300"
                   title="This affects which 10-year luck cycle (大運) you enter first and the direction they progress. It is derived from your year pillar's Yin/Yang polarity combined with this setting — it is completely separate from your gender identity."
                   aria-label="Help: luck cycle direction"
+                  onMouseEnter={handleTooltipOpen}
+                  onFocus={handleTooltipOpen}
                 >
                   ?
                 </span>
@@ -845,7 +875,7 @@ export default function BaziCalculator() {
                         name="calculationMode"
                         value={option.value}
                         checked={isSelected}
-                        onChange={() => setCalculationMode(option.value)}
+                        onChange={() => handleCalculationModeChange(option.value)}
                         className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-emerald-600 focus:ring-emerald-500"
                       />
                       <span className="flex-1 min-w-0">
@@ -885,7 +915,12 @@ export default function BaziCalculator() {
 
           {calcError && <div className="text-red-600 text-sm mt-3">{calcError}</div>}
           <button
-            onClick={() => calculate(formValues)}
+            onClick={() => {
+              if (calculationMode) {
+                trackEvent('calculation_mode_confirmed', { energy_type: calculationMode });
+              }
+              calculate(formValues);
+            }}
             className="mt-4 block w-full sm:w-auto sm:mx-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-8 py-2.5 rounded-lg transition-colors"
           >
             Calculate Chart · 起命盤
