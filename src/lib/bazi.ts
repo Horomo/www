@@ -797,7 +797,10 @@ export function elementToStructure(el: string, dmEl: string): string {
   if (el === controls(dmEl))     return 'wealth';
   if (el === controlledBy(dmEl)) return 'influence';
   if (el === generatedBy(dmEl))  return 'resource';
-  return 'companion';
+  // The five branches above are exhaustive for any valid element string.
+  // Reaching here means `el` or `dmEl` is not a recognised element name —
+  // likely a data bug upstream. Throw rather than silently misclassify.
+  throw new Error(`elementToStructure: unrecognised element "${el}" (dmEl="${dmEl}")`);
 }
 
 export interface ChartData {
@@ -806,6 +809,32 @@ export interface ChartData {
   tenGodsCount: Record<string, number>;
 }
 
+/**
+ * Flat-count aggregation model
+ * ─────────────────────────────
+ * This function implements a deliberately simple, unweighted counting model.
+ * It is NOT a qi-strength model and NOT a seasonal influence model.
+ *
+ * Rules (each item contributes a flat count of 1):
+ *  - Visible stem of each pillar:    counted in structureCounts
+ *  - Hidden stems of each branch:    every stem in BRANCH_HIDDEN_STEMS[branchIdx]
+ *                                    is counted once in both structureCounts and tenGodsCount
+ *  - Day master's own visible stem:  counted in structureCounts (as companion),
+ *                                    but excluded from tenGodsCount (k !== 'day' guard)
+ *                                    because the day master has no Ten God relationship with itself
+ *  - Pillar count:                   4 pillars when birth time is known,
+ *                                    3 (day/month/year) when unknownTime is true
+ *
+ * Intentional asymmetry:
+ *  sum(structureCounts) = sum(tenGodsCount) + 1
+ *  The +1 is the day master's visible stem, which is excluded from tenGodsCount only.
+ *
+ * What this model does NOT do:
+ *  - No qi-depth weighting (main qi ≠ mid qi ≠ residual qi)
+ *  - No seasonal / monthly energy weighting
+ *  - No positional strength for year/month/day/hour pillar
+ *  - No Day Master strong/weak scoring
+ */
 export function computeChartData(
   pillars: BaziResult['pillars'],
   dmStemIdx: number,
@@ -819,11 +848,17 @@ export function computeChartData(
   order.forEach(k => {
     const p = pillars[k];
     if (!p) return;
+
+    // Visible stem: +1 to structureCounts for every pillar (including day).
     structureCounts[elementToStructure(p.stem.element, dmEl)]++;
+
+    // Visible stem Ten God: counted for every pillar except the day master's own stem.
     if (k !== 'day') {
       const tg = tenGod(dmStemIdx, p.stemIdx);
       tenGodsCount[tg.zh] = (tenGodsCount[tg.zh] || 0) + 1;
     }
+
+    // Hidden stems: every hidden stem in the branch counts as +1 in both tallies.
     const hiddenStems = BRANCH_HIDDEN_STEMS[p.branchIdx];
     hiddenStems.forEach(hsIdx => {
       structureCounts[elementToStructure(STEMS[hsIdx].element, dmEl)]++;
