@@ -2,6 +2,8 @@ import path from 'path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  trailingSlash: false,
+
   // ── Turbopack (Next.js 16 default) ──────────────────────────────────────
   // An explicit turbopack key is required in Next.js 16 whenever a webpack()
   // function is also present; otherwise the build errors with a hard stop.

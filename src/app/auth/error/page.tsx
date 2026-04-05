@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { buildMetadata } from '@/lib/seo';
+
 const ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: 'Google sign-in was denied. Please try again and grant access to continue.',
   Configuration: 'Authentication is not configured correctly on the server.',
@@ -10,6 +12,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   SessionRequired: 'You need to sign in with Google to use this feature.',
   default: 'Google sign-in failed. Please try again.',
 };
+
+export const metadata = buildMetadata({
+  title: 'Authentication Error',
+  description: 'Google sign-in could not be completed for Horomo.',
+  path: '/auth/error',
+  noIndex: true,
+});
 
 export default async function AuthErrorPage({
   searchParams,
@@ -22,7 +31,7 @@ export default async function AuthErrorPage({
   const message = ERROR_MESSAGES[errorCode ?? 'default'] ?? ERROR_MESSAGES.default;
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Authentication Error</p>
         <h1 className="mt-2 text-2xl font-semibold text-slate-900">Unable to sign in with Google</h1>

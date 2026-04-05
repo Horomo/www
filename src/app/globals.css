@@ -1,10 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
 }
 
 .font-zh {
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-noto-serif-sc), serif;
 }

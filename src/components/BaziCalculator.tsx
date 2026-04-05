@@ -670,13 +670,22 @@ export default function BaziCalculator() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 py-8 px-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <section className="bg-slate-100 py-8 px-4" aria-labelledby="calculator-heading">
       <div className="max-w-4xl mx-auto space-y-4">
 
         {/* Header */}
         <header className="text-center pb-2">
-          <div className="font-zh text-4xl font-bold text-slate-900 tracking-widest">八字命盤</div>
-          <div className="text-xs font-semibold tracking-widest text-slate-400 uppercase mt-1">Four Pillars of Destiny</div>
+          <p className="font-zh text-4xl font-bold text-slate-900 tracking-widest">八字命盤</p>
+          <h2 id="calculator-heading" className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+            BaZi calculator
+          </h2>
+          <p className="text-xs font-semibold tracking-widest text-slate-400 uppercase mt-1">
+            Four Pillars of Destiny
+          </p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+            Enter your birth details to calculate a Four Pillars chart with Day Master, Ten Gods,
+            hidden stems, element distribution, and major luck cycles.
+          </p>
           <div className="w-8 h-0.5 bg-indigo-600 mx-auto mt-3 rounded" />
         </header>
 
@@ -1264,6 +1273,6 @@ export default function BaziCalculator() {
           </>
         )}
       </div>
-    </main>
+    </section>
   );
 }
