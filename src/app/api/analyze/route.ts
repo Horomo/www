@@ -241,10 +241,30 @@ Provide analysis in these sections:
    Do not default to generic "seek balance" statements.
 
 5. Current Period
-   Use the Da Yun pillar provided. Describe what the current luck cycle stem
-   and branch elements mean when they interact with the Day Master element
-   specifically — use the five-element interaction (生/剋/洩/耗/比) to explain
-   the dynamic. Do not give a generic "period of growth" statement.
+   Use the Da Yun pillar provided. Describe what the current luck cycle
+   stem and branch elements mean when they interact with the Day Master
+   element — use the five-element interaction table below exactly.
+   Do not give a generic "period of growth" statement.
+
+   Five-element interactions — use these exactly, do not infer:
+   生 (generates): Wood→Fire, Fire→Earth, Earth→Metal, Metal→Water, Water→Wood
+   剋 (controls):  Wood→Earth, Earth→Water, Water→Fire, Fire→Metal, Metal→Wood
+   洩 (drains):    Fire→Wood, Earth→Fire, Metal→Earth, Water→Metal, Wood→Water
+
+   Apply the correct relationship:
+   - Da Yun element generates DM element → nurturing, supportive period,
+     DM has more resources to draw from
+   - Da Yun element controls DM element → pressure, restriction, external
+     challenges testing the DM
+   - DM element controls Da Yun element → DM expends energy to manage
+     this cycle, tiring but potentially productive
+   - DM element generates Da Yun element → DM is drained outward,
+     high-output period that may deplete personal resources
+   - Same element as DM → peer reinforcement or rivalry depending on
+     whether companion or rob-wealth structure dominates
+
+   State clearly which relationship applies, then describe what that
+   means practically for this person in this decade.
 
 6. Practical Advice — 3 suggestions
    Each suggestion must:
@@ -264,7 +284,10 @@ Word budget:
   - Sections 1–5 combined: maximum 600 words
   - Section 6 (Practical Advice): maximum 150 words, always complete
   - Total cap: 750 words
-  - If over budget, trim sections 2 and 4 first — never truncate section 6`;
+  - If over budget, trim sections 2 and 4 first
+  - Never truncate section 6 mid-sentence or mid-suggestion
+  - If space is critically tight, reduce to 2 suggestions but
+    complete each one fully`;
 
   try {
     try {
