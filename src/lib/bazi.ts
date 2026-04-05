@@ -111,7 +111,7 @@ export const BRANCHES: Branch[] = [
 // All hidden stems per branch (main qi first, then mid, then residual)
 export const BRANCH_HIDDEN_STEMS: number[][] = [
   [9],           // 子(0): 癸
-  [5, 7, 9],     // 丑(1): 己, 辛, 癸
+  [5, 9, 7],     // 丑(1): 己, 癸, 辛  — canonical order: main(己), mid(癸), residual(辛)
   [0, 2, 4],     // 寅(2): 甲, 丙, 戊
   [1],           // 卯(3): 乙
   [4, 1, 9],     // 辰(4): 戊, 乙, 癸
@@ -712,9 +712,10 @@ export function computeBazi(
 }
 
 // ── Hidden Stem / Chart Helpers ────────────────────────────
+// Main qi derives directly from the hidden stems table (index 0 = main qi).
+// BRANCH_HIDDEN_STEMS is the single source of truth — no duplicate table here.
 export function getBranchMainStem(branchIdx: number): number {
-  const mainQi = [9, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8];
-  return mainQi[branchIdx];
+  return BRANCH_HIDDEN_STEMS[branchIdx][0];
 }
 
 type LocalDateTimeParts = {

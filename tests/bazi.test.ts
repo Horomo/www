@@ -145,3 +145,44 @@ test('local display date survives UTC month rollover in eastern timezones', () =
   assert.equal(result.displayTzLabel, 'UTC+9:00');
   assert.equal(isoDate(result.displayDate), '2024-03-01');
 });
+
+// ── Hidden stems data integrity ────────────────────────────────────────────
+
+test('BRANCH_HIDDEN_STEMS covers all 12 branches with correct canonical order', () => {
+  // Expected: [stemIndices] per branch.
+  // 丑 order: 己(main), 癸(mid), 辛(residual) — canonical per classical sources.
+  // 午 order: 丁(main), 己(mid) — no residual stem in single-tradition tables.
+  const expected: number[][] = [
+    [9],        // 子(0):  癸
+    [5, 9, 7],  // 丑(1):  己, 癸, 辛
+    [0, 2, 4],  // 寅(2):  甲, 丙, 戊
+    [1],        // 卯(3):  乙
+    [4, 1, 9],  // 辰(4):  戊, 乙, 癸
+    [2, 6, 4],  // 巳(5):  丙, 庚, 戊
+    [3, 5],     // 午(6):  丁, 己
+    [5, 3, 1],  // 未(7):  己, 丁, 乙
+    [6, 8, 4],  // 申(8):  庚, 壬, 戊
+    [7],        // 酉(9):  辛
+    [4, 7, 3],  // 戌(10): 戊, 辛, 丁
+    [8, 0],     // 亥(11): 壬, 甲
+  ];
+
+  assert.equal(bazi.BRANCH_HIDDEN_STEMS.length, 12, 'table must have exactly 12 entries');
+  for (let i = 0; i < 12; i++) {
+    assert.deepEqual(
+      bazi.BRANCH_HIDDEN_STEMS[i],
+      expected[i],
+      `branch ${i} (${bazi.BRANCHES[i].zh}): expected [${expected[i]}], got [${bazi.BRANCH_HIDDEN_STEMS[i]}]`,
+    );
+  }
+});
+
+test('getBranchMainStem derives from BRANCH_HIDDEN_STEMS[i][0] for all 12 branches', () => {
+  for (let i = 0; i < 12; i++) {
+    assert.equal(
+      bazi.getBranchMainStem(i),
+      bazi.BRANCH_HIDDEN_STEMS[i][0],
+      `branch ${i} (${bazi.BRANCHES[i].zh}): getBranchMainStem must equal BRANCH_HIDDEN_STEMS[${i}][0]`,
+    );
+  }
+});
