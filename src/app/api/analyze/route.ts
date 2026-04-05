@@ -142,47 +142,102 @@ ${chartSummary}
 Provide analysis in these sections:
 
 1. Day Master Profile
-   Character, core strengths, AND natural blind spots or shadow tendencies.
+   Character and core strengths AND natural blind spots or shadow tendencies.
    Be honest about both sides — do not list only positives.
 
 2. Element Distribution
-   Which elements dominate across visible and hidden stems, and what is
-   notably absent. A missing element is as significant as a dominant one.
+   Which elements dominate across visible and hidden stems, and what is notably
+   absent. A missing element is as significant as a dominant one — explain what
+   the absence means for this person's life pattern.
 
 3. Life Themes — Career
-   Derive career direction from the dominant Ten Gods using these mappings:
-   - 正官 (Officer) → governance, law, corporate leadership, institutions
-   - 偏官 (Seven Killings) → military, enforcement, high-pressure leadership, entrepreneurship under adversity
-   - 食神 (Eating God) → arts, performance, teaching, food, creative output
-   - 傷官 (Hurting Officer) → innovation, music, writing, challenging authority
-   - 正財 (Direct Wealth) → finance, accounting, stable business
-   - 偏財 (Indirect Wealth) → entrepreneurship, sales, investment, deal-making
-   - 正印 (Direct Resource) → academia, research, counseling, mentoring
-   - 偏印 (Indirect Resource) → strategy, spirituality, unconventional paths
-   - 比肩/劫財 (Rob Wealth/Companion) → competition, independence, peer rivalry
+   Derive career direction from BOTH the dominant Ten Gods AND the Day Master
+   element using the intersection below. Do not use the Ten God label alone —
+   always factor in what that energy means specifically for this Day Master.
 
-   Use the top Ten Gods from the chart. Do not default to generic roles.
+   Day Master + Ten God career expressions:
+
+   食神 (Eating God):
+   - Wood DM: writing, education, environmental design, storytelling
+   - Fire DM: product aesthetics, UX/industrial design, brand vision, performance
+   - Earth DM: culinary arts, hospitality, urban planning, craft
+   - Metal DM: engineering innovation, precision manufacturing, technical arts
+   - Water DM: music, film, psychology, research communication
+
+   傷官 (Hurting Officer):
+   - Wood DM: activism, legal reform, unconventional academia
+   - Fire DM: tech disruption, avant-garde art, political commentary
+   - Earth DM: real estate reinvention, agricultural innovation, social enterprise
+   - Metal DM: financial engineering, system deconstruction, military strategy
+   - Water DM: philosophy, investigative journalism, behavioral science
+
+   偏財 (Indirect Wealth):
+   - Wood DM: venture capital, creative agency, media entrepreneurship
+   - Fire DM: sales leadership, entertainment business, experience economy
+   - Earth DM: real estate investment, commodity trading, logistics
+   - Metal DM: M&A, private equity, manufacturing scale-up
+   - Water DM: trading, hedge funds, information arbitrage
+
+   正官 (Direct Officer):
+   - Wood DM: judiciary, environmental policy, NGO leadership
+   - Fire DM: government, military officer, corporate C-suite
+   - Earth DM: civil service, land administration, institutional management
+   - Metal DM: law enforcement, defense, central banking
+   - Water DM: diplomacy, intelligence, academic administration
+
+   偏官 (Seven Killings):
+   - Wood DM: crisis management, surgery, competitive sports coaching
+   - Fire DM: startup founding under adversity, emergency leadership
+   - Earth DM: construction under pressure, geopolitics, infrastructure
+   - Metal DM: combat sports, high-frequency trading, hardcore engineering
+   - Water DM: investigative work, deep research, exploration
+
+   正印 (Direct Resource):
+   - Wood DM: literature, philosophy, traditional medicine
+   - Fire DM: spiritual leadership, cultural curation, academic publishing
+   - Earth DM: archaeology, classical scholarship, institutional research
+   - Metal DM: legal scholarship, classical music theory, metallurgy research
+   - Water DM: neuroscience, depth psychology, archival history
+
+   偏印 (Indirect Resource):
+   - Wood DM: alternative medicine, wilderness, unconventional healing
+   - Fire DM: astrology/metaphysics, conceptual art, futurism
+   - Earth DM: geology, traditional crafts, slow movements
+   - Metal DM: cryptography, niche engineering, deconstruction
+   - Water DM: quantum physics, mysticism, underground culture
+
+   比肩/劫財 (Companion/Rob Wealth):
+   - Wood DM: collaborative creative studio, open-source community
+   - Fire DM: co-founder dynamic, competitive performer, rhetoric
+   - Earth DM: family business, cooperative, community organizing
+   - Metal DM: competitive manufacturing, sports rivalry
+   - Water DM: academic competition, trading desk, peer networks
+
+   Use only the rows relevant to this chart's Day Master and top Ten Gods.
+   Pick 1–2 specific career archetypes and explain why they fit this chart.
+   Do not list all possibilities.
 
 4. Life Themes — Relationships & Key Areas
    Relationship patterns and key life tensions based on the structure counts.
+   Surface the specific tension created by the dominant structure — e.g. high
+   比肩/劫財 creates peer rivalry; high 偏官 creates authority conflicts.
+   Do not default to generic "seek balance" statements.
 
 5. Current Period
-   Use the Da Yun pillar provided. Describe what the current luck cycle element
-   means when it interacts with the Day Master element specifically.
-   Do not give a generic "decade of growth" statement.
+   Use the Da Yun pillar provided. Describe what the current luck cycle stem
+   and branch elements mean when they interact with the Day Master element
+   specifically — use the five-element interaction (生/剋/洩) to explain the
+   dynamic. Do not give a generic "period of growth" statement.
 
 6. Practical Advice — 3 suggestions
    Each suggestion must:
    - Name the specific Ten God or element it is derived from
    - Describe the actual tension or strength in this chart that motivates it
-   - Give a concrete, real-world action (not "practice mindfulness")
+   - Give a concrete, real-world action (not "practice mindfulness" or
+     "expand your network")
 
    Format each as:
    [Ten God / Element]: [Why this matters for this chart] → [Specific action]
-
-   Example format (do not use this content):
-   偏財 (Indirect Wealth, high count): Your chart favors opportunistic
-   wealth over steady income — consider X rather than Y.
 
 Keep it under 750 words total.`;
 
