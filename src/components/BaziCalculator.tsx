@@ -1039,7 +1039,7 @@ export default function BaziCalculator() {
                       <th className="text-center py-2 px-2">Stem 天干</th>
                       <th className="text-center py-2 px-2">Stem God</th>
                       <th className="text-center py-2 px-2">Branch 地支</th>
-                      <th className="text-center py-2 px-2">Branch God</th>
+                      <th className="text-center py-2 px-2">Branch God (main qi)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1078,6 +1078,7 @@ export default function BaziCalculator() {
                   </tbody>
                 </table>
               </div>
+              <p className="text-[10px] text-slate-400 mt-2">Branch God shows main qi (主氣) only. The charts below count all hidden stems (藏干).</p>
             </div>
 
             {/* Charts Section */}
@@ -1088,7 +1089,8 @@ export default function BaziCalculator() {
                   <RadarSVG structureCounts={chartData.structureCounts} structureEls={chartData.structureEls} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">10 Gods · 十神分布</div>
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">10 Gods · 十神分布</div>
+                  <div className="text-[10px] text-slate-400 mb-2">All hidden stems included</div>
                   <BarsSVG tenGodsCount={chartData.tenGodsCount} />
                 </div>
               </div>
