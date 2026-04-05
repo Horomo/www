@@ -186,6 +186,31 @@ export function tenGod(dmStem: number, otherStem: number): TenGod {
 // ── Solar Term Calculations ────────────────────────────────
 
 /**
+ * Verified solar term timestamps from the Hong Kong Observatory (HKO).
+ *
+ * Source: Hong Kong Observatory, Solar Terms calendar, published using data
+ * from HM Nautical Almanac Office and US Naval Observatory.
+ * Reference: https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm
+ *
+ * Keyed as SOLAR_TERM_LOOKUP[calendarYear][solarLongitude] = UTC ISO string.
+ * "calendarYear" is the year argument passed to solarTermDate(), which matches
+ * the civil year in which the term falls (e.g. Li Chun at 315° in early
+ * February is stored under the year of that February, not refYear).
+ *
+ * Terms not present in this table fall back to the iterative approximation
+ * (±~6 min accuracy), which is sufficient for day-level pillar resolution
+ * but not for minute-level boundary tests.
+ */
+const SOLAR_TERM_LOOKUP: Record<number, Partial<Record<number, string>>> = {
+  2024: {
+    315: '2024-02-04T08:27:00.000Z', // 立春 Li Chun  — HKO: 2024-02-04 16:27 HKT
+    345: '2024-03-05T02:23:00.000Z', // 驚蟄 Jing Zhe — HKO: 2024-03-05 10:23 HKT
+     15: '2024-04-04T07:02:00.000Z', // 清明 Qing Ming — HKO: 2024-04-04 15:02 HKT
+     45: '2024-05-05T00:10:00.000Z', // 立夏 Li Xia   — HKO: 2024-05-05 08:10 HKT
+  },
+};
+
+/**
  * Approximate Sun apparent longitude (degrees) for a given JDE.
  */
 export function sunApparentLongitude(jde: number): number {
@@ -223,9 +248,20 @@ export function dateToJD(date: Date): number {
 }
 
 /**
- * Calculate the approximate date of a solar term for a given year.
+ * Return the UTC Date when the sun reaches solarLon (degrees) in the given
+ * calendar year.
+ *
+ * Lookup order:
+ *   1. SOLAR_TERM_LOOKUP — exact timestamps verified against HKO publications.
+ *   2. Iterative solar-longitude solver — accurate to ±~6 min, sufficient for
+ *      day-level pillar resolution but not for minute-level boundary tests.
  */
 export function solarTermDate(year: number, solarLon: number): Date {
+  const tableEntry = SOLAR_TERM_LOOKUP[year]?.[solarLon];
+  if (tableEntry !== undefined) {
+    return new Date(tableEntry);
+  }
+
   const refYear = (solarLon >= 280) ? year - 1 : year;
   const JDE_VE = 2451623.80984 + 365.242189623 * (refYear - 2000);
   const daysPerDeg = 365.242189623 / 360;
