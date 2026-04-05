@@ -114,10 +114,11 @@ ${Object.entries(chartData.structureCounts).map(([k,v]) => `- ${k}: ${v}`).join(
 
 Most Frequent Ten Gods (flat count, unweighted): ${Object.entries(chartData.tenGodsCount).sort((a: [string, unknown], b: [string, unknown]) => (b[1] as number) - (a[1] as number)).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}
 
-${daYun ? `Current Da Yun (luck cycle pillar):
-- Stem: ${daYun.stem.zh} (${daYun.stem.pinyin}) — ${daYun.stem.element}
-- Branch: ${daYun.branch.zh} (${daYun.branch.pinyin}) — ${daYun.branch.element}
-- Age range: ${daYun.ageStart}–${daYun.ageEnd}` : '(Da Yun unavailable — birth time unknown)'}
+Current Da Yun (luck cycle pillar):
+- Stem: ${daYun?.stem?.zh ?? '?'} (${daYun?.stem?.pinyin ?? '?'}) — ${daYun?.stem?.element ?? '?'}
+- Branch: ${daYun?.branch?.zh ?? '?'} (${daYun?.branch?.pinyin ?? '?'}) — ${daYun?.branch?.element ?? '?'}
+- Age range: ${daYun?.ageStart ?? '?'}–${daYun?.ageEnd ?? '?'}
+${!daYun ? '(Da Yun unavailable — birth time unknown)' : ''}
 `;
 
   if (mode === 'follow_up' && !followUpQuestion) {
@@ -152,70 +153,86 @@ Provide analysis in these sections:
 
 3. Life Themes — Career
    Derive career direction from BOTH the dominant Ten Gods AND the Day Master
-   element using the intersection below. Do not use the Ten God label alone —
-   always factor in what that energy means specifically for this Day Master.
-
-   Day Master + Ten God career expressions:
+   element — including whether the Day Master is Yin or Yang — using the
+   intersection table below. Do not use the Ten God label alone. Do not lump
+   Yang and Yin Fire (or any element pair) together; they express differently.
 
    食神 (Eating God):
-   - Wood DM: writing, education, environmental design, storytelling
-   - Fire DM: product aesthetics, UX/industrial design, brand vision, performance
-   - Earth DM: culinary arts, hospitality, urban planning, craft
-   - Metal DM: engineering innovation, precision manufacturing, technical arts
-   - Water DM: music, film, psychology, research communication
+   - Wood DM (甲/乙): writing, education, environmental design, storytelling
+   - Fire DM — 丙 Yang: product aesthetics, UX/industrial design, brand vision,
+     large-scale performance
+   - Fire DM — 丁 Yin: songwriting, poetry, intimate performance, fine arts,
+     jewelry/textile design, personal narrative
+   - Earth DM (戊/己): culinary arts, hospitality, urban planning, craft
+   - Metal DM (庚/辛): engineering innovation, precision manufacturing, technical arts
+   - Water DM (壬/癸): music composition, film, psychology, research communication
 
    傷官 (Hurting Officer):
-   - Wood DM: activism, legal reform, unconventional academia
-   - Fire DM: tech disruption, avant-garde art, political commentary
-   - Earth DM: real estate reinvention, agricultural innovation, social enterprise
-   - Metal DM: financial engineering, system deconstruction, military strategy
-   - Water DM: philosophy, investigative journalism, behavioral science
+   - Wood DM (甲/乙): activism, legal reform, unconventional academia
+   - Fire DM — 丙 Yang: tech disruption, avant-garde art, political commentary
+   - Fire DM — 丁 Yin: lyrical rebellion, genre-breaking music, personal
+     storytelling that challenges norms
+   - Earth DM (戊/己): real estate reinvention, agricultural innovation, social enterprise
+   - Metal DM (庚/辛): financial engineering, system deconstruction, military strategy
+   - Water DM (壬/癸): philosophy, investigative journalism, behavioral science
 
    偏財 (Indirect Wealth):
-   - Wood DM: venture capital, creative agency, media entrepreneurship
-   - Fire DM: sales leadership, entertainment business, experience economy
-   - Earth DM: real estate investment, commodity trading, logistics
-   - Metal DM: M&A, private equity, manufacturing scale-up
-   - Water DM: trading, hedge funds, information arbitrage
+   - Wood DM (甲/乙): venture capital, creative agency, media entrepreneurship
+   - Fire DM — 丙 Yang: sales leadership, entertainment business, experience economy
+   - Fire DM — 丁 Yin: independent artist business, licensing, personal brand
+     monetization, boutique label
+   - Earth DM (戊/己): real estate investment, commodity trading, logistics
+   - Metal DM (庚/辛): M&A, private equity, manufacturing scale-up
+   - Water DM (壬/癸): trading, hedge funds, information arbitrage
 
    正官 (Direct Officer):
-   - Wood DM: judiciary, environmental policy, NGO leadership
-   - Fire DM: government, military officer, corporate C-suite
-   - Earth DM: civil service, land administration, institutional management
-   - Metal DM: law enforcement, defense, central banking
-   - Water DM: diplomacy, intelligence, academic administration
+   - Wood DM (甲/乙): judiciary, environmental policy, NGO leadership
+   - Fire DM — 丙 Yang: government, military officer, corporate C-suite
+   - Fire DM — 丁 Yin: arts institution leadership, cultural policy, editorial
+     direction, creative director
+   - Earth DM (戊/己): civil service, land administration, institutional management
+   - Metal DM (庚/辛): law enforcement, defense, central banking
+   - Water DM (壬/癸): diplomacy, intelligence, academic administration
 
    偏官 (Seven Killings):
-   - Wood DM: crisis management, surgery, competitive sports coaching
-   - Fire DM: startup founding under adversity, emergency leadership
-   - Earth DM: construction under pressure, geopolitics, infrastructure
-   - Metal DM: combat sports, high-frequency trading, hardcore engineering
-   - Water DM: investigative work, deep research, exploration
+   - Wood DM (甲/乙): crisis management, surgery, competitive sports coaching
+   - Fire DM — 丙 Yang: startup founding under adversity, emergency leadership
+   - Fire DM — 丁 Yin: artist navigating hostile industry, surviving public
+     scrutiny, creative work under extreme pressure
+   - Earth DM (戊/己): construction under pressure, geopolitics, infrastructure
+   - Metal DM (庚/辛): combat sports, high-frequency trading, hardcore engineering
+   - Water DM (壬/癸): investigative work, deep research, exploration
 
    正印 (Direct Resource):
-   - Wood DM: literature, philosophy, traditional medicine
-   - Fire DM: spiritual leadership, cultural curation, academic publishing
-   - Earth DM: archaeology, classical scholarship, institutional research
-   - Metal DM: legal scholarship, classical music theory, metallurgy research
-   - Water DM: neuroscience, depth psychology, archival history
+   - Wood DM (甲/乙): literature, philosophy, traditional medicine
+   - Fire DM — 丙 Yang: spiritual leadership, cultural curation, academic publishing
+   - Fire DM — 丁 Yin: music theory, literary fiction, deep craft mentorship,
+     classical training
+   - Earth DM (戊/己): archaeology, classical scholarship, institutional research
+   - Metal DM (庚/辛): legal scholarship, classical music theory, metallurgy research
+   - Water DM (壬/癸): neuroscience, depth psychology, archival history
 
    偏印 (Indirect Resource):
-   - Wood DM: alternative medicine, wilderness, unconventional healing
-   - Fire DM: astrology/metaphysics, conceptual art, futurism
-   - Earth DM: geology, traditional crafts, slow movements
-   - Metal DM: cryptography, niche engineering, deconstruction
-   - Water DM: quantum physics, mysticism, underground culture
+   - Wood DM (甲/乙): alternative medicine, wilderness, unconventional healing
+   - Fire DM — 丙 Yang: astrology/metaphysics, conceptual art, futurism
+   - Fire DM — 丁 Yin: mystical songwriting, occult aesthetics, solitary creative
+     practice, intuitive art
+   - Earth DM (戊/己): geology, traditional crafts, slow movements
+   - Metal DM (庚/辛): cryptography, niche engineering, deconstruction
+   - Water DM (壬/癸): quantum physics, mysticism, underground culture
 
    比肩/劫財 (Companion/Rob Wealth):
-   - Wood DM: collaborative creative studio, open-source community
-   - Fire DM: co-founder dynamic, competitive performer, rhetoric
-   - Earth DM: family business, cooperative, community organizing
-   - Metal DM: competitive manufacturing, sports rivalry
-   - Water DM: academic competition, trading desk, peer networks
+   - Wood DM (甲/乙): collaborative creative studio, open-source community
+   - Fire DM — 丙 Yang: co-founder dynamic, competitive performer, rhetoric
+   - Fire DM — 丁 Yin: peer songwriter circle, intimate band dynamic, creative
+     rivalry within a tight-knit artistic community
+   - Earth DM (戊/己): family business, cooperative, community organizing
+   - Metal DM (庚/辛): competitive manufacturing, sports rivalry
+   - Water DM (壬/癸): academic competition, trading desk, peer networks
 
-   Use only the rows relevant to this chart's Day Master and top Ten Gods.
-   Pick 1–2 specific career archetypes and explain why they fit this chart.
-   Do not list all possibilities.
+   Use only the rows matching this chart's Day Master (including Yin/Yang)
+   and top Ten Gods. Pick 1–2 specific career archetypes and explain why
+   they fit this chart. Do not list all possibilities.
 
 4. Life Themes — Relationships & Key Areas
    Relationship patterns and key life tensions based on the structure counts.
@@ -226,18 +243,22 @@ Provide analysis in these sections:
 5. Current Period
    Use the Da Yun pillar provided. Describe what the current luck cycle stem
    and branch elements mean when they interact with the Day Master element
-   specifically — use the five-element interaction (生/剋/洩) to explain the
-   dynamic. Do not give a generic "period of growth" statement.
+   specifically — use the five-element interaction (生/剋/洩/耗/比) to explain
+   the dynamic. Do not give a generic "period of growth" statement.
 
 6. Practical Advice — 3 suggestions
    Each suggestion must:
    - Name the specific Ten God or element it is derived from
    - Describe the actual tension or strength in this chart that motivates it
-   - Give a concrete, real-world action (not "practice mindfulness" or
-     "expand your network")
+   - Give a concrete, real-world action — not "practice mindfulness",
+     "expand your network", or "seek balance"
 
    Format each as:
    [Ten God / Element]: [Why this matters for this chart] → [Specific action]
+
+   Priority if trimming is needed: cut from sections 2 or 4 first.
+   Never cut section 6 mid-sentence. If space is tight, reduce to
+   2 suggestions but always complete each one fully.
 
 Keep it under 750 words total.`;
 
