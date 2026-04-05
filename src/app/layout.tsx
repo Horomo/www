@@ -34,10 +34,10 @@ export default function RootLayout({
         <Providers>
           <nav className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-6">
             <Link href="/" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
-              八字命盤
+              Bazi Calculator
             </Link>
             <Link href="/compatibility" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
-              合婚分析
+              Compatibility
             </Link>
           </nav>
           {children}
