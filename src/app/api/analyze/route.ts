@@ -84,7 +84,9 @@ export async function handleAnalyzeRequest(
   const mode = parsedBody.mode ?? 'initial';
   const followUpQuestion = parsedBody.followUpQuestion?.trim() ?? '';
 
-  const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.`;
+  const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.
+
+Note on data model: element and Ten God counts in this chart are flat, unweighted occurrences from visible stems and hidden stems. They are not qi-strength scores. Avoid asserting that the Day Master is "strong" or "weak", or that elements are "favorable" or "unfavorable", based solely on these counts.`;
 
   const chartSummary = `
 Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}
@@ -100,7 +102,7 @@ ${pillars.hour ? `- Hour 時柱: ${pillars.hour.stem.zh}${pillars.hour.branch.zh
 5 Structures count (including all hidden stems):
 ${Object.entries(chartData.structureCounts).map(([k,v]) => `- ${k}: ${v}`).join('\n')}
 
-Dominant Ten Gods: ${Object.entries(chartData.tenGodsCount).sort((a: [string, unknown], b: [string, unknown]) => (b[1] as number) - (a[1] as number)).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}
+Most Frequent Ten Gods (flat count, unweighted): ${Object.entries(chartData.tenGodsCount).sort((a: [string, unknown], b: [string, unknown]) => (b[1] as number) - (a[1] as number)).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}
 `;
 
   if (mode === 'follow_up' && !followUpQuestion) {
@@ -124,7 +126,7 @@ ${chartSummary}
 
 Provide analysis in these sections:
 1. **Day Master Profile** — character, strengths, natural tendencies
-2. **Chart Balance** — which elements dominate, favorable/unfavorable elements
+2. **Element Distribution** — which elements appear most often across visible and hidden stems
 3. **Life Themes** — career tendencies, relationship patterns, key life areas
 4. **Current Period** — general outlook for the current decade
 5. **Practical Advice** — 3-4 actionable suggestions based on the chart

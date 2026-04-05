@@ -68,8 +68,28 @@ test('analyze route accepts a genuine payload and uses the server-validated char
   assert.equal(response.status, 200);
   assert.equal(json.analysis, 'validated-analysis');
   assert.equal(openAiCalls.length, 1);
-  assert.match(openAiCalls[0].messages[1].content, /Day 日柱: 辛亥/);
-  assert.match(openAiCalls[0].messages[1].content, /Hour 時柱: 壬辰/);
+
+  const userMsg: string = openAiCalls[0].messages[1].content;
+  const sysMsg: string = openAiCalls[0].messages[0].content;
+
+  // Structural content still present
+  assert.match(userMsg, /Day 日柱: 辛亥/);
+  assert.match(userMsg, /Hour 時柱: 壬辰/);
+
+  // Accurate flat-count wording is present
+  assert.match(userMsg, /Most Frequent Ten Gods \(flat count, unweighted\)/);
+  assert.match(userMsg, /Element Distribution/);
+  assert.match(userMsg, /appear most often/);
+
+  // Model limitation note is in the system prompt
+  assert.match(sysMsg, /flat, unweighted occurrences/);
+  assert.match(sysMsg, /not qi-strength scores/);
+
+  // Misleading phrases have been removed
+  assert.doesNotMatch(userMsg, /Dominant Ten Gods/);
+  assert.doesNotMatch(userMsg, /Chart Balance/);
+  assert.doesNotMatch(userMsg, /which elements dominate/);
+  assert.doesNotMatch(userMsg, /favorable\/unfavorable/);
 });
 
 test('analyze route rejects forged computed charts before calling OpenAI', async () => {
