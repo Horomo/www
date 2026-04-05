@@ -1,0 +1,80 @@
+[
+  {
+    "id": "oracle-day-calendar-2000-01-07",
+    "description": "Daily Chinese calendar reference used to verify year/month/day pillars without introducing an hour oracle.",
+    "input": {
+      "date": "2000-01-07",
+      "time": null,
+      "timezone": "Asia/Shanghai",
+      "longitude": 121.4737,
+      "calculationMode": "male"
+    },
+    "expected": {
+      "yearPillar": "己卯",
+      "monthPillar": "丁丑",
+      "dayPillar": "甲子",
+      "hourPillar": null
+    },
+    "oracle": {
+      "sourceKind": "published_daily_calendar",
+      "referenceUrl": "https://fourpillars.pro/2000/january/07",
+      "sourceNote": "The Fourpillars.pro daily Chinese calendar page for 2000-01-07 lists Day/Month/Year as 甲子 / 丁丑 / 己卯. No hour pillar is published on that page."
+    },
+    "status": {
+      "resolvedFields": ["yearPillar", "monthPillar", "dayPillar"],
+      "unresolvedFields": ["hourPillar"]
+    }
+  },
+  {
+    "id": "oracle-day-calendar-2000-01-08",
+    "description": "Adjacent daily calendar reference to verify day-pillar advancement and confirm the same month/year frame.",
+    "input": {
+      "date": "2000-01-08",
+      "time": null,
+      "timezone": "Asia/Shanghai",
+      "longitude": 121.4737,
+      "calculationMode": "male"
+    },
+    "expected": {
+      "yearPillar": "己卯",
+      "monthPillar": "丁丑",
+      "dayPillar": "乙丑",
+      "hourPillar": null
+    },
+    "oracle": {
+      "sourceKind": "published_daily_calendar",
+      "referenceUrl": "https://fourpillars.pro/2000/january/08",
+      "sourceNote": "The Fourpillars.pro daily Chinese calendar page for 2000-01-08 lists Day/Month/Year as 乙丑 / 丁丑 / 己卯. No hour pillar is published on that page."
+    },
+    "status": {
+      "resolvedFields": ["yearPillar", "monthPillar", "dayPillar"],
+      "unresolvedFields": ["hourPillar"]
+    }
+  },
+  {
+    "id": "pending-full-chart-1990-06-15-1030-bangkok",
+    "description": "Audit case held as a placeholder until a full four-pillar oracle with timezone-aware hour output is captured.",
+    "input": {
+      "date": "1990-06-15",
+      "time": "10:30",
+      "timezone": "Asia/Bangkok",
+      "longitude": 100.52,
+      "calculationMode": "male"
+    },
+    "expected": {
+      "yearPillar": null,
+      "monthPillar": null,
+      "dayPillar": null,
+      "hourPillar": null
+    },
+    "oracle": {
+      "sourceKind": "pending",
+      "referenceUrl": null,
+      "sourceNote": "Needs an authoritative calculator or published chart that explicitly states timezone handling and hour pillar rules."
+    },
+    "status": {
+      "resolvedFields": [],
+      "unresolvedFields": ["yearPillar", "monthPillar", "dayPillar", "hourPillar"]
+    }
+  }
+]

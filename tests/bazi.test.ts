@@ -73,12 +73,12 @@ test('unknown-time fallback preserves the civil birth date in western timezones'
   assert.equal(isoDate(losAngeles.displayDate), '2024-02-04');
   assert.equal(losAngeles.pillars.year.stem.zh + losAngeles.pillars.year.branch.zh, '甲辰');
   assert.equal(losAngeles.pillars.month.stem.zh + losAngeles.pillars.month.branch.zh, '丙寅');
-  assert.equal(losAngeles.pillars.day.stem.zh + losAngeles.pillars.day.branch.zh, '己亥');
+  assert.equal(losAngeles.pillars.day.stem.zh + losAngeles.pillars.day.branch.zh, '戊戌');
 
   assert.equal(isoDate(honolulu.displayDate), '1990-01-01');
   assert.equal(honolulu.pillars.year.stem.zh + honolulu.pillars.year.branch.zh, '己巳');
   assert.equal(honolulu.pillars.month.stem.zh + honolulu.pillars.month.branch.zh, '丁丑');
-  assert.equal(honolulu.pillars.day.stem.zh + honolulu.pillars.day.branch.zh, '丁卯');
+  assert.equal(honolulu.pillars.day.stem.zh + honolulu.pillars.day.branch.zh, '丙寅');
   assert.deepEqual(
     honolulu.daYun && [honolulu.daYun.pillars[0].yearStart, honolulu.daYun.pillars[0].yearEnd],
     [1998, 2007],

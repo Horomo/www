@@ -1,0 +1,46 @@
+[
+  {
+    "id": "2024-li-chun",
+    "termName": "Li Chun",
+    "chineseName": "立春",
+    "year": 2024,
+    "solarLongitude": 315,
+    "oracleUtc": "2024-02-04T08:27:00.000Z",
+    "oracleLocalLabel": "2024-02-04 16:27 HKT",
+    "referenceUrl": "https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm",
+    "sourceNote": "Published by the Hong Kong Observatory from HM Nautical Almanac Office and US Naval Observatory data; times are listed in Hong Kong Time (UTC+8)."
+  },
+  {
+    "id": "2024-jing-zhe",
+    "termName": "Jing Zhe",
+    "chineseName": "驚蟄",
+    "year": 2024,
+    "solarLongitude": 345,
+    "oracleUtc": "2024-03-05T02:23:00.000Z",
+    "oracleLocalLabel": "2024-03-05 10:23 HKT",
+    "referenceUrl": "https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm",
+    "sourceNote": "Published by the Hong Kong Observatory from HM Nautical Almanac Office and US Naval Observatory data; times are listed in Hong Kong Time (UTC+8)."
+  },
+  {
+    "id": "2024-qing-ming",
+    "termName": "Qing Ming",
+    "chineseName": "清明",
+    "year": 2024,
+    "solarLongitude": 15,
+    "oracleUtc": "2024-04-04T07:02:00.000Z",
+    "oracleLocalLabel": "2024-04-04 15:02 HKT",
+    "referenceUrl": "https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm",
+    "sourceNote": "Published by the Hong Kong Observatory from HM Nautical Almanac Office and US Naval Observatory data; times are listed in Hong Kong Time (UTC+8)."
+  },
+  {
+    "id": "2024-li-xia",
+    "termName": "Li Xia",
+    "chineseName": "立夏",
+    "year": 2024,
+    "solarLongitude": 45,
+    "oracleUtc": "2024-05-05T00:10:00.000Z",
+    "oracleLocalLabel": "2024-05-05 08:10 HKT",
+    "referenceUrl": "https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm",
+    "sourceNote": "Published by the Hong Kong Observatory from HM Nautical Almanac Office and US Naval Observatory data; times are listed in Hong Kong Time (UTC+8)."
+  }
+]

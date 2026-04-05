@@ -327,10 +327,17 @@ export function monthPillar(date: Date, yearStemIdx: number): { stemIdx: number;
 
 // ── Day Pillar (日柱) ──────────────────────────────────────
 export function dayPillar(date: Date): { stemIdx: number; branchIdx: number; cycleIdx: number } {
-  const REF_JD    = 2451545;
-  const REF_INDEX = 55;
+  const REF_JD = 2451545;
+  const REF_INDEX = 54;
   const jd = dateToJD(date);
-  const diff = Math.floor(jd) - Math.floor(REF_JD);
+
+  // Julian Day numbers roll over at noon, but the sexagenary day pillar is
+  // verified against civil dates that roll over at local midnight. Converting
+  // JD -> civil day via floor(jd + 0.5) realigns the count to midnight-based
+  // day boundaries before we compare against the reference anchor.
+  const civilDay = Math.floor(jd + 0.5);
+  const refCivilDay = Math.floor(REF_JD + 0.5);
+  const diff = civilDay - refCivilDay;
   const cycleIdx = ((diff + REF_INDEX) % 60 + 60) % 60;
   const stemIdx   = cycleIdx % 10;
   const branchIdx = cycleIdx % 12;
