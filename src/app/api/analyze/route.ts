@@ -260,7 +260,11 @@ Provide analysis in these sections:
    Never cut section 6 mid-sentence. If space is tight, reduce to
    2 suggestions but always complete each one fully.
 
-Keep it under 750 words total.`;
+Word budget:
+  - Sections 1–5 combined: maximum 600 words
+  - Section 6 (Practical Advice): maximum 150 words, always complete
+  - Total cap: 750 words
+  - If over budget, trim sections 2 and 4 first — never truncate section 6`;
 
   try {
     try {
