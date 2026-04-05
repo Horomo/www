@@ -17,6 +17,32 @@ export type AnalysisDebugMetadata = {
   unknownTime: boolean;
 };
 
+// ── Compatibility logging types ────────────────────────────
+
+export type CompatibilityBirthInfo = {
+  person_a: { name: string; date: string; time: string };
+  person_b: { name: string; date: string; time: string };
+};
+
+export type CompatibilityDebugMetadata = {
+  type: 'compatibility';
+  rating: string;
+  day_branch_interaction: 'six_harmony' | 'six_clash' | 'neutral';
+  day_master_relationship: string;
+};
+
+export type CompatibilityLogInsert = {
+  user_id: string | null;
+  birth_info: CompatibilityBirthInfo;
+  pillars: { person_a: unknown; person_b: unknown };
+  chart_data: null;
+  request_payload: unknown;
+  debug_metadata: CompatibilityDebugMetadata;
+  analysis_status: AnalysisStatus;
+  app_version: null;
+  logging_error: null;
+};
+
 export type AnalysisLogInsert = {
   user_id: string | null;
   birth_info: AnalysisFormPayload;
@@ -78,7 +104,7 @@ export function buildAnalysisLogInsert(params: {
   };
 }
 
-export async function insertAnalysisLog(payload: AnalysisLogInsert): Promise<void> {
+export async function insertAnalysisLog(payload: AnalysisLogInsert | CompatibilityLogInsert): Promise<void> {
   const { url, serviceRoleKey } = getSupabaseConfig();
   const response = await fetch(`${url}/rest/v1/${ANALYSIS_LOG_TABLE}`, {
     method: 'POST',

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Link from 'next/link';
 
 import Providers from './providers';
 import './globals.css';
@@ -30,7 +31,17 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <nav className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-6">
+            <Link href="/" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
+              八字命盤
+            </Link>
+            <Link href="/compatibility" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">
+              合婚分析
+            </Link>
+          </nav>
+          {children}
+        </Providers>
       </body>
     </html>
   );
