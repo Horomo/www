@@ -268,6 +268,14 @@ export default function BaziCalculator() {
                             );
                           })}
                         </div>
+                        <div className="rounded-[18px] bg-[linear-gradient(135deg,rgba(255,255,255,0.62),rgba(255,255,255,0.42))] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.58)]">
+                          <p className="text-xs leading-6 text-[#151d22]/62">
+                            Yin/Yang is used in BaZi calculation. In general: <span className="font-medium">Male → Yang</span>, <span className="font-medium">Female → Yin</span>. If you do not identify as male or female, choose the energy that best represents you.
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[#151d22]/40">
+                            Yang represents more outward, direct, active energy. Yin represents more inward, subtle, and adaptive energy.
+                          </p>
+                        </div>
                         {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
                       </div>
                     ) : null}
