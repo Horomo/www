@@ -33,51 +33,39 @@ import {
 } from '@/lib/bazi';
 import {
   formatCalculationGenderModeDisplay,
-  formatGenderIdentity,
+  formatMergedGenderSelection,
   type CalculationGenderMode,
-  type GenderIdentity,
 } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
 
-const GENDER_IDENTITY_OPTIONS: Array<{ value: GenderIdentity; label: string; description: string }> = [
-  { value: 'male', label: 'Male', description: 'Auto-sets energy polarity to Yang' },
-  { value: 'female', label: 'Female', description: 'Auto-sets energy polarity to Yin' },
-  { value: 'non_binary', label: 'Non-binary', description: "You'll choose your energy polarity below" },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: "You'll choose your energy polarity below" },
-  { value: 'other', label: 'Other', description: "You'll choose your energy polarity below" },
-];
-
-const CALCULATION_MODE_OPTIONS: Array<{
+const MERGED_GENDER_OPTIONS: Array<{
   value: CalculationGenderMode;
   yinYang: string;
   pinyinLabel: string;
   label: string;
   tagline: string;
   description: string;
-  advancedNote: string;
 }> = [
   {
     value: 'male',
     yinYang: '陽',
     pinyinLabel: 'Yáng',
-    label: 'Yang - Active Energy',
-    tagline: 'Outward, forward-moving',
-    description: 'Your 10-year luck cycles progress in the active direction from your birth.',
-    advancedNote: 'Traditional male calculation rule',
+    label: 'Male (Yang)',
+    tagline: 'Male identity with Yang polarity',
+    description: 'Maps internally to gender=male and yinYang/calculationMode=yang for the existing Da Yun rule.',
   },
   {
     value: 'female',
     yinYang: '陰',
     pinyinLabel: 'Yīn',
-    label: 'Yin - Receptive Energy',
-    tagline: 'Inward, reflective',
-    description: 'Your 10-year luck cycles progress in the complementary direction from your birth.',
-    advancedNote: 'Traditional female calculation rule',
+    label: 'Female (Yin)',
+    tagline: 'Female identity with Yin polarity',
+    description: 'Maps internally to gender=female and yinYang/calculationMode=yin for the existing Da Yun rule.',
   },
 ];
 
 const WIZARD_STEPS = [
-  { id: 'identity', label: 'Identity', detail: 'Choose identity and energy rule.' },
+  { id: 'identity', label: 'Identity', detail: 'Choose one merged gender and polarity option.' },
   { id: 'birth', label: 'Birth', detail: 'Set date, time, and known-time status.' },
   { id: 'location', label: 'Location', detail: 'Confirm place, timezone, and coordinates.' },
   { id: 'confirm', label: 'Confirm', detail: 'Review the reading ritual before reveal.' },
@@ -93,7 +81,7 @@ const PILLAR_META = [
 type PillarKey = (typeof PILLAR_META)[number]['key'];
 type FormValues = AnalysisFormDraft;
 type FollowUpItem = { question: string; answer: string | null; loading: boolean; error: string | null };
-type StepFieldErrors = Partial<Record<'calculationMode' | 'genderOtherText' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
+type StepFieldErrors = Partial<Record<'calculationMode' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
 
 const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
   { question: '', answer: null, loading: false, error: null },
@@ -345,7 +333,7 @@ function PillarCard({ result, keyName, currentYear }: { result: BaziResult; keyN
 }
 
 function WizardPreview({ formValues, step }: { formValues: FormValues; step: number }) {
-  const energyLabel = formValues.calculationMode ? formatCalculationGenderModeDisplay(formValues.calculationMode) : 'Not selected yet';
+  const selectionLabel = formatMergedGenderSelection(formValues.calculationMode);
   return (
     <div className="space-y-4 lg:sticky lg:top-24">
       <GlowCard accent="violet" className="p-6">
@@ -354,7 +342,7 @@ function WizardPreview({ formValues, step }: { formValues: FormValues; step: num
         <p className="mt-3 text-sm leading-7 text-[#151d22]/66">The wizard keeps the existing birth fields and logic intact, but turns the experience into a guided intake rather than a long static form.</p>
         <div className="mt-6 grid gap-3">
           <StatTile label="Current step" value={`${step + 1}. ${WIZARD_STEPS[step].label}`} hint={WIZARD_STEPS[step].detail} />
-          <StatTile label="Energy mode" value={energyLabel} hint="This controls the Da Yun progression rule only." />
+          <StatTile label="Selection" value={selectionLabel} hint="This single choice fills the existing gender identity and Da Yun rule fields together." />
           <StatTile label="Location status" value={formValues.birthPlace ? 'Matched from place search' : 'Manual review available'} hint={formValues.timezone || 'Timezone will appear here once set.'} />
         </div>
       </GlowCard>
@@ -378,9 +366,9 @@ export default function BaziCalculator() {
   const [timezone, setTimezone] = useState('Asia/Bangkok');
   const [longitude, setLongitude] = useState('100.52');
   const [latitude, setLatitude] = useState('13.75');
-  const [genderIdentity, setGenderIdentity] = useState<GenderIdentity>('male');
+  const [genderIdentity, setGenderIdentity] = useState<FormValues['genderIdentity']>('');
   const [genderOtherText, setGenderOtherText] = useState('');
-  const [calculationMode, setCalculationMode] = useState<CalculationGenderMode | ''>('male');
+  const [calculationMode, setCalculationMode] = useState<CalculationGenderMode | ''>('');
   const [unknownTime, setUnknownTime] = useState(false);
   const [result, setResult] = useState<BaziResult | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
@@ -405,15 +393,10 @@ export default function BaziCalculator() {
     setDob(values.dob); setTob(values.tob); setBirthPlaceQuery(values.birthPlaceQuery); setBirthPlace(values.birthPlace); setTimezone(values.timezone); setLongitude(values.longitude); setLatitude(values.latitude); setGenderIdentity(values.genderIdentity); setGenderOtherText(values.genderOtherText); setCalculationMode(values.calculationMode); setUnknownTime(values.unknownTime);
   }
 
-  function handleGenderIdentityChange(nextIdentity: GenderIdentity) {
+  function handleMergedGenderChange(next: CalculationGenderMode) {
     setShowStepValidation(false);
-    setGenderIdentity(nextIdentity);
-    if (nextIdentity === 'male' || nextIdentity === 'female') return void setCalculationMode(nextIdentity);
-    setCalculationMode('');
-  }
-
-  function handleCalculationModeChange(next: CalculationGenderMode) {
-    setShowStepValidation(false);
+    setGenderIdentity(next);
+    setGenderOtherText('');
     if (next !== calculationMode) trackEvent('selection_changed', { previous_energy_type: calculationMode || undefined, energy_type: next, screen_name: 'bazi_form' });
     trackEvent('calculation_mode_selected', { energy_type: next, screen_name: 'bazi_form' });
     setCalculationMode(next);
@@ -423,10 +406,7 @@ export default function BaziCalculator() {
     const errors: StepFieldErrors = {};
 
     if (step === 0) {
-      if (!values.calculationMode) errors.calculationMode = 'Choose a calculation mode for classical Da Yun rules.';
-      if (values.genderIdentity === 'other' && !values.genderOtherText.trim()) {
-        errors.genderOtherText = 'Add a short self-description or choose another identity option.';
-      }
+      if (!values.calculationMode) errors.calculationMode = 'Choose one option so we can apply the existing gender and polarity mapping.';
     }
     if (step === 1) {
       if (!values.dob) errors.dob = 'Enter date of birth.';
@@ -457,7 +437,7 @@ export default function BaziCalculator() {
       if (firstInvalidStep !== undefined) moveToStep(firstInvalidStep);
       return void setCalcError(error);
     }
-    if (!normalizedValues) return void setCalcError('Please review the gender identity and calculation fields.');
+    if (!normalizedValues) return void setCalcError('Please review the merged gender and polarity selection.');
     setShowStepValidation(false);
     setCalcError(null);
     try {
@@ -548,14 +528,13 @@ export default function BaziCalculator() {
   function goBack() { setShowStepValidation(false); setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
 
   const confirmationSummary = useMemo(() => [
-    ['Gender identity', formatGenderIdentity(genderIdentity, genderOtherText)],
-    ['Luck cycle rule', calculationMode ? formatCalculationGenderModeDisplay(calculationMode) : 'Not selected'],
+    ['Selection', formatMergedGenderSelection(calculationMode)],
     ['Birth date', dob || 'Not set'],
     ['Birth time', unknownTime ? 'Unknown time mode' : tob || 'Not set'],
     ['Birth place', birthPlaceQuery || 'Not set'],
     ['Timezone', timezone || 'Not set'],
     ['Coordinates', `${latitude || '-'}, ${longitude || '-'}`],
-  ], [birthPlaceQuery, calculationMode, dob, genderIdentity, genderOtherText, latitude, longitude, timezone, tob, unknownTime]);
+  ], [birthPlaceQuery, calculationMode, dob, latitude, longitude, timezone, tob, unknownTime]);
 
   const resultAnchor = result ? `${fmtDate(result.displayDate)}-${result.pillars.day.stem.zh}-${result.pillars.day.branch.zh}` : 'empty';
   const activeDaYun = result?.daYun?.pillars[activeLuckCycle] ?? null;
@@ -600,37 +579,22 @@ export default function BaziCalculator() {
                     <>
                       <div>
                         <div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 1</div>
-                        <h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Identity and calculation polarity</h3>
-                        <p className="mt-2 text-sm leading-7 text-[#151d22]/66">Choose your gender identity, then confirm the classical Da Yun treatment rule that the engine already uses.</p>
+                        <h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Gender and polarity</h3>
+                        <p className="mt-2 text-sm leading-7 text-[#151d22]/66">Choose one combined option. The calculator will keep the same internal fields and automatically map your selection to the existing classical Da Yun rule.</p>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {GENDER_IDENTITY_OPTIONS.map((option) => (
-                          <label key={option.value} data-selected={String(genderIdentity === option.value)} className="flex cursor-pointer items-start gap-3 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-4 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.28),0_18px_38px_rgba(64,224,208,0.12)]">
-                            <input type="radio" name="genderIdentity" value={option.value} checked={genderIdentity === option.value} onChange={() => handleGenderIdentityChange(option.value)} className="mt-1 h-4 w-4 border-white/30 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
-                            <span><span className="block font-semibold text-[#151d22]">{option.label}</span><span className="mt-1 block text-xs leading-6 text-[#151d22]/52">{option.description}</span></span>
-                          </label>
-                        ))}
-                      </div>
-                      {genderIdentity === 'other' ? (
-                        <div>
-                          <label htmlFor="gender-other-text" className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Optional self-description</label>
-                          <input id="gender-other-text" type="text" value={genderOtherText} onChange={(event) => { setShowStepValidation(false); setGenderOtherText(event.target.value); }} placeholder="Enter a label if you want to share one" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />
-                          {showStepValidation && currentStepErrors.genderOtherText ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.genderOtherText}</p> : null}
-                        </div>
-                      ) : null}
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Luck Cycle Direction · 大運方向</span>
-                          <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="This affects which 10-year luck cycle you enter first. It is separate from gender identity." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Selection · 命盤設定</span>
+                          <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="This single choice updates both the displayed gender selection and the existing binary Da Yun calculation mode." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
                         </div>
-                        {genderIdentity === 'non_binary' || genderIdentity === 'prefer_not_to_say' || genderIdentity === 'other' ? <div className="rounded-2xl bg-[linear-gradient(135deg,rgba(64,224,208,0.16),rgba(255,255,255,0.7))] px-4 py-3 text-sm leading-7 text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.14)]">Traditional BaZi uses a binary treatment rule for this one timing calculation only. Choose the pattern that feels most resonant with your experience.</div> : <p className="text-sm leading-7 text-[#151d22]/56">Auto-set from your gender identity above. Override here if you wish.</p>}
+                        <p className="text-sm leading-7 text-[#151d22]/56">Choose one option below. No extra Yin/Yang step is required.</p>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          {CALCULATION_MODE_OPTIONS.map((option) => {
+                          {MERGED_GENDER_OPTIONS.map((option) => {
                             const selected = calculationMode === option.value;
                             return (
                               <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-5 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
-                                <input type="radio" name="calculationMode" value={option.value} checked={selected} onChange={() => handleCalculationModeChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
-                                <span className="min-w-0"><span className="flex items-center gap-3"><span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span><span><span className="block text-sm font-semibold text-[#151d22]">{option.label}</span><span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span></span></span><span className="mt-3 block text-sm leading-7 text-[#151d22]/66">{option.description}</span><span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline} · {option.advancedNote}</span></span>
+                                <input type="radio" name="mergedGenderSelection" value={option.value} checked={selected} onChange={() => handleMergedGenderChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
+                                <span className="min-w-0"><span className="flex items-center gap-3"><span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span><span><span className="block text-sm font-semibold text-[#151d22]">{option.label}</span><span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span></span></span><span className="mt-3 block text-sm leading-7 text-[#151d22]/66">{option.description}</span><span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline}</span></span>
                               </label>
                             );
                           })}
@@ -680,7 +644,7 @@ export default function BaziCalculator() {
         {result && chartData ? (
           <div key={resultAnchor} className="mt-10 space-y-6 animate-reveal">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_360px]">
-              <GlowCard accent="gold" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="gold">Character Profile</Badge><h3 className="mt-4 font-serif text-4xl text-[#151d22]">{result.pillars.day.stem.zh} {result.pillars.day.stem.pinyin} Day Master</h3><p className="mt-3 text-sm leading-8 text-[#151d22]/66">{getDayMasterNote(result.pillars.day.stem)}. The result surface now clusters the pillar story, timing, and analysis into focused panels without changing any source data.</p></div><div className="flex flex-wrap gap-2"><Badge tone="cyan">{formatCalculationGenderModeDisplay(result.daYun?.calculationMode ?? calculatedFormValues?.calculationMode ?? 'male')}</Badge><Badge tone="violet">{formatGenderIdentity(calculatedFormValues?.genderIdentity ?? genderIdentity, calculatedFormValues?.genderOtherText ?? genderOtherText)}</Badge></div></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatTile label="Day Master stem" value={`${result.pillars.day.stem.zh} (${result.pillars.day.stem.pinyin})`} hint={`${EL_LABEL[result.pillars.day.stem.element].zh} ${EL_LABEL[result.pillars.day.stem.element].en}`} /><StatTile label="Polarity" value={result.pillars.day.stem.yin ? 'Yin' : 'Yang'} hint="The core polarity of the Day Master stem." /><StatTile label="Clock / solar" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : `${fmtDate(result.displayDate)} -> ${fmtDate(result.tstDate)}`} hint={result.unknownTime ? 'Hour pillar is intentionally left unknown.' : result.displayTzLabel} /><StatTile label="Luck cycle start" value={result.daYun ? `${result.daYun.startYears} yrs${result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}` : 'Unavailable'} hint={result.daYun ? `${result.daYun.forward ? 'Forward' : 'Backward'} from ${result.daYun.jie.name}` : 'Requires full chart'} /></div></GlowCard>
+              <GlowCard accent="gold" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="gold">Character Profile</Badge><h3 className="mt-4 font-serif text-4xl text-[#151d22]">{result.pillars.day.stem.zh} {result.pillars.day.stem.pinyin} Day Master</h3><p className="mt-3 text-sm leading-8 text-[#151d22]/66">{getDayMasterNote(result.pillars.day.stem)}. The result surface now clusters the pillar story, timing, and analysis into focused panels without changing any source data.</p></div><div className="flex flex-wrap gap-2"><Badge tone="cyan">{formatMergedGenderSelection(calculatedFormValues?.calculationMode ?? calculationMode)}</Badge></div></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatTile label="Day Master stem" value={`${result.pillars.day.stem.zh} (${result.pillars.day.stem.pinyin})`} hint={`${EL_LABEL[result.pillars.day.stem.element].zh} ${EL_LABEL[result.pillars.day.stem.element].en}`} /><StatTile label="Polarity" value={result.pillars.day.stem.yin ? 'Yin' : 'Yang'} hint="The core polarity of the Day Master stem." /><StatTile label="Clock / solar" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : `${fmtDate(result.displayDate)} -> ${fmtDate(result.tstDate)}`} hint={result.unknownTime ? 'Hour pillar is intentionally left unknown.' : result.displayTzLabel} /><StatTile label="Luck cycle start" value={result.daYun ? `${result.daYun.startYears} yrs${result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}` : 'Unavailable'} hint={result.daYun ? `${result.daYun.forward ? 'Forward' : 'Backward'} from ${result.daYun.jie.name}` : 'Requires full chart'} /></div></GlowCard>
               <GlowCard accent="violet" className="p-6"><div className="text-[11px] uppercase tracking-[0.22em] text-[#874e58]/62">Result briefing</div><div className="mt-4 space-y-4"><StatTile label="Local display" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : fmtDate(result.displayDate)} hint={result.displayTzLabel} /><StatTile label="True solar time" value={result.unknownTime ? 'Not calculated' : fmtDate(result.tstDate)} hint={result.unknownTime ? 'Unknown birth time skips the hour pillar.' : 'Astronomically corrected time'} /><StatTile label="Current focus" value={activeDaYun ? `${activeDaYun.ageStart}-${activeDaYun.ageEnd}` : 'Luck cycles pending'} hint={activeDaYun ? `${activeDaYun.yearStart}-${activeDaYun.yearEnd}` : 'Use the journey map below'} /></div></GlowCard>
             </div>
             <div className="grid gap-5 lg:grid-cols-4">{displayPillarOrder.map((keyName) => <PillarCard key={keyName} result={result} keyName={keyName} currentYear={currentYear} />)}</div>

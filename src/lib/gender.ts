@@ -18,7 +18,7 @@ export type GenderFields = {
 };
 
 export type GenderDraftFields = {
-  genderIdentity: GenderIdentity;
+  genderIdentity: GenderIdentity | '';
   genderOtherText: string;
   calculationMode: CalculationGenderMode | '';
 };
@@ -58,6 +58,18 @@ export function formatGenderIdentity(identity: GenderIdentity, otherText?: strin
   }
 }
 
+export function formatMergedGenderSelection(mode: CalculationGenderMode | ''): string {
+  if (mode === 'male') {
+    return 'Male (Yang)';
+  }
+
+  if (mode === 'female') {
+    return 'Female (Yin)';
+  }
+
+  return 'Not selected';
+}
+
 /**
  * Precise technical label used in AI prompts and server-side logging.
  * Includes both the traditional rule name and the Yin/Yang energy framing
@@ -86,9 +98,12 @@ export function normalizeGenderDraft(
   if (!value) return null;
 
   const legacyGender = isLegacyBinaryGender(value.gender) ? value.gender : null;
-  const genderIdentity = isGenderIdentity(value.genderIdentity) ? value.genderIdentity : legacyGender;
-
-  if (!genderIdentity) return null;
+  const rawGenderIdentity = value.genderIdentity;
+  const genderIdentity = isGenderIdentity(rawGenderIdentity)
+    ? rawGenderIdentity
+    : rawGenderIdentity === ''
+      ? ''
+      : (legacyGender ?? '');
 
   const calculationMode = isCalculationGenderMode(value.calculationMode)
     ? value.calculationMode
