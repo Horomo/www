@@ -80,14 +80,14 @@ export default function BirthPlaceSearch(props: BirthPlaceSearchProps) {
             }
           }}
           placeholder="Search city, province, country, or hospital area"
-          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          className="glass-input w-full rounded-2xl px-4 py-3 text-sm"
         />
         {showResults && (loading || error || results.length > 0) && (
-          <div className="absolute z-10 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-            {loading && <div className="px-3 py-2 text-sm text-slate-500">Searching places...</div>}
-            {!loading && error && <div className="px-3 py-2 text-sm text-red-600">{error}</div>}
+          <div className="absolute z-10 mt-2 w-full overflow-hidden rounded-3xl border border-white/12 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.86))] shadow-[0_25px_60px_rgba(2,8,23,0.56)] backdrop-blur-xl">
+            {loading && <div className="px-4 py-3 text-sm text-slate-300">Searching places...</div>}
+            {!loading && error && <div className="px-4 py-3 text-sm text-rose-300">{error}</div>}
             {!loading && !error && results.length === 0 && (
-              <div className="px-3 py-2 text-sm text-slate-500">No matching places found.</div>
+              <div className="px-4 py-3 text-sm text-slate-300">No matching places found.</div>
             )}
             {!loading && !error && results.map((place) => (
               <button
@@ -97,10 +97,10 @@ export default function BirthPlaceSearch(props: BirthPlaceSearchProps) {
                   onSelect(place);
                   setShowResults(false);
                 }}
-                className="block w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                className="block w-full border-b border-white/6 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-white/8"
               >
-                <div className="text-sm font-medium text-slate-800">{formatPlaceLabel(place)}</div>
-                <div className="text-xs text-slate-500">
+                <div className="text-sm font-medium text-slate-100">{formatPlaceLabel(place)}</div>
+                <div className="text-xs text-slate-400">
                   {place.timezone} · {place.latitude.toFixed(2)}, {place.longitude.toFixed(2)}
                 </div>
               </button>
@@ -108,12 +108,12 @@ export default function BirthPlaceSearch(props: BirthPlaceSearchProps) {
           </div>
         )}
       </div>
-      <p className="text-[10px] text-slate-400 mt-0.5">
+      <p className="mt-0.5 text-[10px] text-slate-400">
         Search the place of birth and we&apos;ll fill timezone, longitude, and latitude automatically.
       </p>
       {selectedPlace && (
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-slate-600">
-          <span className="font-medium text-slate-800">{formatPlaceLabel(selectedPlace)}</span>
+        <div className="rounded-2xl border border-cyan-300/18 bg-cyan-400/10 px-4 py-3 text-xs text-slate-300">
+          <span className="font-medium text-slate-100">{formatPlaceLabel(selectedPlace)}</span>
           {' · '}
           {selectedPlace.timezone}
           {' · '}

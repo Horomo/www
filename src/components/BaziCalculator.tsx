@@ -1,7 +1,15 @@
 'use client';
 
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
+
+import BirthPlaceSearch from '@/components/BirthPlaceSearch';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import ChartContainer from '@/components/ui/ChartContainer';
+import GlowCard from '@/components/ui/GlowCard';
+import Stepper from '@/components/ui/Stepper';
+import { cn } from '@/components/ui/utils';
 import {
   buildAnalyzeRequestBody,
   finalizeAnalysisFormPayload,
@@ -9,19 +17,19 @@ import {
   type AnalysisFormDraft,
   type AnalysisFormPayload,
 } from '@/lib/analysis-payload';
-import BirthPlaceSearch from '@/components/BirthPlaceSearch';
+import { trackEvent } from '@/lib/analytics';
 import {
+  BRANCH_HIDDEN_STEMS,
   computeBazi,
   computeChartData,
-  BaziResult,
-  ChartData,
-  STEMS,
-  BRANCHES,
   EL_LABEL,
-  TG_ABBR,
-  tenGod,
   getBranchMainStem,
   getDayMasterNote,
+  STEMS,
+  TG_ABBR,
+  tenGod,
+  type BaziResult,
+  type ChartData,
 } from '@/lib/bazi';
 import {
   formatCalculationGenderModeDisplay,
@@ -30,26 +38,15 @@ import {
   type GenderIdentity,
 } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
-import { trackEvent } from '@/lib/analytics';
 
 const GENDER_IDENTITY_OPTIONS: Array<{ value: GenderIdentity; label: string; description: string }> = [
-  { value: 'male',              label: 'Male',              description: 'Auto-sets energy polarity to Yang'         },
-  { value: 'female',            label: 'Female',            description: 'Auto-sets energy polarity to Yin'          },
-  { value: 'non_binary',        label: 'Non-binary',        description: 'You\'ll choose your energy polarity below' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: 'You\'ll choose your energy polarity below' },
-  { value: 'other',             label: 'Other',             description: 'You\'ll choose your energy polarity below' },
+  { value: 'male', label: 'Male', description: 'Auto-sets energy polarity to Yang' },
+  { value: 'female', label: 'Female', description: 'Auto-sets energy polarity to Yin' },
+  { value: 'non_binary', label: 'Non-binary', description: "You'll choose your energy polarity below" },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say', description: "You'll choose your energy polarity below" },
+  { value: 'other', label: 'Other', description: "You'll choose your energy polarity below" },
 ];
 
-/**
- * Calculation mode options using Yin/Yang language.
- *
- * The underlying values stay 'male'/'female' to keep backward compatibility
- * with the calculation engine and API; only the user-facing copy changes.
- *
- * Background: Da Yun direction = (treatedAsMale) XOR (yearStemIsYin).
- * "Yang mode" means the chart is treated with the classical male rule;
- * the actual forward/backward direction also depends on the year stem.
- */
 const CALCULATION_MODE_OPTIONS: Array<{
   value: CalculationGenderMode;
   yinYang: string;
@@ -60,254 +57,42 @@ const CALCULATION_MODE_OPTIONS: Array<{
   advancedNote: string;
 }> = [
   {
-    value:        'male',
-    yinYang:      '陽',
-    pinyinLabel:  'Yáng',
-    label:        'Yang — Active Energy',
-    tagline:      'Outward, forward-moving',
-    description:  'Your 10-year luck cycles progress in the active direction from your birth.',
+    value: 'male',
+    yinYang: '陽',
+    pinyinLabel: 'Yáng',
+    label: 'Yang - Active Energy',
+    tagline: 'Outward, forward-moving',
+    description: 'Your 10-year luck cycles progress in the active direction from your birth.',
     advancedNote: 'Traditional male calculation rule',
   },
   {
-    value:        'female',
-    yinYang:      '陰',
-    pinyinLabel:  'Yīn',
-    label:        'Yin — Receptive Energy',
-    tagline:      'Inward, reflective',
-    description:  'Your 10-year luck cycles progress in the complementary direction from your birth.',
+    value: 'female',
+    yinYang: '陰',
+    pinyinLabel: 'Yīn',
+    label: 'Yin - Receptive Energy',
+    tagline: 'Inward, reflective',
+    description: 'Your 10-year luck cycles progress in the complementary direction from your birth.',
     advancedNote: 'Traditional female calculation rule',
   },
 ];
 
-// ── Element color helper ───────────────────────────────────
-function elColor(el: string): string {
-  switch (el) {
-    case 'wood':  return 'text-green-600';
-    case 'fire':  return 'text-red-600';
-    case 'earth': return 'text-stone-500';
-    case 'metal': return 'text-amber-700';
-    case 'water': return 'text-blue-600';
-    default:      return 'text-slate-600';
-  }
-}
+const WIZARD_STEPS = [
+  { id: 'identity', label: 'Identity', detail: 'Choose identity and energy rule.' },
+  { id: 'birth', label: 'Birth', detail: 'Set date, time, and known-time status.' },
+  { id: 'location', label: 'Location', detail: 'Confirm place, timezone, and coordinates.' },
+  { id: 'confirm', label: 'Confirm', detail: 'Review the reading ritual before reveal.' },
+] as const;
 
-// ── TG badge color helper ──────────────────────────────────
-function tgBadgeColor(abbr: string): string {
-  switch (abbr) {
-    case 'FR': case 'RW': return 'bg-slate-500';
-    case 'EG': case 'HO': return 'bg-amber-600';
-    case 'IW': case 'DW': return 'bg-green-600';
-    case '7K': case 'DO': return 'bg-red-600';
-    case 'IR': case 'DR': return 'bg-violet-600';
-    default: return 'bg-slate-400';
-  }
-}
+const PILLAR_META = [
+  { key: 'year', label: 'Year', zh: '年柱', accent: 'cyan' as const },
+  { key: 'month', label: 'Month', zh: '月柱', accent: 'violet' as const },
+  { key: 'day', label: 'Day', zh: '日柱', accent: 'gold' as const },
+  { key: 'hour', label: 'Hour', zh: '時柱', accent: 'pink' as const },
+] as const;
 
-// ── Format date helper ─────────────────────────────────────
-function fmtDate(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} `
-       + `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
-}
-
-function fmtMin(min: number): string {
-  const sign = min >= 0 ? '+' : '−';
-  const abs  = Math.abs(min);
-  const m    = Math.round(abs);
-  return `${sign}${m} min`;
-}
-
-// ── SVG Radar Chart ────────────────────────────────────────
-function RadarSVG({ structureCounts, structureEls }: { structureCounts: Record<string, number>; structureEls: Record<string, string> }) {
-  const W = 280, H = 264;
-  const cx = 140, cy = 134;
-  const rMax = 72;
-  const toRad = (d: number) => d * Math.PI / 180;
-  const px = (d: number, r: number) => (cx + r * Math.cos(toRad(d))).toFixed(1);
-  const py = (d: number, r: number) => (cy + r * Math.sin(toRad(d))).toFixed(1);
-
-  const structs = [
-    { key: 'companion', name: 'Companion', angle: -90 },
-    { key: 'output',    name: 'Output',    angle: -18 },
-    { key: 'wealth',    name: 'Wealth',    angle:  54 },
-    { key: 'influence', name: 'Influence', angle: 126 },
-    { key: 'resource',  name: 'Resource',  angle: 198 },
-  ];
-  const elZh: Record<string, string> = { wood:'木', fire:'火', earth:'土', metal:'金', water:'水' };
-  const elEn: Record<string, string> = { wood:'Wood', fire:'Fire', earth:'Earth', metal:'Metal', water:'Water' };
-
-  const maxScale = Math.max(4, ...Object.values(structureCounts));
-
-  const gridLines = [1, 2, 3, 4].map(l => {
-    const r = rMax * l / 4;
-    const pts = structs.map(s => `${px(s.angle, r)},${py(s.angle, r)}`).join(' ');
-    return <polygon key={l} points={pts} fill="none" stroke="#E2E8F0" strokeWidth="1" />;
-  });
-
-  const axes = structs.map(s => (
-    <line key={s.key} x1={cx} y1={cy} x2={px(s.angle, rMax)} y2={py(s.angle, rMax)} stroke="#E2E8F0" strokeWidth="1" />
-  ));
-
-  const dataPts = structs.map(s => {
-    const v = structureCounts[s.key] || 0;
-    const r = v === 0 ? 0 : rMax * Math.min(v, maxScale) / maxScale;
-    return `${px(s.angle, r)},${py(s.angle, r)}`;
-  }).join(' ');
-
-  const dots = structs.map(s => {
-    const v = structureCounts[s.key] || 0;
-    const r = rMax * Math.min(v, maxScale) / maxScale;
-    return (
-      <g key={s.key}>
-        <circle cx={px(s.angle, r)} cy={py(s.angle, r)} r="3.5" fill="#4F46E5" stroke="#fff" strokeWidth="1.5" />
-        {v > 0 && (
-          <text x={px(s.angle, r)} y={(parseFloat(py(s.angle, r)) - 6).toFixed(1)} textAnchor="middle" fontSize="9" fontWeight="700" fill="#4F46E5">{v}</text>
-        )}
-      </g>
-    );
-  });
-
-  const anchorOf = (d: number) => Math.cos(toRad(d)) > 0.2 ? 'start' : Math.cos(toRad(d)) < -0.2 ? 'end' : 'middle';
-  const labelR = rMax + 26;
-  const labels = structs.map(s => {
-    const el = structureEls[s.key];
-    const anchor = anchorOf(s.angle);
-    return (
-      <g key={s.key}>
-        <text x={px(s.angle, labelR)} y={(parseFloat(py(s.angle, labelR)) - 4).toFixed(1)} textAnchor={anchor} fontSize="9.5" fontWeight="600" fill="#475569">{s.name}</text>
-        <text x={px(s.angle, labelR)} y={(parseFloat(py(s.angle, labelR)) + 8).toFixed(1)} textAnchor={anchor} fontSize="8.5" fill="#94A3B8">{elZh[el]} {elEn[el]}</text>
-      </g>
-    );
-  });
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" fontFamily="Inter,sans-serif">
-      {gridLines}
-      {axes}
-      <polygon points={dataPts} fill="rgba(79,70,229,0.12)" stroke="#4F46E5" strokeWidth="2" strokeLinejoin="round" />
-      {dots}
-      {labels}
-    </svg>
-  );
-}
-
-// ── SVG Bar Chart ──────────────────────────────────────────
-function BarsSVG({ tenGodsCount }: { tenGodsCount: Record<string, number> }) {
-  const ALL_TG = [
-    { zh:'比肩', en:'Friend'            },
-    { zh:'劫財', en:'Rob Wealth'        },
-    { zh:'食神', en:'Eating God'        },
-    { zh:'傷官', en:'Hurting Officer'   },
-    { zh:'偏財', en:'Indirect Wealth'   },
-    { zh:'正財', en:'Direct Wealth'     },
-    { zh:'偏官', en:'Seven Killing'     },
-    { zh:'正官', en:'Direct Officer'    },
-    { zh:'偏印', en:'Indirect Resource' },
-    { zh:'正印', en:'Direct Resource'   },
-  ];
-  const sorted = [...ALL_TG].sort((a, b) => (tenGodsCount[b.zh] || 0) - (tenGodsCount[a.zh] || 0));
-  const maxVal = Math.max(...ALL_TG.map(t => tenGodsCount[t.zh] || 0), 1);
-  const labelW = 148, barMaxW = 130, rowH = 24;
-  const H = sorted.length * rowH + 20;
-  const W = labelW + barMaxW + 24;
-
-  const rows = sorted.map((tg, i) => {
-    const count = tenGodsCount[tg.zh] || 0;
-    const bw = count === 0 ? 0 : Math.max(4, (count / maxVal) * barMaxW);
-    const y = i * rowH + 2;
-    const color = count >= 2 ? '#DC2626' : '#94A3B8';
-    return (
-      <g key={tg.zh}>
-        <text x={labelW - 6} y={y + 14} textAnchor="end" fontSize="10" fill="#475569">{tg.en} {tg.zh}</text>
-        {count > 0 && <rect x={labelW} y={y + 5} width={bw} height="11" rx="2" fill={color} />}
-      </g>
-    );
-  });
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" fontFamily="Inter,sans-serif">
-      {rows}
-      <line x1={labelW} y1={H - 8} x2={labelW + barMaxW} y2={H - 8} stroke="#E2E8F0" strokeWidth="1" />
-      <text x={labelW} y={H - 2} fontSize="8" fill="#94A3B8" textAnchor="middle">0</text>
-      <text x={labelW + barMaxW} y={H - 2} fontSize="8" fill="#94A3B8" textAnchor="middle">{maxVal}</text>
-    </svg>
-  );
-}
-
-// ── Markdown bold renderer ─────────────────────────────────
-function RenderMd({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.startsWith('**') && part.endsWith('**')
-          ? <strong key={i}>{part.slice(2, -2)}</strong>
-          : part
-      )}
-    </>
-  );
-}
-
-// ── TST Info Card ──────────────────────────────────────────
-function TSTCard({ result }: { result: BaziResult }) {
-  const { tst, displayDate, tstDate, displayTzLabel } = result;
-  if (!tst) return null;
-
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const clockStr = `${pad(displayDate.getUTCHours())}:${pad(displayDate.getUTCMinutes())}`;
-  const tstStr   = `${pad(tstDate.getUTCHours())}:${pad(tstDate.getUTCMinutes())}`;
-
-  const rows = [
-    { label: 'Clock Time (birth certificate)', value: clockStr, note: displayTzLabel + (tst.dstApplied ? ' (DST in effect)' : ''), color: 'text-slate-700' },
-    { label: 'Step 1 · DST Correction',        value: fmtMin(tst.dstCorrectionMin), note: tst.dstApplied ? 'DST detected — reverted to standard time' : 'No DST in effect', color: tst.dstApplied ? 'text-amber-600' : 'text-slate-400' },
-    { label: 'Step 2 · Longitude Correction',  value: fmtMin(tst.lonCorrectionMin), note: '(longitude − std meridian) × 4 min/°', color: 'text-indigo-600' },
-    { label: 'Step 3 · Equation of Time',      value: fmtMin(tst.eotMin),           note: 'Earth orbital eccentricity correction', color: 'text-teal-600' },
-  ];
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-slate-700 mb-1">True Solar Time · 真太陽時</h3>
-      <p className="text-xs text-slate-400 mb-4">3-step astronomical correction applied to clock time</p>
-
-      <div className="space-y-2">
-        {rows.map(r => (
-          <div key={r.label} className="flex items-start justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0">
-            <div>
-              <div className="text-xs font-medium text-slate-600">{r.label}</div>
-              <div className="text-[10px] text-slate-400 mt-0.5">{r.note}</div>
-            </div>
-            <div className={`text-sm font-bold tabular-nums shrink-0 ${r.color}`}>{r.value}</div>
-          </div>
-        ))}
-
-        {/* Result */}
-        <div className="flex items-center justify-between pt-2 mt-1">
-          <div>
-            <div className="text-xs font-semibold text-slate-700">True Solar Time</div>
-            <div className="text-[10px] text-slate-400">Total correction: {fmtMin(tst.totalCorrectionMin)}</div>
-          </div>
-          <div className="text-lg font-bold text-indigo-700 tabular-nums">{tstStr}</div>
-        </div>
-      </div>
-
-      {tst.dayChanged && (
-        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
-          <span className="font-semibold">Day transition detected:</span> True Solar Time crosses midnight —
-          astrological date shifts to the {tst.dayChangedDir === 'next' ? 'following' : 'previous'} day.
-          All pillars have been recalculated accordingly.
-        </div>
-      )}
-    </div>
-  );
-}
-
+type PillarKey = (typeof PILLAR_META)[number]['key'];
 type FormValues = AnalysisFormDraft;
-type FollowUpItem = {
-  question: string;
-  answer: string | null;
-  loading: boolean;
-  error: string | null;
-};
+type FollowUpItem = { question: string; answer: string | null; loading: boolean; error: string | null };
 
 const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
   { question: '', answer: null, loading: false, error: null },
@@ -316,962 +101,550 @@ const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
 ];
 
 const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
+const TEXT_INPUT_CLASS = 'glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-slate-500';
+const TEXTAREA_CLASS = 'glass-input w-full rounded-2xl px-4 py-3 text-sm placeholder:text-slate-500';
 
-// ── Main Component ─────────────────────────────────────────
+function elColor(el: string): string {
+  switch (el) {
+    case 'wood': return 'text-emerald-300';
+    case 'fire': return 'text-rose-300';
+    case 'earth': return 'text-amber-200';
+    case 'metal': return 'text-yellow-100';
+    case 'water': return 'text-sky-300';
+    default: return 'text-slate-200';
+  }
+}
+
+function elementGlow(el: string): string {
+  switch (el) {
+    case 'wood': return 'border-emerald-300/24 bg-emerald-400/10';
+    case 'fire': return 'border-rose-300/24 bg-rose-400/10';
+    case 'earth': return 'border-amber-200/24 bg-amber-300/10';
+    case 'metal': return 'border-yellow-100/22 bg-yellow-100/10';
+    case 'water': return 'border-sky-300/24 bg-sky-400/10';
+    default: return 'border-white/12 bg-white/6';
+  }
+}
+
+function tgBadgeTone(abbr: string): 'default' | 'cyan' | 'violet' | 'pink' | 'gold' | 'danger' {
+  switch (abbr) {
+    case 'EG': case 'HO': return 'gold';
+    case 'IW': case 'DW': return 'cyan';
+    case '7K': case 'DO': return 'danger';
+    case 'IR': case 'DR': return 'violet';
+    default: return 'default';
+  }
+}
+
+function fmtDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
+function fmtMin(min: number): string {
+  const sign = min >= 0 ? '+' : '-';
+  return `${sign}${Math.round(Math.abs(min))} min`;
+}
+
+function RenderMd({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return <>{parts.map((part, index) => part.startsWith('**') && part.endsWith('**') ? <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong> : <span key={`${part}-${index}`}>{part}</span>)}</>;
+}
+
+function StatTile({ label, value, hint, className }: { label: string; value: string; hint?: string; className?: string }) {
+  return (
+    <div className={cn('rounded-2xl border border-white/8 bg-white/6 p-4', className)}>
+      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{label}</div>
+      <div className="mt-2 text-base font-semibold text-white">{value}</div>
+      {hint ? <div className="mt-2 text-xs leading-6 text-slate-400">{hint}</div> : null}
+    </div>
+  );
+}
+
+function TSTCard({ result }: { result: BaziResult }) {
+  const { tst, displayDate, tstDate, displayTzLabel } = result;
+  if (!tst) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const clockStr = `${pad(displayDate.getUTCHours())}:${pad(displayDate.getUTCMinutes())}`;
+  const tstStr = `${pad(tstDate.getUTCHours())}:${pad(tstDate.getUTCMinutes())}`;
+  const rows = [
+    { label: 'Clock Time', value: clockStr, note: `${displayTzLabel}${tst.dstApplied ? ' (DST in effect)' : ''}`, tone: 'text-slate-100' },
+    { label: 'Step 1 · DST Correction', value: fmtMin(tst.dstCorrectionMin), note: tst.dstApplied ? 'DST detected and reverted to standard time.' : 'No DST adjustment needed.', tone: tst.dstApplied ? 'text-amber-100' : 'text-slate-300' },
+    { label: 'Step 2 · Longitude Correction', value: fmtMin(tst.lonCorrectionMin), note: '(longitude - standard meridian) x 4 min/deg', tone: 'text-cyan-100' },
+    { label: 'Step 3 · Equation of Time', value: fmtMin(tst.eotMin), note: 'Orbital eccentricity correction.', tone: 'text-violet-100' },
+  ];
+
+  return (
+    <GlowCard accent="gold" className="p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Badge tone="gold">Astronomy layer</Badge>
+          <h3 className="mt-3 text-xl font-semibold text-white">True Solar Time · 真太陽時</h3>
+          <p className="mt-2 text-sm leading-7 text-slate-300">Horomo applies a three-step astronomical correction to stabilize boundary cases.</p>
+        </div>
+        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-right">
+          <div className="text-xs uppercase tracking-[0.24em] text-cyan-100/70">Final solar time</div>
+          <div className="mt-2 text-2xl font-semibold text-cyan-50">{tstStr}</div>
+          <div className="mt-1 text-xs text-slate-300">Total correction {fmtMin(tst.totalCorrectionMin)}</div>
+        </div>
+      </div>
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
+        {rows.map((row) => <div key={row.label} className="rounded-2xl border border-white/8 bg-white/6 p-4"><div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{row.label}</div><div className={cn('mt-2 text-lg font-semibold', row.tone)}>{row.value}</div><div className="mt-2 text-xs leading-6 text-slate-400">{row.note}</div></div>)}
+      </div>
+      {tst.dayChanged ? <div className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm leading-7 text-rose-100"><span className="font-semibold">Day transition detected:</span> true solar time crosses midnight, so the astrological date shifts to the {tst.dayChangedDir === 'next' ? 'following' : 'previous'} day. All pillars have already been recalculated.</div> : null}
+    </GlowCard>
+  );
+}
+function RadarGlowChart({ structureCounts, structureEls }: { structureCounts: Record<string, number>; structureEls: Record<string, string> }) {
+  const structures = [
+    { key: 'companion', name: 'Companion', angle: -90 },
+    { key: 'output', name: 'Output', angle: -18 },
+    { key: 'wealth', name: 'Wealth', angle: 54 },
+    { key: 'influence', name: 'Influence', angle: 126 },
+    { key: 'resource', name: 'Resource', angle: 198 },
+  ];
+  const maxScale = Math.max(4, ...Object.values(structureCounts));
+  const center = 120;
+  const radius = 86;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const point = (deg: number, r: number) => ({ x: center + r * Math.cos(toRad(deg)), y: center + r * Math.sin(toRad(deg)) });
+  const polygonPoints = structures.map((structure) => {
+    const value = structureCounts[structure.key] || 0;
+    const pointValue = point(structure.angle, value === 0 ? 0 : (radius * Math.min(value, maxScale)) / maxScale);
+    return `${pointValue.x},${pointValue.y}`;
+  }).join(' ');
+
+  return (
+    <svg viewBox="0 0 240 240" className="mx-auto w-full max-w-[320px]">
+      <defs>
+        <linearGradient id="radar-fill" x1="0%" x2="100%" y1="0%" y2="100%">
+          <stop offset="0%" stopColor="rgba(56,189,248,0.35)" />
+          <stop offset="100%" stopColor="rgba(168,85,247,0.45)" />
+        </linearGradient>
+      </defs>
+      {[0.25, 0.5, 0.75, 1].map((ratio) => {
+        const points = structures.map((structure) => {
+          const pointValue = point(structure.angle, radius * ratio);
+          return `${pointValue.x},${pointValue.y}`;
+        }).join(' ');
+        return <polygon key={ratio} points={points} fill="none" stroke="rgba(148,163,184,0.22)" strokeWidth="1" />;
+      })}
+      {structures.map((structure) => {
+        const outer = point(structure.angle, radius);
+        return <line key={structure.key} x1={center} y1={center} x2={outer.x} y2={outer.y} stroke="rgba(148,163,184,0.22)" strokeWidth="1" />;
+      })}
+      <polygon points={polygonPoints} fill="url(#radar-fill)" stroke="rgba(103,232,249,0.95)" strokeWidth="2.5" strokeLinejoin="round" />
+      {structures.map((structure) => {
+        const value = structureCounts[structure.key] || 0;
+        const pointValue = point(structure.angle, value === 0 ? 0 : (radius * Math.min(value, maxScale)) / maxScale);
+        const label = point(structure.angle, radius + 20);
+        return (
+          <g key={`${structure.key}-dot`}>
+            <circle cx={pointValue.x} cy={pointValue.y} r="4.5" fill="rgba(125,211,252,1)" />
+            <text x={label.x} y={label.y} textAnchor="middle" fontSize="9.5" fill="rgba(226,232,240,0.85)">{structure.name}</text>
+            <text x={label.x} y={label.y + 11} textAnchor="middle" fontSize="8" fill="rgba(148,163,184,0.9)">{EL_LABEL[structureEls[structure.key]].en}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function NeonBars({ tenGodsCount }: { tenGodsCount: Record<string, number> }) {
+  const allTenGods = [
+    { zh: '比肩', en: 'Friend' },
+    { zh: '劫財', en: 'Rob Wealth' },
+    { zh: '食神', en: 'Eating God' },
+    { zh: '傷官', en: 'Hurting Officer' },
+    { zh: '偏財', en: 'Indirect Wealth' },
+    { zh: '正財', en: 'Direct Wealth' },
+    { zh: '偏官', en: 'Seven Killing' },
+    { zh: '正官', en: 'Direct Officer' },
+    { zh: '偏印', en: 'Indirect Resource' },
+    { zh: '正印', en: 'Direct Resource' },
+  ].sort((a, b) => (tenGodsCount[b.zh] || 0) - (tenGodsCount[a.zh] || 0));
+  const maxValue = Math.max(...allTenGods.map((item) => tenGodsCount[item.zh] || 0), 1);
+
+  return (
+    <div className="space-y-3">
+      {allTenGods.map((item) => {
+        const value = tenGodsCount[item.zh] || 0;
+        return (
+          <div key={item.zh} className="grid grid-cols-[minmax(0,1fr)_56px] items-center gap-3">
+            <div>
+              <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-300">
+                <span>{item.en} <span className="font-zh text-sm">{item.zh}</span></span>
+                <span className="text-slate-400">{value}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-white/6">
+                <div className="h-full rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.95),rgba(168,85,247,0.9),rgba(251,191,36,0.95))] shadow-[0_0_20px_rgba(56,189,248,0.22)] transition-[width] duration-700" style={{ width: `${(value / maxValue) * 100}%` }} />
+              </div>
+            </div>
+            <div className="text-right text-xs uppercase tracking-[0.18em] text-slate-400">Rank</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function getPillarSummary(result: BaziResult, key: PillarKey) {
+  const pillar = result.pillars[key];
+  if (!pillar) return null;
+  const hiddenStems = BRANCH_HIDDEN_STEMS[pillar.branchIdx].map((stemIdx) => ({ stem: STEMS[stemIdx], stemIdx }));
+  const stemGod = key === 'day' ? null : tenGod(result.pillars.day.stemIdx, pillar.stemIdx);
+  const branchGod = tenGod(result.pillars.day.stemIdx, getBranchMainStem(pillar.branchIdx));
+  return { pillar, hiddenStems, stemGod, branchGod };
+}
+
+function PillarCard({ result, keyName, currentYear }: { result: BaziResult; keyName: PillarKey; currentYear: number }) {
+  const meta = PILLAR_META.find((item) => item.key === keyName)!;
+  const summary = getPillarSummary(result, keyName);
+
+  if (!summary) {
+    return (
+      <GlowCard accent={meta.accent} interactive className="h-full p-5">
+        <div className="flex items-center justify-between gap-3"><div><div className="text-xs uppercase tracking-[0.2em] text-slate-400">{meta.label} Pillar</div><div className="mt-2 text-sm text-slate-400">{meta.zh}</div></div><Badge tone="default">Unknown</Badge></div>
+        <div className="mt-6 rounded-3xl border border-dashed border-white/12 bg-white/4 p-6 text-center"><div className="font-zh text-5xl text-slate-500">?</div><div className="mt-3 text-sm text-slate-300">Hour pillar cannot be calculated without a known birth time.</div></div>
+      </GlowCard>
+    );
+  }
+
+  const { pillar, hiddenStems, stemGod, branchGod } = summary;
+  const pillarHint = keyName === 'year' ? `Current year ${currentYear}` : keyName === 'day' ? 'Day Master anchor' : keyName === 'month' ? 'Seasonal climate' : 'Expression timing';
+
+  return (
+    <GlowCard accent={meta.accent} interactive className="h-full p-5">
+      <div className="flex items-center justify-between gap-3"><div><div className="text-xs uppercase tracking-[0.2em] text-slate-400">{meta.label} Pillar</div><div className="mt-1 text-sm text-slate-300">{meta.zh}</div></div>{keyName === 'day' ? <Badge tone="gold">Day Master</Badge> : <Badge tone="default">{pillarHint}</Badge>}</div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className={cn('rounded-[24px] border p-4', elementGlow(pillar.stem.element))}>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Stem · 天干</div>
+          <div className={cn('mt-3 font-zh text-5xl font-bold', elColor(pillar.stem.element))}>{pillar.stem.zh}</div>
+          <div className="mt-2 text-sm font-semibold text-white">{pillar.stem.pinyin}</div>
+          <div className="mt-1 text-xs text-slate-300">{EL_LABEL[pillar.stem.element].en} {pillar.stem.yin ? 'Yin' : 'Yang'}</div>
+          <div className="mt-3 flex flex-wrap gap-2">{stemGod ? <><Badge tone={tgBadgeTone(TG_ABBR[stemGod.zh] || '')}>{TG_ABBR[stemGod.zh] || 'TG'}</Badge><span className="text-xs text-slate-300">{stemGod.zh} {stemGod.pinyin}</span></> : <span className="text-xs text-slate-300">Source stem of the chart.</span>}</div>
+        </div>
+        <div className={cn('rounded-[24px] border p-4', elementGlow(pillar.branch.element))}>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Branch · 地支</div>
+          <div className={cn('mt-3 font-zh text-5xl font-bold', elColor(pillar.branch.element))}>{pillar.branch.zh}</div>
+          <div className="mt-2 text-sm font-semibold text-white">{pillar.branch.pinyin}</div>
+          <div className="mt-1 text-xs text-slate-300">{pillar.branch.animal} · {EL_LABEL[pillar.branch.element].en}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[branchGod.zh] || '')}>{TG_ABBR[branchGod.zh] || 'TG'}</Badge><span className="text-xs text-slate-300">{branchGod.zh} {branchGod.pinyin}</span></div>
+        </div>
+      </div>
+      <div className="mt-4"><div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Hidden stems · 藏干</div><div className="mt-3 flex flex-wrap gap-2">{hiddenStems.map(({ stem, stemIdx }) => { const tg = tenGod(result.pillars.day.stemIdx, stemIdx); return <span key={`${keyName}-${stem.zh}`} className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs', elementGlow(stem.element))}><span className={cn('font-zh text-base', elColor(stem.element))}>{stem.zh}</span><span className="text-slate-200">{stem.pinyin}</span><Badge tone={tgBadgeTone(TG_ABBR[tg.zh] || '')} className="px-2 py-0.5 text-[9px]">{TG_ABBR[tg.zh] || 'TG'}</Badge></span>; })}</div></div>
+    </GlowCard>
+  );
+}
+
+function WizardPreview({ formValues, step }: { formValues: FormValues; step: number }) {
+  const energyLabel = formValues.calculationMode ? formatCalculationGenderModeDisplay(formValues.calculationMode) : 'Not selected yet';
+  return (
+    <div className="space-y-4 lg:sticky lg:top-24">
+      <GlowCard accent="violet" className="p-6">
+        <Badge tone="violet">Journey Preview</Badge>
+        <h3 className="mt-4 text-2xl font-semibold text-white">The chart reveal is staged in four deliberate steps.</h3>
+        <p className="mt-3 text-sm leading-7 text-slate-300">The wizard keeps the existing birth fields and logic intact, but turns the experience into a guided intake rather than a long static form.</p>
+        <div className="mt-6 grid gap-3">
+          <StatTile label="Current step" value={`${step + 1}. ${WIZARD_STEPS[step].label}`} hint={WIZARD_STEPS[step].detail} />
+          <StatTile label="Energy mode" value={energyLabel} hint="This controls the Da Yun progression rule only." />
+          <StatTile label="Location status" value={formValues.birthPlace ? 'Matched from place search' : 'Manual review available'} hint={formValues.timezone || 'Timezone will appear here once set.'} />
+        </div>
+      </GlowCard>
+      <GlowCard accent="cyan" className="p-6">
+        <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-100/70">What stays preserved</div>
+        <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
+          <li>All birth fields, validation rules, and location overrides remain available.</li>
+          <li>Local-first BaZi computation still runs in the browser with the same engine.</li>
+          <li>AI reading, Google sign-in, follow-up questions, and chart logging all remain untouched.</li>
+        </ul>
+      </GlowCard>
+    </div>
+  );
+}
+
 export default function BaziCalculator() {
-  const [dob, setDob]             = useState('1990-06-15');
-  const [tob, setTob]             = useState('08:30');
+  const [dob, setDob] = useState('1990-06-15');
+  const [tob, setTob] = useState('08:30');
   const [birthPlaceQuery, setBirthPlaceQuery] = useState('Bangkok, Thailand');
   const [birthPlace, setBirthPlace] = useState<PlaceSearchResult | null>(null);
-  const [timezone, setTimezone]   = useState('Asia/Bangkok');
+  const [timezone, setTimezone] = useState('Asia/Bangkok');
   const [longitude, setLongitude] = useState('100.52');
-  const [latitude, setLatitude]   = useState('13.75');
+  const [latitude, setLatitude] = useState('13.75');
   const [genderIdentity, setGenderIdentity] = useState<GenderIdentity>('male');
   const [genderOtherText, setGenderOtherText] = useState('');
   const [calculationMode, setCalculationMode] = useState<CalculationGenderMode | ''>('male');
   const [unknownTime, setUnknownTime] = useState(false);
-  const [result, setResult]       = useState<BaziResult | null>(null);
+  const [result, setResult] = useState<BaziResult | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [calculatedFormValues, setCalculatedFormValues] = useState<AnalysisFormPayload | null>(null);
-  const [analysis, setAnalysis]   = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<string | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpItem[]>(EMPTY_FOLLOW_UPS);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-  const [analysisError, setAnalysisError]     = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [activeLuckCycle, setActiveLuckCycle] = useState(0);
   const { data: session, status: sessionStatus } = useSession();
+  const currentYear = new Date().getUTCFullYear();
 
-  const formValues: FormValues = {
-    dob,
-    tob,
-    birthPlaceQuery,
-    birthPlace,
-    timezone,
-    longitude,
-    latitude,
-    genderIdentity,
-    genderOtherText,
-    calculationMode,
-    unknownTime,
-  };
+  const formValues: FormValues = { dob, tob, birthPlaceQuery, birthPlace, timezone, longitude, latitude, genderIdentity, genderOtherText, calculationMode, unknownTime };
+  useEffect(() => { trackEvent('calculation_mode_view', { screen_name: 'bazi_form' }); }, []);
 
   function syncFormState(values: FormValues) {
-    setDob(values.dob);
-    setTob(values.tob);
-    setBirthPlaceQuery(values.birthPlaceQuery);
-    setBirthPlace(values.birthPlace);
-    setTimezone(values.timezone);
-    setLongitude(values.longitude);
-    setLatitude(values.latitude);
-    setGenderIdentity(values.genderIdentity);
-    setGenderOtherText(values.genderOtherText);
-    setCalculationMode(values.calculationMode);
-    setUnknownTime(values.unknownTime);
+    setDob(values.dob); setTob(values.tob); setBirthPlaceQuery(values.birthPlaceQuery); setBirthPlace(values.birthPlace); setTimezone(values.timezone); setLongitude(values.longitude); setLatitude(values.latitude); setGenderIdentity(values.genderIdentity); setGenderOtherText(values.genderOtherText); setCalculationMode(values.calculationMode); setUnknownTime(values.unknownTime);
   }
-
-  // ── GA4: fire calculation_mode_view once on mount ─────────
-  useEffect(() => {
-    trackEvent('calculation_mode_view', { screen_name: 'bazi_form' });
-  }, []);
 
   function handleGenderIdentityChange(nextIdentity: GenderIdentity) {
     setGenderIdentity(nextIdentity);
-
-    if (nextIdentity === 'male' || nextIdentity === 'female') {
-      setCalculationMode(nextIdentity);
-      return;
-    }
-
+    if (nextIdentity === 'male' || nextIdentity === 'female') return void setCalculationMode(nextIdentity);
     setCalculationMode('');
   }
 
   function handleCalculationModeChange(next: CalculationGenderMode) {
-    if (next !== calculationMode) {
-      trackEvent('selection_changed', {
-        previous_energy_type: calculationMode || undefined,
-        energy_type: next,
-        screen_name: 'bazi_form',
-      });
-    }
-    trackEvent('calculation_mode_selected', {
-      energy_type: next,
-      screen_name: 'bazi_form',
-    });
+    if (next !== calculationMode) trackEvent('selection_changed', { previous_energy_type: calculationMode || undefined, energy_type: next, screen_name: 'bazi_form' });
+    trackEvent('calculation_mode_selected', { energy_type: next, screen_name: 'bazi_form' });
     setCalculationMode(next);
   }
 
-  function handleTooltipOpen() {
-    trackEvent('tooltip_opened', {
-      interaction_type: 'tooltip',
-      screen_name: 'bazi_form',
-    });
+  function validateStep(step: number, values: FormValues): string | null {
+    if (step === 0) {
+      if (!values.calculationMode) return 'Please choose a calculation mode for classical Da Yun rules.';
+      if (values.genderIdentity === 'other' && !values.genderOtherText.trim()) return 'Please add a short self-description or choose another gender identity option.';
+    }
+    if (step === 1) {
+      if (!values.dob) return 'Please enter date of birth.';
+      if (!values.unknownTime && !values.tob) return "Please enter time of birth, or check 'I don't know my birth time'.";
+    }
+    if (step === 2) {
+      const lng = parseFloat(values.longitude); const lat = parseFloat(values.latitude);
+      if (!values.timezone) return 'Please choose a birth place or enter a timezone manually.';
+      if (Number.isNaN(lng) || lng < -180 || lng > 180) return 'Longitude must be between -180 and 180.';
+      if (Number.isNaN(lat) || lat < -90 || lat > 90) return 'Latitude must be between -90 and 90.';
+    }
+    return null;
   }
 
-  function calculate(values: FormValues, options?: { syncInputs?: boolean }) {
+  const calculate = useCallback((values: FormValues) => {
     const normalizedValues = finalizeAnalysisFormPayload(values);
-    if (options?.syncInputs) syncFormState(values);
-    if (!values.dob) { setCalcError('Please enter date of birth.'); return; }
-    if (!values.unknownTime && !values.tob) { setCalcError('Please enter time of birth, or check "I don\'t know my birth time".'); return; }
-    if (!values.calculationMode) {
-      setCalcError('Please choose a calculation mode for classical Da Yun rules.');
-      return;
-    }
-    const lng = parseFloat(values.longitude);
-    if (isNaN(lng) || lng < -180 || lng > 180) { setCalcError('Longitude must be between −180 and 180.'); return; }
-    const lat = parseFloat(values.latitude);
-    if (isNaN(lat) || lat < -90 || lat > 90) { setCalcError('Latitude must be between −90 and 90.'); return; }
-    if (!values.timezone) { setCalcError('Please choose a birth place or enter a timezone manually.'); return; }
-    if (!normalizedValues) {
-      setCalcError('Please review the gender identity and calculation fields.');
-      return;
-    }
+    const error = validateStep(0, values) ?? validateStep(1, values) ?? validateStep(2, values);
+    if (error) return void setCalcError(error);
+    if (!normalizedValues) return void setCalcError('Please review the gender identity and calculation fields.');
     setCalcError(null);
     try {
-      const r = computeBazi(
-        normalizedValues.dob,
-        normalizedValues.unknownTime ? null : normalizedValues.tob,
-        normalizedValues.timezone,
-        lng,
-        normalizedValues.calculationMode,
-      );
-      const cd = computeChartData(r.pillars, r.pillars.day.stemIdx, r.unknownTime);
-      syncFormState(normalizedValues);
-      setResult(r);
-      setChartData(cd);
-      setCalculatedFormValues(normalizedValues);
-      setAnalysis(null);
-      setFollowUps(EMPTY_FOLLOW_UPS);
-      setAnalysisError(null);
-
-      // Log chart calculation to Supabase (fire-and-forget, non-blocking)
-      fetch('/api/log-chart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildAnalyzeRequestBody({ formValues: normalizedValues, result: r, chartData: cd })),
-      }).catch(() => {});
-    } catch (e: unknown) {
-      setCalcError('Calculation error: ' + (e instanceof Error ? e.message : String(e)));
-    }
-  }
-
-  useEffect(() => {
-    const rawSavedState = sessionStorage.getItem(AUTH_STATE_KEY);
-    if (!rawSavedState) return;
-
-    sessionStorage.removeItem(AUTH_STATE_KEY);
-
-    try {
-      const savedState = JSON.parse(rawSavedState) as {
-        formValues?: FormValues;
-        restoreChart?: boolean;
-      };
-
-      if (!savedState.formValues) return;
-
-      const restoredDraft = normalizeAnalysisFormDraft(savedState.formValues);
-      if (!restoredDraft) return;
-
-      if (savedState.restoreChart) {
-        const restoredValues = restoredDraft;
-        const finalizedRestoredValues = finalizeAnalysisFormPayload(restoredValues);
-        syncFormState(restoredValues);
-
-        if (!restoredValues.dob) { setCalcError('Please enter date of birth.'); return; }
-        if (!restoredValues.unknownTime && !restoredValues.tob) {
-          setCalcError('Please enter time of birth, or check "I don\'t know my birth time".');
-          return;
-        }
-        if (!restoredValues.calculationMode || !finalizedRestoredValues) {
-          setCalcError('Please choose a calculation mode for classical Da Yun rules.');
-          return;
-        }
-
-        const lng = parseFloat(restoredValues.longitude);
-        if (isNaN(lng) || lng < -180 || lng > 180) {
-          setCalcError('Longitude must be between −180 and 180.');
-          return;
-        }
-        const lat = parseFloat(restoredValues.latitude);
-        if (isNaN(lat) || lat < -90 || lat > 90) {
-          setCalcError('Latitude must be between −90 and 90.');
-          return;
-        }
-
-        setCalcError(null);
-
-        try {
-          const restoredResult = computeBazi(
-            finalizedRestoredValues.dob,
-            finalizedRestoredValues.unknownTime ? null : finalizedRestoredValues.tob,
-            finalizedRestoredValues.timezone,
-            lng,
-            finalizedRestoredValues.calculationMode,
-          );
-          const restoredChartData = computeChartData(
-            restoredResult.pillars,
-            restoredResult.pillars.day.stemIdx,
-            restoredResult.unknownTime,
-          );
-
-          setResult(restoredResult);
-          setChartData(restoredChartData);
-          setCalculatedFormValues(finalizedRestoredValues);
-          setAnalysis(null);
-          setFollowUps(EMPTY_FOLLOW_UPS);
-          setAnalysisError(null);
-        } catch (error: unknown) {
-          setCalcError(`Calculation error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-        return;
-      }
-
-      syncFormState(restoredDraft);
-    } catch {
-      sessionStorage.removeItem(AUTH_STATE_KEY);
-    }
+      const lng = parseFloat(values.longitude);
+      const computedResult = computeBazi(normalizedValues.dob, normalizedValues.unknownTime ? null : normalizedValues.tob, normalizedValues.timezone, lng, normalizedValues.calculationMode);
+      const computedChartData = computeChartData(computedResult.pillars, computedResult.pillars.day.stemIdx, computedResult.unknownTime);
+      syncFormState(normalizedValues); setResult(computedResult); setChartData(computedChartData); setCalculatedFormValues(normalizedValues); setAnalysis(null); setFollowUps(EMPTY_FOLLOW_UPS); setAnalysisError(null); setCurrentStep(3);
+      fetch('/api/log-chart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildAnalyzeRequestBody({ formValues: normalizedValues, result: computedResult, chartData: computedChartData })) }).catch(() => {});
+    } catch (error: unknown) { setCalcError(`Calculation error: ${error instanceof Error ? error.message : String(error)}`); }
   }, []);
 
   useEffect(() => {
-    if (sessionStatus === 'authenticated') {
-      setSigningIn(false);
-      setLoginError(null);
-    }
-  }, [sessionStatus]);
+    const rawSavedState = sessionStorage.getItem(AUTH_STATE_KEY); if (!rawSavedState) return; sessionStorage.removeItem(AUTH_STATE_KEY);
+    try {
+      const savedState = JSON.parse(rawSavedState) as { formValues?: FormValues; restoreChart?: boolean };
+      if (!savedState.formValues) return;
+      const restoredDraft = normalizeAnalysisFormDraft(savedState.formValues); if (!restoredDraft) return;
+      syncFormState(restoredDraft);
+      if (!savedState.restoreChart) return;
+      calculate(restoredDraft);
+    } catch { sessionStorage.removeItem(AUTH_STATE_KEY); }
+  }, [calculate]);
+
+  useEffect(() => { if (sessionStatus === 'authenticated') { setSigningIn(false); setLoginError(null); } }, [sessionStatus]);
+  useEffect(() => {
+    if (!result?.daYun) return void setActiveLuckCycle(0);
+    const currentCycleIndex = result.daYun.pillars.findIndex((pillar) => currentYear >= pillar.yearStart && currentYear <= pillar.yearEnd);
+    setActiveLuckCycle(currentCycleIndex >= 0 ? currentCycleIndex : 0);
+  }, [currentYear, result]);
 
   async function handleGoogleSignIn() {
-    setLoginError(null);
-    setSigningIn(true);
-
-    sessionStorage.setItem(
-      AUTH_STATE_KEY,
-      JSON.stringify({
-        formValues,
-        restoreChart: Boolean(result && chartData),
-      }),
-    );
-
+    setLoginError(null); setSigningIn(true);
+    sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({ formValues, restoreChart: Boolean(result && chartData) }));
     try {
-      const response = await signIn('google', {
-        callbackUrl: window.location.href,
-        redirect: false,
-      });
-
-      if (!response?.url) {
-        throw new Error('Unable to start Google sign-in. Please try again.');
-      }
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
+      const response = await signIn('google', { callbackUrl: window.location.href, redirect: false });
+      if (!response?.url) throw new Error('Unable to start Google sign-in. Please try again.');
+      if (response.error) throw new Error(response.error);
       window.location.assign(response.url);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unable to sign in with Google.';
-      setLoginError(message === 'Configuration'
-        ? 'Google sign-in is not configured correctly on the server.'
-        : 'Google sign-in failed. Please try again.');
+      setLoginError(message === 'Configuration' ? 'Google sign-in is not configured correctly on the server.' : 'Google sign-in failed. Please try again.');
       setSigningIn(false);
     }
   }
 
   async function runAnalysis() {
     if (!result || !chartData || !calculatedFormValues) return;
-    setLoadingAnalysis(true);
-    setAnalysisError(null);
-    setAnalysis(null);
+    setLoadingAnalysis(true); setAnalysisError(null); setAnalysis(null);
     try {
-      const requestBody = buildAnalyzeRequestBody({
-        formValues: calculatedFormValues,
-        result,
-        chartData,
-      });
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Unable to analyze this chart right now.');
-      }
-
+      const response = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildAnalyzeRequestBody({ formValues: calculatedFormValues, result, chartData })) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? 'Unable to analyze this chart right now.');
       if (data.error) throw new Error(data.error);
-      setAnalysis(data.analysis);
-      setFollowUps(EMPTY_FOLLOW_UPS);
-    } catch (e: unknown) {
-      setAnalysisError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      setLoadingAnalysis(false);
-    }
+      setAnalysis(data.analysis); setFollowUps(EMPTY_FOLLOW_UPS);
+    } catch (error: unknown) { setAnalysisError(error instanceof Error ? error.message : 'Unknown error'); } finally { setLoadingAnalysis(false); }
   }
 
-  function updateFollowUp(index: number, patch: Partial<FollowUpItem>) {
-    setFollowUps((current) => current.map((item, itemIndex) => (
-      itemIndex === index ? { ...item, ...patch } : item
-    )));
-  }
+  function updateFollowUp(index: number, patch: Partial<FollowUpItem>) { setFollowUps((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item)); }
 
   async function runFollowUp(index: number) {
     if (!result || !chartData || !calculatedFormValues) return;
-
     const question = followUps[index]?.question.trim() ?? '';
-    if (!question) {
-      updateFollowUp(index, { error: 'Please enter a question first.' });
-      return;
-    }
-
+    if (!question) return void updateFollowUp(index, { error: 'Please enter a question first.' });
     updateFollowUp(index, { loading: true, error: null, answer: null });
-
     try {
-      const requestBody = {
-        ...buildAnalyzeRequestBody({
-          formValues: calculatedFormValues,
-          result,
-          chartData,
-        }),
-        mode: 'follow_up' as const,
-        followUpQuestion: question,
-      };
-
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Unable to answer this question right now.');
-      }
-
+      const requestBody = { ...buildAnalyzeRequestBody({ formValues: calculatedFormValues, result, chartData }), mode: 'follow_up' as const, followUpQuestion: question };
+      const response = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? 'Unable to answer this question right now.');
       if (data.error) throw new Error(data.error);
       updateFollowUp(index, { answer: data.analysis, loading: false });
-    } catch (error: unknown) {
-      updateFollowUp(index, {
-        loading: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    } catch (error: unknown) { updateFollowUp(index, { loading: false, error: error instanceof Error ? error.message : 'Unknown error' }); }
   }
 
-  function handleBirthPlaceQueryChange(value: string) {
-    setBirthPlaceQuery(value);
-    setBirthPlace(null);
-  }
+  function handleBirthPlaceQueryChange(value: string) { setBirthPlaceQuery(value); setBirthPlace(null); }
+  function handleBirthPlaceSelect(place: PlaceSearchResult) { setBirthPlace(place); setBirthPlaceQuery([place.name, place.admin1, place.country].filter(Boolean).join(', ')); setTimezone(place.timezone); setLongitude(place.longitude.toFixed(4)); setLatitude(place.latitude.toFixed(4)); }
+  function moveToStep(nextStep: number) { startTransition(() => setCurrentStep(nextStep)); }
+  function goNext() { const error = validateStep(currentStep, formValues); if (error) return void setCalcError(error); setCalcError(null); moveToStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1)); }
+  function goBack() { setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
 
-  function handleBirthPlaceSelect(place: PlaceSearchResult) {
-    setBirthPlace(place);
-    setBirthPlaceQuery([place.name, place.admin1, place.country].filter(Boolean).join(', '));
-    setTimezone(place.timezone);
-    setLongitude(place.longitude.toFixed(4));
-    setLatitude(place.latitude.toFixed(4));
-  }
+  const confirmationSummary = useMemo(() => [
+    ['Gender identity', formatGenderIdentity(genderIdentity, genderOtherText)],
+    ['Luck cycle rule', calculationMode ? formatCalculationGenderModeDisplay(calculationMode) : 'Not selected'],
+    ['Birth date', dob || 'Not set'],
+    ['Birth time', unknownTime ? 'Unknown time mode' : tob || 'Not set'],
+    ['Birth place', birthPlaceQuery || 'Not set'],
+    ['Timezone', timezone || 'Not set'],
+    ['Coordinates', `${latitude || '-'}, ${longitude || '-'}`],
+  ], [birthPlaceQuery, calculationMode, dob, genderIdentity, genderOtherText, latitude, longitude, timezone, tob, unknownTime]);
+
+  const resultAnchor = result ? `${fmtDate(result.displayDate)}-${result.pillars.day.stem.zh}-${result.pillars.day.branch.zh}` : 'empty';
+  const activeDaYun = result?.daYun?.pillars[activeLuckCycle] ?? null;
 
   return (
-    <section className="bg-slate-100 py-8 px-4" aria-labelledby="calculator-heading">
-      <div className="max-w-4xl mx-auto space-y-4">
-
-        {/* Header */}
-        <header className="text-center pb-2">
-          <p className="font-zh text-4xl font-bold text-slate-900 tracking-widest">八字命盤</p>
-          <h2 id="calculator-heading" className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
-            BaZi calculator
-          </h2>
-          <p className="text-xs font-semibold tracking-widest text-slate-400 uppercase mt-1">
-            Four Pillars of Destiny
-          </p>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Enter your birth details to calculate a Four Pillars chart with Day Master, Ten Gods,
-            hidden stems, element distribution, and major luck cycles.
-          </p>
-          <div className="w-8 h-0.5 bg-indigo-600 mx-auto mt-3 rounded" />
-        </header>
-
-        {/* Form */}
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-          <div className="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-4">Birth Information · 生辰八字</div>
-          <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-slate-600">
-            <div className="font-medium text-slate-800">How to fill this in</div>
-            <p className="mt-1">
-              Enter the birth date and clock time from the birth certificate, then search for the place of birth.
-              We&apos;ll automatically fill the timezone and coordinates used for the chart.
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              If the place search is not exact, open Advanced Location Details and adjust timezone or coordinates manually.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* Date */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Date of Birth</label>
-              <input
-                type="date"
-                value={dob}
-                onChange={e => setDob(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
-
-            {/* Time */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-600">Time of Birth (clock time on certificate)</label>
-              <input
-                type="time"
-                value={tob}
-                disabled={unknownTime}
-                onChange={e => setTob(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
-              />
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.
-              </p>
-              <label className="flex items-center gap-2 text-xs text-slate-500 mt-1 cursor-pointer">
-                <input type="checkbox" checked={unknownTime} onChange={e => setUnknownTime(e.target.checked)} />
-                <span>I don&apos;t know my birth time</span>
-              </label>
-            </div>
-
-            <BirthPlaceSearch
-              value={birthPlaceQuery}
-              onChange={handleBirthPlaceQueryChange}
-              onSelect={handleBirthPlaceSelect}
-              selectedPlace={birthPlace}
-            />
-
-            <details className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-              <summary className="cursor-pointer text-xs font-semibold tracking-widest text-slate-500 uppercase">
-                Advanced Location Details
-              </summary>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <label className="text-xs font-medium text-slate-600">Timezone (DST detected automatically)</label>
-                  <input
-                    type="text"
-                    value={timezone}
-                    onChange={e => {
-                      setBirthPlace(null);
-                      setTimezone(e.target.value);
-                    }}
-                    placeholder="e.g. Asia/Bangkok"
-                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-600">Longitude (°E positive, °W negative)</label>
-                  <input
-                    type="number"
-                    value={longitude}
-                    onChange={e => {
-                      setBirthPlace(null);
-                      setLongitude(e.target.value);
-                    }}
-                    min="-180" max="180" step="0.01"
-                    placeholder="e.g. 100.52"
-                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-slate-600">Latitude (°N positive, °S negative)</label>
-                  <input
-                    type="number"
-                    value={latitude}
-                    onChange={e => {
-                      setBirthPlace(null);
-                      setLatitude(e.target.value);
-                    }}
-                    min="-90" max="90" step="0.01"
-                    placeholder="e.g. 13.75"
-                    className="bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Only longitude affects True Solar Time. Latitude is kept for reference and logging.</p>
-                </div>
-              </div>
-            </details>
-
-            {/* Gender Identity */}
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600">Gender Identity</label>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {GENDER_IDENTITY_OPTIONS.map((option) => (
-                  <label
-                    key={option.value}
-                    data-selected={String(genderIdentity === option.value)}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors
-                      border-slate-200 bg-white text-slate-700 hover:border-indigo-300
-                      data-[selected=true]:border-indigo-500 data-[selected=true]:bg-indigo-50 data-[selected=true]:text-indigo-900"
-                  >
-                    <input
-                      type="radio"
-                      name="genderIdentity"
-                      value={option.value}
-                      checked={genderIdentity === option.value}
-                      onChange={() => handleGenderIdentityChange(option.value)}
-                      className="mt-0.5 h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span>
-                      <span className="block font-medium">{option.label}</span>
-                      <span className="block text-xs text-slate-500">{option.description}</span>
-                    </span>
-                  </label>
-                ))}
+    <section className="px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
+      <div className="mx-auto max-w-7xl">
+        <div className="rounded-[36px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.58),rgba(15,23,42,0.38))] p-5 shadow-[0_35px_90px_rgba(2,8,23,0.45)] backdrop-blur-xl sm:p-7 lg:p-9">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px]">
+            <div>
+              <Badge tone="cyan">Interactive BaZi Forge</Badge>
+              <div className="mt-4 max-w-3xl">
+                <p className="font-zh text-4xl font-bold tracking-[0.22em] text-slate-50">八字命盤</p>
+                <h2 id="calculator-heading" className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Guided chart creation with a premium, reveal-based flow</h2>
+                <p className="mt-4 text-sm leading-8 text-slate-300 sm:text-base">Every field, validator, and calculation stays intact. The redesign turns the intake into a layered sequence, then reveals the result as a character profile, visual atlas, and timing journey.</p>
               </div>
 
-              {genderIdentity === 'other' && (
-                <div className="mt-2">
-                  <label htmlFor="gender-other-text" className="text-xs font-medium text-slate-600">
-                    Optional self-description
-                  </label>
-                  <input
-                    id="gender-other-text"
-                    type="text"
-                    value={genderOtherText}
-                    onChange={(event) => setGenderOtherText(event.target.value)}
-                    placeholder="Enter a label if you want to share one"
-                    className="mt-1 w-full bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Calculation Mode — Yin/Yang energy polarity */}
-            <div className="flex flex-col gap-2 sm:col-span-2">
-
-              {/* Section header */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-600">Luck Cycle Direction · 大運方向</span>
-                {/* Native tooltip keeps the component dependency-free */}
-                <span
-                  className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-500 hover:bg-slate-300"
-                  title="This affects which 10-year luck cycle (大運) you enter first and the direction they progress. It is derived from your year pillar's Yin/Yang polarity combined with this setting — it is completely separate from your gender identity."
-                  aria-label="Help: luck cycle direction"
-                  onMouseEnter={handleTooltipOpen}
-                  onFocus={handleTooltipOpen}
-                >
-                  ?
-                </span>
+              <div className="mt-8">
+                <Stepper
+                  steps={WIZARD_STEPS.map((step) => ({ ...step }))}
+                  currentStep={currentStep}
+                  onStepClick={(index) => {
+                    if (index <= currentStep) {
+                      setCalcError(null);
+                      moveToStep(index);
+                    }
+                  }}
+                />
               </div>
 
-              {/* Contextual helper — adapts to gender identity selection */}
-              {(genderIdentity === 'non_binary' || genderIdentity === 'prefer_not_to_say' || genderIdentity === 'other') ? (
-                <p className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
-                  Traditional BaZi uses a binary energy polarity for this one calculation only.
-                  Choose the pattern that feels most resonant with your experience — there is no wrong choice.
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-400">
-                  Auto-set from your gender identity above. Override here if you wish.
-                </p>
-              )}
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {CALCULATION_MODE_OPTIONS.map((option) => {
-                  const isSelected = calculationMode === option.value;
-                  return (
-                    <label
-                      key={option.value}
-                      data-selected={String(isSelected)}
-                      className="flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors
-                        border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40
-                        data-[selected=true]:border-emerald-500 data-[selected=true]:bg-emerald-50 data-[selected=true]:text-emerald-900"
-                    >
-                      <input
-                        type="radio"
-                        name="calculationMode"
-                        value={option.value}
-                        checked={isSelected}
-                        onChange={() => handleCalculationModeChange(option.value)}
-                        className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="flex-1 min-w-0">
-                        {/* Chinese character badge + English label */}
-                        <span className="mb-1 flex items-baseline gap-2">
-                          <span
-                            data-selected={String(isSelected)}
-                            className="font-zh text-2xl font-bold leading-none text-slate-400 data-[selected=true]:text-emerald-700"
-                          >
-                            {option.yinYang}
-                          </span>
-                          <span className="text-sm font-semibold leading-tight">{option.label}</span>
-                        </span>
-                        {/* One-line tagline */}
-                        <span
-                          data-selected={String(isSelected)}
-                          className="block text-xs font-medium mb-1 text-slate-400 data-[selected=true]:text-emerald-600"
-                        >
-                          {option.tagline}
-                        </span>
-                        {/* Plain-language description */}
-                        <span className="block text-[11px] leading-relaxed text-slate-500">
-                          {option.description}
-                        </span>
-                        {/* Advanced note — very subtle, for practitioners */}
-                        <span className="mt-2 block border-t border-slate-100 pt-1.5 text-[10px] text-slate-300">
-                          {option.advancedNote}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-
-          {calcError && <div className="text-red-600 text-sm mt-3">{calcError}</div>}
-          <button
-            onClick={() => {
-              if (calculationMode) {
-                trackEvent('calculation_mode_confirmed', { energy_type: calculationMode });
-              }
-              calculate(formValues);
-            }}
-            className="mt-4 block w-full sm:w-auto sm:mx-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-8 py-2.5 rounded-lg transition-colors"
-          >
-            Calculate Chart · 起命盤
-          </button>
-        </div>
-
-        {result && chartData && (
-          <>
-            {calculatedFormValues && (
-              <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
-                Gender identity: <span className="font-medium text-slate-800">{formatGenderIdentity(calculatedFormValues.genderIdentity, calculatedFormValues.genderOtherText)}</span>
-                &nbsp;·&nbsp;
-                Luck cycle direction: <span className="font-medium text-slate-800">{formatCalculationGenderModeDisplay(calculatedFormValues.calculationMode)}</span>
-              </div>
-            )}
-
-            {/* Solar Info */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3 text-sm text-slate-600">
-              {result.unknownTime
-                ? <>Local date: <span className="font-medium text-slate-800">{result.displayDate.getUTCFullYear()}-{String(result.displayDate.getUTCMonth() + 1).padStart(2, '0')}-{String(result.displayDate.getUTCDate()).padStart(2, '0')} ({result.displayTzLabel})</span> &nbsp;·&nbsp; Hour pillar not calculated</>
-                : <>Clock time: <span className="font-medium text-slate-800">{fmtDate(result.displayDate)} ({result.displayTzLabel})</span> &nbsp;→&nbsp; True Solar Time: <span className="font-medium text-indigo-700">{fmtDate(result.tstDate)}</span></>
-              }
-            </div>
-
-            {/* True Solar Time Card */}
-            {!result.unknownTime && <TSTCard result={result} />}
-
-            {/* Pillar Table */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
-              <table className="w-full min-w-[400px]">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="w-16 py-3 px-3 text-xs font-semibold text-slate-400 text-left"></th>
-                    {['hour', 'day', 'month', 'year'].map(k => (
-                      <th key={k} className={`py-3 px-3 text-center text-xs font-semibold ${k === 'day' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}>
-                        {k === 'hour' ? '時柱' : k === 'day' ? '日柱' : k === 'month' ? '月柱' : '年柱'}
-                        <br /><span className="text-[10px] font-normal capitalize opacity-70">{k}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Stem row */}
-                  <tr className="border-b border-slate-100">
-                    <td className="py-3 px-3 text-xs text-slate-400 font-medium">天干<br/>Stem</td>
-                    {(['hour', 'day', 'month', 'year'] as const).map(k => {
-                      const p = result.pillars[k];
-                      if (!p) return (
-                        <td key={k} className="py-3 px-3 text-center">
-                          <div className="font-zh text-3xl text-slate-300">?</div>
-                          <div className="text-xs text-slate-300 mt-0.5">—</div>
-                          <div className="text-[10px] text-slate-300">Unknown</div>
-                        </td>
-                      );
-                      return (
-                        <td key={k} className={`py-3 px-3 text-center ${k === 'day' ? 'bg-indigo-50' : ''}`}>
-                          {k === 'day' && <div className="text-[10px] font-semibold text-indigo-500 mb-1">日主</div>}
-                          <div className={`font-zh text-3xl font-bold ${elColor(p.stem.element)}`}>{p.stem.zh}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{p.stem.pinyin}</div>
-                          <div className="text-[10px] text-slate-400">{EL_LABEL[p.stem.element].zh}{p.stem.yin ? '陰' : '陽'} · {EL_LABEL[p.stem.element].en} {p.stem.yin ? 'Yin' : 'Yang'}</div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {/* Branch row */}
-                  <tr>
-                    <td className="py-3 px-3 text-xs text-slate-400 font-medium">地支<br/>Branch</td>
-                    {(['hour', 'day', 'month', 'year'] as const).map(k => {
-                      const p = result.pillars[k];
-                      if (!p) return (
-                        <td key={k} className="py-3 px-3 text-center">
-                          <div className="font-zh text-3xl text-slate-300">?</div>
-                          <div className="text-xs text-slate-300 mt-0.5">—</div>
-                          <div className="text-[10px] text-slate-300">Unknown</div>
-                        </td>
-                      );
-                      return (
-                        <td key={k} className={`py-3 px-3 text-center ${k === 'day' ? 'bg-indigo-50' : ''}`}>
-                          <div className={`font-zh text-3xl font-bold ${elColor(p.branch.element)}`}>{p.branch.zh}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{p.branch.pinyin} · {p.branch.animal}</div>
-                          <div className="text-[10px] text-slate-400">{EL_LABEL[p.branch.element].zh}{p.branch.yin ? '陰' : '陽'} · {EL_LABEL[p.branch.element].en} {p.branch.yin ? 'Yin' : 'Yang'}</div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Day Master Card */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Day Master · 日主</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Stem · 天干', value: `${result.pillars.day.stem.zh} (${result.pillars.day.stem.pinyin})`, el: result.pillars.day.stem.element },
-                  { label: 'Element · 五行', value: `${EL_LABEL[result.pillars.day.stem.element].zh} ${EL_LABEL[result.pillars.day.stem.element].en}`, el: result.pillars.day.stem.element },
-                  { label: 'Polarity · 陰陽', value: result.pillars.day.stem.yin ? '陰 Yin' : '陽 Yang', el: null },
-                  { label: 'Nature · 性格', value: getDayMasterNote(result.pillars.day.stem), el: null },
-                ].map(item => (
-                  <div key={item.label} className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mb-1">{item.label}</div>
-                    <div className={`text-sm font-semibold ${item.el ? elColor(item.el) : 'text-slate-700'}`}>{item.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Ten Gods Table */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Ten Gods · 十神 (relative to Day Master {result.pillars.day.stem.zh} {result.pillars.day.stem.pinyin})</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[480px]">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-400 font-medium">
-                      <th className="text-left py-2 pr-4">Pillar</th>
-                      <th className="text-center py-2 px-2">Stem 天干</th>
-                      <th className="text-center py-2 px-2">Stem God</th>
-                      <th className="text-center py-2 px-2">Branch 地支</th>
-                      <th className="text-center py-2 px-2">Branch God (main qi)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(result.unknownTime ? ['day', 'month', 'year'] : ['hour', 'day', 'month', 'year'] as const).map(k => {
-                      const p = result.pillars[k as keyof typeof result.pillars];
-                      if (!p) return null;
-                      const dmIdx = result.pillars.day.stemIdx;
-                      const tgStem = k === 'day' ? { zh: '—', en: 'Day Master', pinyin: '日主' } : tenGod(dmIdx, p.stemIdx);
-                      const branchMainStem = getBranchMainStem(p.branchIdx);
-                      const tgBranch = tenGod(dmIdx, branchMainStem);
-                      const pillarLabel: Record<string, string> = { hour: '時柱 Hour', day: '日柱 Day', month: '月柱 Month', year: '年柱 Year' };
-                      const tgAbbr = TG_ABBR[tgStem.zh] || '';
-                      const tgBranchAbbr = TG_ABBR[tgBranch.zh] || '';
-                      return (
-                        <tr key={k} className="border-b border-slate-50 last:border-0">
-                          <td className="py-2 pr-4 text-xs text-slate-500">{pillarLabel[k]}</td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={`font-zh text-base font-bold ${elColor(STEMS[p.stemIdx].element)}`}>{STEMS[p.stemIdx].zh}</span>
-                          </td>
-                          <td className={`py-2 px-2 text-center ${k === 'day' ? 'text-slate-400 text-xs' : ''}`}>
-                            {tgAbbr && <span className={`inline-block text-white text-[10px] font-bold px-1.5 py-0.5 rounded ${tgBadgeColor(tgAbbr)} mr-1`}>{tgAbbr}</span>}
-                            <span className="text-xs text-slate-600">{tgStem.zh}</span>
-                            <span className="text-[10px] text-slate-400 ml-1">{tgStem.pinyin}</span>
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={`font-zh text-base font-bold ${elColor(BRANCHES[p.branchIdx].element)}`}>{BRANCHES[p.branchIdx].zh}</span>
-                          </td>
-                          <td className="py-2 px-2 text-center">
-                            {tgBranchAbbr && <span className={`inline-block text-white text-[10px] font-bold px-1.5 py-0.5 rounded ${tgBadgeColor(tgBranchAbbr)} mr-1`}>{tgBranchAbbr}</span>}
-                            <span className="text-xs text-slate-600">{tgBranch.zh}</span>
-                            <span className="text-[10px] text-slate-400 ml-1">{tgBranch.pinyin}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-2">Branch God shows main qi (主氣) only. The charts below count all hidden stems (藏干).</p>
-            </div>
-
-            {/* Charts Section */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">5 Structures · 五行格局</div>
-                  <RadarSVG structureCounts={chartData.structureCounts} structureEls={chartData.structureEls} />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">10 Gods · 十神分布</div>
-                  <div className="text-[10px] text-slate-400 mb-2">All hidden stems included</div>
-                  <BarsSVG tenGodsCount={chartData.tenGodsCount} />
-                </div>
-              </div>
-            </div>
-
-            {/* Da Yun Section */}
-            {result.daYun && (
-              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                <h3 className="text-sm font-semibold text-slate-700 mb-1">Major Luck Cycles · 大運</h3>
-                <div className="text-xs text-slate-500 mb-3">
-                  Direction: <span className="font-medium text-slate-700">{result.daYun.forward ? 'Forward 順行' : 'Backward 逆行'}</span>
-                  {result.daYun.forward
-                    ? ' (classical rule advances from the month pillar)'
-                    : ' (classical rule moves backward from the month pillar)'}
-                  <br />
-                  Energy polarity: <span className="font-medium text-slate-700">{formatCalculationGenderModeDisplay(result.daYun.calculationMode)}</span>
-                  &nbsp;·&nbsp; <span>{result.daYun.ruleNote}</span>
-                  <br />
-                  Nearest solar term: <span className="font-medium text-slate-700">{result.daYun.jie.name}</span>
-                  &nbsp;·&nbsp; Luck begins at: <span className="font-medium text-slate-700">
-                    {result.daYun.startYears} yrs{result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <div className="flex gap-3 min-w-max pb-2">
-                    {result.daYun.pillars.map((p, i) => (
-                      <div key={i} className="flex flex-col items-center border border-slate-200 rounded-lg px-3 py-2 min-w-[80px] text-center bg-slate-50">
-                        <div className="text-[10px] text-slate-400 font-medium">Cycle {i + 1}</div>
-                        <div className="text-[10px] text-slate-400">Age {p.ageStart}–{p.ageEnd}</div>
-                        <div className="text-[10px] text-slate-400">{p.yearStart}–{p.yearEnd}</div>
-                        <div className={`font-zh text-2xl font-bold mt-1 ${elColor(p.stem.element)}`}>{p.stem.zh}</div>
-                        <div className="w-full h-px bg-slate-200 my-1" />
-                        <div className={`font-zh text-2xl font-bold ${elColor(p.branch.element)}`}>{p.branch.zh}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{p.stem.pinyin} / {p.branch.pinyin}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* AI Analysis Section */}
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-              <h3 className="text-sm font-semibold text-slate-700 mb-1">AI Reading · 八字解析</h3>
-              <p className="text-xs text-slate-400 mb-3">Google sign-in is required before AI analysis can run.</p>
-
-              {sessionStatus === 'authenticated' && session.user && (
-                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>Signed in as <span className="font-medium text-slate-700">{session.user.email ?? session.user.name ?? 'Google user'}</span></span>
-                  <button
-                    type="button"
-                    onClick={() => signOut({ callbackUrl: '/' })}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
-
-              {sessionStatus === 'loading' ? (
-                <button
-                  disabled
-                  className="flex items-center gap-2 rounded-lg bg-slate-300 px-5 py-2 text-sm font-semibold text-white"
-                >
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Checking sign-in…
-                </button>
-              ) : sessionStatus === 'authenticated' ? (
-                <button
-                  onClick={runAnalysis}
-                  disabled={loadingAnalysis}
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold text-sm px-5 py-2 rounded-lg transition-colors"
-                >
-                  {loadingAnalysis ? (
+              <GlowCard accent="cyan" className="mt-6 p-5 sm:p-6">
+                <div key={currentStep} className="animate-reveal space-y-5">
+                  {currentStep === 0 ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Analyzing…
-                    </>
-                  ) : 'Analyze with AI · 用AI解析'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={signingIn}
-                  className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-slate-700 border border-slate-300 transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {signingIn ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Redirecting to Google…
-                    </>
-                  ) : 'Sign in with Google'}
-                </button>
-              )}
-
-              {loginError && <div className="text-red-600 text-sm mt-3">{loginError}</div>}
-              {analysisError && <div className="text-red-600 text-sm mt-3">{analysisError}</div>}
-              {analysis && (
-                <>
-                  <div className="mt-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap border-t border-slate-100 pt-4">
-                    {analysis.split('\n').map((line, i) => (
-                      <p key={i} className={line.trim() === '' ? 'mt-3' : ''}>
-                        <RenderMd text={line} />
-                      </p>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 border-t border-slate-100 pt-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
                       <div>
-                        <h4 className="text-sm font-semibold text-slate-700">Ask 3 More Questions</h4>
-                        <p className="text-xs text-slate-400">Ask about career, relationships, timing, strengths, or any other point in this chart.</p>
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-cyan-100/70">Step 1</div>
+                        <h3 className="mt-2 text-2xl font-semibold text-white">Identity and calculation polarity</h3>
+                        <p className="mt-2 text-sm leading-7 text-slate-300">Choose your gender identity, then confirm the classical Da Yun treatment rule that the engine already uses.</p>
                       </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {followUps.map((item, index) => (
-                        <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                          <label className="block text-xs font-medium text-slate-600 mb-1">
-                            Question {index + 1}
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {GENDER_IDENTITY_OPTIONS.map((option) => (
+                          <label key={option.value} data-selected={String(genderIdentity === option.value)} className="flex cursor-pointer items-start gap-3 rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 transition-all duration-300 hover:border-cyan-300/30 hover:bg-white/8 data-[selected=true]:border-cyan-300/40 data-[selected=true]:bg-cyan-400/10">
+                            <input type="radio" name="genderIdentity" value={option.value} checked={genderIdentity === option.value} onChange={() => handleGenderIdentityChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-cyan-400 focus:ring-cyan-300" />
+                            <span><span className="block font-semibold text-white">{option.label}</span><span className="mt-1 block text-xs leading-6 text-slate-400">{option.description}</span></span>
                           </label>
-                          <textarea
-                            value={item.question}
-                            onChange={(event) => updateFollowUp(index, {
-                              question: event.target.value,
-                              error: null,
-                            })}
-                            rows={2}
-                            placeholder="e.g. What does this chart suggest about career direction over the next 3 years?"
-                            className="w-full resize-y bg-white border border-slate-200 rounded-lg text-slate-900 text-sm px-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                          />
-                          <div className="mt-2 flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => runFollowUp(index)}
-                              disabled={item.loading}
-                              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-900 disabled:opacity-60"
-                            >
-                              {item.loading ? 'Asking…' : `Ask Question ${index + 1}`}
-                            </button>
-                            <span className="text-[10px] text-slate-400">Each question is answered separately and does not change the main reading above.</span>
-                          </div>
-
-                          {item.error && <div className="text-red-600 text-sm mt-2">{item.error}</div>}
-                          {item.answer && (
-                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                              {item.answer.split('\n').map((line, lineIndex) => (
-                                <p key={lineIndex} className={line.trim() === '' ? 'mt-3' : ''}>
-                                  <RenderMd text={line} />
-                                </p>
-                              ))}
-                            </div>
-                          )}
+                        ))}
+                      </div>
+                      {genderIdentity === 'other' ? (
+                        <div>
+                          <label htmlFor="gender-other-text" className="text-xs font-medium text-slate-300">Optional self-description</label>
+                          <input id="gender-other-text" type="text" value={genderOtherText} onChange={(event) => setGenderOtherText(event.target.value)} placeholder="Enter a label if you want to share one" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+                      ) : null}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-300">Luck Cycle Direction · 大運方向</span>
+                          <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-white/12 bg-white/8 text-[10px] font-semibold text-slate-300" title="This affects which 10-year luck cycle you enter first. It is separate from gender identity." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
+                        </div>
+                        {genderIdentity === 'non_binary' || genderIdentity === 'prefer_not_to_say' || genderIdentity === 'other' ? <div className="rounded-2xl border border-cyan-300/18 bg-cyan-400/10 px-4 py-3 text-sm leading-7 text-slate-200">Traditional BaZi uses a binary treatment rule for this one timing calculation only. Choose the pattern that feels most resonant with your experience.</div> : <p className="text-sm leading-7 text-slate-400">Auto-set from your gender identity above. Override here if you wish.</p>}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {CALCULATION_MODE_OPTIONS.map((option) => {
+                            const selected = calculationMode === option.value;
+                            return (
+                              <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 transition-all duration-300 hover:border-emerald-300/30 hover:bg-white/8 data-[selected=true]:border-emerald-300/40 data-[selected=true]:bg-emerald-400/10">
+                                <input type="radio" name="calculationMode" value={option.value} checked={selected} onChange={() => handleCalculationModeChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-emerald-400 focus:ring-emerald-300" />
+                                <span className="min-w-0"><span className="flex items-center gap-3"><span className="font-zh text-3xl font-bold text-emerald-100">{option.yinYang}</span><span><span className="block text-sm font-semibold text-white">{option.label}</span><span className="block text-xs text-slate-400">{option.pinyinLabel}</span></span></span><span className="mt-3 block text-sm leading-7 text-slate-300">{option.description}</span><span className="mt-2 block text-xs uppercase tracking-[0.18em] text-slate-500">{option.tagline} · {option.advancedNote}</span></span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {currentStep === 1 ? (
+                    <>
+                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-cyan-100/70">Step 2</div><h3 className="mt-2 text-2xl font-semibold text-white">Birth date and recorded time</h3><p className="mt-2 text-sm leading-7 text-slate-300">Enter the birth date and the recorded clock time from the certificate. Unknown time mode remains available and keeps the hour pillar unresolved.</p></div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div><label className="text-xs font-medium text-slate-300">Date of Birth</label><input type="date" value={dob} onChange={(event) => setDob(event.target.value)} className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div>
+                        <div><label className="text-xs font-medium text-slate-300">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => setTob(event.target.value)} className={cn(TEXT_INPUT_CLASS, 'mt-2')} /><p className="mt-2 text-xs leading-6 text-slate-400">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
+                      </div>
+                      <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200"><input type="checkbox" checked={unknownTime} onChange={(event) => setUnknownTime(event.target.checked)} className="h-4 w-4 border-white/20 bg-transparent text-cyan-400 focus:ring-cyan-300" /><span>I don&apos;t know my birth time</span></label>
+                    </>
+                  ) : null}
+
+                  {currentStep === 2 ? (
+                    <>
+                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-cyan-100/70">Step 3</div><h3 className="mt-2 text-2xl font-semibold text-white">Birthplace, timezone, and coordinates</h3><p className="mt-2 text-sm leading-7 text-slate-300">Search the birthplace first, then fine-tune the timezone and coordinates manually if needed.</p></div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
+                        <div className="rounded-[24px] border border-white/10 bg-white/5 p-4"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-slate-300"><div>Timezone: <span className="font-semibold text-white">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-white">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-white">{latitude || '—'}</span></div></div><p className="mt-3 text-xs leading-6 text-slate-400">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
+                      </div>
+                      <details className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium text-slate-300">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium text-slate-300">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium text-slate-300">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div></div></details>
+                    </>
+                  ) : null}
+
+                  {currentStep === 3 ? (
+                    <>
+                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-cyan-100/70">Step 4</div><h3 className="mt-2 text-2xl font-semibold text-white">Confirmation and chart reveal</h3><p className="mt-2 text-sm leading-7 text-slate-300">Review the exact details that will be sent into the current calculation engine, then generate the chart.</p></div>
+                      <div className="grid gap-3 sm:grid-cols-2">{confirmationSummary.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}</div>
+                      <div className="rounded-[24px] border border-cyan-300/18 bg-cyan-400/10 px-4 py-4 text-sm leading-7 text-slate-200">The calculation still runs locally through the current BaZi engine. AI analysis remains optional and only runs after the chart exists.</div>
+                    </>
+                  ) : null}
+                </div>
+                {calcError ? <div className="mt-5 rounded-2xl border border-rose-300/18 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{calcError}</div> : null}
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-3"><Button variant="ghost" size="md" onClick={goBack} disabled={currentStep === 0}>Previous</Button>{currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Continue</Button> : null}</div><Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button></div>
+              </GlowCard>
             </div>
-          </>
-        )}
+            <WizardPreview formValues={formValues} step={currentStep} />
+          </div>
+        </div>
+        {result && chartData ? (
+          <div key={resultAnchor} className="mt-10 space-y-6 animate-reveal">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_360px]">
+              <GlowCard accent="gold" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="gold">Character Profile</Badge><h3 className="mt-4 text-3xl font-semibold text-white">{result.pillars.day.stem.zh} {result.pillars.day.stem.pinyin} Day Master</h3><p className="mt-3 text-sm leading-8 text-slate-300">{getDayMasterNote(result.pillars.day.stem)}. The result surface now clusters the pillar story, timing, and analysis into focused panels without changing any source data.</p></div><div className="flex flex-wrap gap-2"><Badge tone="cyan">{formatCalculationGenderModeDisplay(result.daYun?.calculationMode ?? calculatedFormValues?.calculationMode ?? 'male')}</Badge><Badge tone="violet">{formatGenderIdentity(calculatedFormValues?.genderIdentity ?? genderIdentity, calculatedFormValues?.genderOtherText ?? genderOtherText)}</Badge></div></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatTile label="Day Master stem" value={`${result.pillars.day.stem.zh} (${result.pillars.day.stem.pinyin})`} hint={`${EL_LABEL[result.pillars.day.stem.element].zh} ${EL_LABEL[result.pillars.day.stem.element].en}`} /><StatTile label="Polarity" value={result.pillars.day.stem.yin ? 'Yin' : 'Yang'} hint="The core polarity of the Day Master stem." /><StatTile label="Clock / solar" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : `${fmtDate(result.displayDate)} -> ${fmtDate(result.tstDate)}`} hint={result.unknownTime ? 'Hour pillar is intentionally left unknown.' : result.displayTzLabel} /><StatTile label="Luck cycle start" value={result.daYun ? `${result.daYun.startYears} yrs${result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}` : 'Unavailable'} hint={result.daYun ? `${result.daYun.forward ? 'Forward' : 'Backward'} from ${result.daYun.jie.name}` : 'Requires full chart'} /></div></GlowCard>
+              <GlowCard accent="violet" className="p-6"><div className="text-[11px] uppercase tracking-[0.22em] text-violet-100/70">Result briefing</div><div className="mt-4 space-y-4"><StatTile label="Local display" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : fmtDate(result.displayDate)} hint={result.displayTzLabel} /><StatTile label="True solar time" value={result.unknownTime ? 'Not calculated' : fmtDate(result.tstDate)} hint={result.unknownTime ? 'Unknown birth time skips the hour pillar.' : 'Astronomically corrected time'} /><StatTile label="Current focus" value={activeDaYun ? `${activeDaYun.ageStart}-${activeDaYun.ageEnd}` : 'Luck cycles pending'} hint={activeDaYun ? `${activeDaYun.yearStart}-${activeDaYun.yearEnd}` : 'Use the journey map below'} /></div></GlowCard>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{PILLAR_META.map((meta) => <PillarCard key={meta.key} result={result} keyName={meta.key} currentYear={currentYear} />)}</div>
+            {!result.unknownTime ? <TSTCard result={result} /> : null}
+            <div className="grid gap-6 xl:grid-cols-2"><ChartContainer eyebrow="Chart pulse" title="5 Structures · 五行格局" description="The structure view is now drawn as a neon pulse map, preserving the same underlying counts."><RadarGlowChart structureCounts={chartData.structureCounts} structureEls={chartData.structureEls} /></ChartContainer><ChartContainer eyebrow="Pattern loadout" title="10 Gods · 十神分布" description="All hidden stems are still included. The presentation now reads like a ranked signal board."><NeonBars tenGodsCount={chartData.tenGodsCount} /></ChartContainer></div>
+            <GlowCard accent="cyan" className="p-6"><div><Badge tone="cyan">Source Matrix</Badge><h3 className="mt-3 text-xl font-semibold text-white">Detailed pillar and Ten Gods reference</h3><p className="mt-2 text-sm leading-7 text-slate-300">The original analytical detail remains available here for practitioners who want the raw matrix view.</p></div><div className="cosmic-scrollbar mt-6 overflow-x-auto"><table className="min-w-[720px] w-full text-sm"><thead><tr className="border-b border-white/8 text-xs uppercase tracking-[0.18em] text-slate-400"><th className="py-3 pr-4 text-left">Pillar</th><th className="py-3 px-2 text-center">Stem</th><th className="py-3 px-2 text-center">Stem God</th><th className="py-3 px-2 text-center">Branch</th><th className="py-3 px-2 text-center">Branch God</th></tr></thead><tbody>{((result.unknownTime ? ['day', 'month', 'year'] : ['hour', 'day', 'month', 'year']) as PillarKey[]).map((keyName) => { const summary = getPillarSummary(result, keyName); if (!summary) return null; const meta = PILLAR_META.find((item) => item.key === keyName)!; return <tr key={keyName} className="border-b border-white/6 text-slate-200 last:border-b-0"><td className="py-3 pr-4"><div className="font-medium text-white">{meta.label}</div><div className="text-xs text-slate-400">{meta.zh}</div></td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.stem.element))}>{summary.pillar.stem.zh}</div><div className="text-xs text-slate-400">{summary.pillar.stem.pinyin}</div></td><td className="py-3 px-2 text-center">{summary.stemGod ? <div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.stemGod.zh] || '')}>{TG_ABBR[summary.stemGod.zh] || 'TG'}</Badge><span className="text-xs text-slate-300">{summary.stemGod.zh} {summary.stemGod.pinyin}</span></div> : <span className="text-xs text-slate-400">Day Master</span>}</td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.branch.element))}>{summary.pillar.branch.zh}</div><div className="text-xs text-slate-400">{summary.pillar.branch.pinyin}</div></td><td className="py-3 px-2 text-center"><div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.branchGod.zh] || '')}>{TG_ABBR[summary.branchGod.zh] || 'TG'}</Badge><span className="text-xs text-slate-300">{summary.branchGod.zh} {summary.branchGod.pinyin}</span></div></td></tr>; })}</tbody></table></div><p className="mt-3 text-xs leading-6 text-slate-400">Branch God shows main qi (主氣) only. The charts above continue to count all hidden stems (藏干).</p></GlowCard>
+            {result.daYun ? <GlowCard accent="pink" className="p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><Badge tone="pink">Journey Map</Badge><h3 className="mt-3 text-2xl font-semibold text-white">Major Luck Cycles · 大運</h3><p className="mt-2 text-sm leading-7 text-slate-300">The cycle stream now reads like a navigable progression path, while keeping the same decade markers and start-age logic.</p></div><div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-200"><div>Direction: <span className="font-semibold text-white">{result.daYun.forward ? 'Forward 順行' : 'Backward 逆行'}</span></div><div className="mt-1">Energy polarity: <span className="font-semibold text-white">{formatCalculationGenderModeDisplay(result.daYun.calculationMode)}</span></div><div className="mt-1 text-xs text-slate-400">{result.daYun.ruleNote}</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Button variant="secondary" size="sm" onClick={() => setActiveLuckCycle((current) => Math.max(current - 1, 0))} disabled={activeLuckCycle === 0}>Previous cycle</Button><Button variant="secondary" size="sm" onClick={() => setActiveLuckCycle((current) => Math.min(current + 1, result.daYun!.pillars.length - 1))} disabled={activeLuckCycle === result.daYun.pillars.length - 1}>Next cycle</Button></div><div className="cosmic-scrollbar mt-6 overflow-x-auto"><div className="flex min-w-max items-center gap-4 pb-3">{result.daYun.pillars.map((pillar, index) => { const isActive = index === activeLuckCycle; const isCurrent = currentYear >= pillar.yearStart && currentYear <= pillar.yearEnd; return <button key={`${pillar.cycleIdx}-${pillar.yearStart}`} type="button" onClick={() => setActiveLuckCycle(index)} className={cn('relative flex min-w-[138px] flex-col items-center rounded-[28px] border px-4 py-4 text-center transition-all duration-300', isActive ? 'border-cyan-300/35 bg-cyan-400/10 shadow-[0_0_35px_rgba(34,211,238,0.18)]' : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8')}>{isCurrent ? <span className="absolute right-3 top-3 h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.85)]" /> : null}<div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Cycle {index + 1}</div><div className="mt-2 text-xs text-slate-300">Age {pillar.ageStart}-{pillar.ageEnd}</div><div className="text-xs text-slate-400">{pillar.yearStart}-{pillar.yearEnd}</div><div className={cn('mt-4 font-zh text-3xl font-bold', elColor(pillar.stem.element))}>{pillar.stem.zh}</div><div className="my-2 h-px w-full bg-white/10" /><div className={cn('font-zh text-3xl font-bold', elColor(pillar.branch.element))}>{pillar.branch.zh}</div><div className="mt-2 text-xs text-slate-400">{pillar.stem.pinyin} / {pillar.branch.pinyin}</div></button>; })}</div></div>{activeDaYun ? <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]"><div className="rounded-[28px] border border-white/10 bg-white/6 p-5"><div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Focused cycle</div><h4 className="mt-3 text-xl font-semibold text-white">Age {activeDaYun.ageStart}-{activeDaYun.ageEnd} · {activeDaYun.yearStart}-{activeDaYun.yearEnd}</h4><p className="mt-3 text-sm leading-7 text-slate-300">Nearest solar term: <span className="font-semibold text-white">{result.daYun.jie.name}</span>. Luck begins at <span className="font-semibold text-white">{result.daYun.startYears} yrs{result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}</span>.</p></div><div className="grid gap-3"><StatTile label="Stem" value={`${activeDaYun.stem.zh} ${activeDaYun.stem.pinyin}`} hint={EL_LABEL[activeDaYun.stem.element].en} /><StatTile label="Branch" value={`${activeDaYun.branch.zh} ${activeDaYun.branch.pinyin}`} hint={activeDaYun.branch.animal} /></div></div> : null}</GlowCard> : null}
+            <GlowCard accent="violet" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="violet">AI Insight Panel</Badge><h3 className="mt-3 text-2xl font-semibold text-white">AI Reading · 八字解析</h3><p className="mt-2 text-sm leading-7 text-slate-300">The optional AI layer is now framed as a premium highlight panel, but it still uses the same authentication flow and endpoint.</p></div>{sessionStatus === 'authenticated' && session.user ? <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-300">Signed in as <span className="font-semibold text-white">{session.user.email ?? session.user.name ?? 'Google user'}</span><button type="button" onClick={() => signOut({ callbackUrl: '/' })} className="ml-3 text-cyan-200 transition-colors hover:text-cyan-100">Sign out</button></div> : null}</div><div className="mt-6 flex flex-wrap gap-3">{sessionStatus === 'loading' ? <Button variant="secondary" size="lg" disabled>Checking sign-in...</Button> : sessionStatus === 'authenticated' ? <Button variant="primary" size="lg" onClick={runAnalysis} disabled={loadingAnalysis}>{loadingAnalysis ? 'Analyzing...' : 'Analyze with AI · 用AI解析'}</Button> : <Button variant="secondary" size="lg" onClick={handleGoogleSignIn} disabled={signingIn}>{signingIn ? 'Redirecting to Google...' : 'Sign in with Google'}</Button>}</div>{loginError ? <div className="mt-4 rounded-2xl border border-rose-300/18 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{loginError}</div> : null}{analysisError ? <div className="mt-4 rounded-2xl border border-rose-300/18 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{analysisError}</div> : null}{analysis ? <><div className="mt-6 rounded-[28px] border border-white/10 bg-white/6 p-5 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{analysis.split('\n').map((line, index) => <p key={`${line}-${index}`} className={line.trim() === '' ? 'mt-3' : ''}><RenderMd text={line} /></p>)}</div><div className="mt-6"><div><h4 className="text-lg font-semibold text-white">Ask 3 More Questions</h4><p className="mt-1 text-sm leading-7 text-slate-300">Ask about career, relationships, timing, strengths, or any other point in this chart.</p></div><div className="mt-5 grid gap-4">{followUps.map((item, index) => <div key={index} className="rounded-[28px] border border-white/10 bg-white/6 p-4"><label className="block text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Question {index + 1}</label><textarea value={item.question} onChange={(event) => updateFollowUp(index, { question: event.target.value, error: null })} rows={3} placeholder="e.g. What does this chart suggest about career direction over the next 3 years?" className={cn(TEXTAREA_CLASS, 'mt-3')} /><div className="mt-3 flex flex-wrap items-center gap-3"><Button variant="secondary" size="sm" onClick={() => runFollowUp(index)} disabled={item.loading}>{item.loading ? 'Asking...' : `Ask Question ${index + 1}`}</Button><span className="text-xs leading-6 text-slate-400">Each answer is returned separately and does not overwrite the main reading.</span></div>{item.error ? <div className="mt-3 rounded-2xl border border-rose-300/18 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{item.error}</div> : null}{item.answer ? <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-4 text-sm leading-8 text-slate-200 whitespace-pre-wrap">{item.answer.split('\n').map((line, lineIndex) => <p key={`${line}-${lineIndex}`} className={line.trim() === '' ? 'mt-3' : ''}><RenderMd text={line} /></p>)}</div> : null}</div>)}</div></div></> : null}</GlowCard>
+          </div>
+        ) : null}
       </div>
     </section>
   );

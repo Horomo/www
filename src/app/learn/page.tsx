@@ -1,7 +1,11 @@
 import Link from 'next/link';
 
 import Breadcrumbs from '@/components/Breadcrumbs';
+import LearnGuideCard from '@/components/LearnGuideCard';
 import StructuredData from '@/components/StructuredData';
+import Badge from '@/components/ui/Badge';
+import { buttonClassName } from '@/components/ui/Button';
+import GlowCard from '@/components/ui/GlowCard';
 import { learnGuides } from '@/lib/learn';
 import { buildBreadcrumbSchema, buildMetadata } from '@/lib/seo';
 
@@ -20,46 +24,53 @@ export default function LearnHubPage() {
   ];
 
   return (
-    <main className="bg-slate-50">
+    <main>
       <StructuredData
         data={buildBreadcrumbSchema([
           { name: 'Home', path: '/' },
           { name: 'Learn', path: '/learn' },
         ])}
       />
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <section className="border-b border-white/8">
+        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
           <Breadcrumbs items={breadcrumbItems} />
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900">
+          <Badge tone="violet" className="mt-6">Learning vault</Badge>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">
             BaZi guides and glossary
           </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
             This hub supports the calculator with practical explanations of the core concepts people
             search for before and after running a chart.
           </p>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              'Use the calculator first, then bring your chart into the guide that matches your question.',
+              'Each article stays grounded in the app’s real output instead of generic fortune-telling language.',
+              'The visual system matches the main app, so moving between education and analysis feels seamless.',
+            ].map((copy, index) => (
+              <GlowCard key={copy} accent={index === 0 ? 'cyan' : index === 1 ? 'violet' : 'gold'} className="p-5">
+                <p className="text-sm leading-7 text-slate-300">{copy}</p>
+              </GlowCard>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Guide cards</h2>
+            <p className="mt-2 text-sm leading-7 text-slate-300">
+              Browse concept-focused entries with quick visual cues and direct calls to continue reading.
+            </p>
+          </div>
+          <Link href="/#calculator" className={buttonClassName('secondary', 'sm')}>
+            Open calculator
+          </Link>
+        </div>
         <div className="grid gap-6 md:grid-cols-2">
-          {learnGuides.map((guide) => (
-            <article
-              key={guide.slug}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <h2 className="text-2xl font-semibold text-slate-900">
-                <Link href={guide.href} className="transition-colors hover:text-indigo-700">
-                  {guide.title}
-                </Link>
-              </h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">{guide.description}</p>
-              <p className="mt-4 text-sm font-medium text-slate-500">{guide.excerpt}</p>
-              <div className="mt-5">
-                <Link href={guide.href} className="font-semibold text-indigo-700 hover:text-indigo-800">
-                  Read guide
-                </Link>
-              </div>
-            </article>
+          {learnGuides.map((guide, index) => (
+            <LearnGuideCard key={guide.slug} guide={guide} index={index} />
           ))}
         </div>
       </section>
