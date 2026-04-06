@@ -119,8 +119,11 @@ export default function RootLayout({
                 </span>
               </Link>
               <nav aria-label="Primary" className="hidden flex-wrap items-center gap-2 rounded-full bg-white/36 px-3 py-2 text-sm text-[#151d22]/72 backdrop-blur-[18px] md:flex">
-                <Link href="/#calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                <Link href="/calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Calculator
+                </Link>
+                <Link href="/" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                  Home
                 </Link>
                 <Link href="/learn" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Learn
@@ -137,8 +140,8 @@ export default function RootLayout({
               </nav>
               <div className="flex items-center gap-3">
                 <Badge tone="cyan" className="hidden sm:inline-flex">True Solar Time</Badge>
-                <Link href="/#calculator" className={buttonClassName('secondary', 'sm')}>
-                  Start chart
+                <Link href="/calculator" className={buttonClassName('secondary', 'sm')}>
+                  Start Your Analysis
                 </Link>
               </div>
             </div>

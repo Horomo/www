@@ -1,6 +1,5 @@
 import Link from 'next/link';
 
-import BaziCalculator from '@/components/BaziCalculator';
 import GuideArtwork from '@/components/GuideArtwork';
 import LearnGuideCard from '@/components/LearnGuideCard';
 import StructuredData from '@/components/StructuredData';
@@ -72,8 +71,8 @@ export default function Home() {
               <Badge tone="gold">AI reading unlock</Badge>
             </div>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link href="/#calculator" className={buttonClassName('primary', 'lg')}>
-                Open the calculator
+              <Link href="/calculator" className={buttonClassName('primary', 'lg')}>
+                Start Your Analysis
               </Link>
               <Link href="/learn" className={buttonClassName('secondary', 'lg')}>
                 Learn the core concepts
@@ -138,8 +137,24 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="calculator">
-        <BaziCalculator />
+      <section className="px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-[2.5rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.62)_54%,rgba(240,250,255,0.72))] px-6 py-8 text-center shadow-[0_28px_72px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:px-10 sm:py-10">
+            <Badge tone="cyan">Start your chart</Badge>
+            <h2 className="mt-4 font-serif text-4xl tracking-[-0.03em] text-[#151d22] sm:text-[3rem]">
+              Begin your BaZi analysis on a dedicated calculator page
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[#151d22]/66">
+              The full birth intake, chart generation flow, and optional AI reading now live in a
+              focused workspace designed for uninterrupted analysis.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <Link href="/calculator" className={buttonClassName('primary', 'lg')}>
+                Start Your Analysis
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">

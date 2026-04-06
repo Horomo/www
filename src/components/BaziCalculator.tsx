@@ -526,16 +526,21 @@ export default function BaziCalculator() {
   const activeDaYun = result?.daYun?.pillars[activeLuckCycle] ?? null;
 
   return (
-    <section className="px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
-      <div className="mx-auto max-w-7xl">
-        <div className="rounded-[2.5rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.74),rgba(255,255,255,0.58)_52%,rgba(240,250,255,0.7))] p-5 shadow-[0_28px_72px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:p-7 lg:p-9">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px]">
+    <section className="px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid justify-center gap-6 lg:grid-cols-[minmax(0,560px)_280px] lg:items-start">
+          <div className="rounded-[2.5rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.74),rgba(255,255,255,0.58)_52%,rgba(240,250,255,0.7))] p-5 shadow-[0_28px_72px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:p-7">
             <div>
-              <Badge tone="cyan">Celestial Day Intake</Badge>
-              <div className="mt-4 max-w-3xl">
-                <p className="font-zh text-4xl font-bold tracking-[0.22em] text-[#006a62]">八字命盤</p>
-                <h2 id="calculator-heading" className="mt-3 font-serif text-4xl tracking-[-0.03em] text-[#151d22] sm:text-[3rem]">Guided chart creation with a premium, reveal-based flow</h2>
-                <p className="mt-4 text-sm leading-8 text-[#151d22]/66 sm:text-base">Every field, validator, and calculation stays intact. The redesign turns the intake into a layered sequence, then reveals the result as a character profile, visual atlas, and timing journey.</p>
+              <Badge tone="cyan">Birth chart intake</Badge>
+              <div className="mt-4 max-w-2xl">
+                <p className="font-zh text-3xl font-bold tracking-[0.22em] text-[#006a62]">八字命盤</p>
+                <h2 id="calculator-heading" className="mt-3 font-serif text-3xl tracking-[-0.03em] text-[#151d22] sm:text-[2.4rem]">
+                  Guided chart creation, one step at a time
+                </h2>
+                <p className="mt-4 text-sm leading-8 text-[#151d22]/66 sm:text-base">
+                  Every field, validator, and calculation stays intact. Move through the same
+                  intake flow, then review the full chart and analysis below.
+                </p>
               </div>
 
               <div className="mt-8">
@@ -629,8 +634,8 @@ export default function BaziCalculator() {
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-3"><Button variant="ghost" size="md" onClick={goBack} disabled={currentStep === 0}>Previous</Button>{currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Continue</Button> : null}</div><Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button></div>
               </GlowCard>
             </div>
-            <WizardPreview formValues={formValues} step={currentStep} />
           </div>
+          <WizardPreview formValues={formValues} step={currentStep} />
         </div>
         {result && chartData ? (
           <div key={resultAnchor} className="mt-10 space-y-6 animate-reveal">
