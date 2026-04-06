@@ -332,32 +332,6 @@ function PillarCard({ result, keyName, currentYear }: { result: BaziResult; keyN
   );
 }
 
-function WizardPreview({ formValues, step }: { formValues: FormValues; step: number }) {
-  const selectionLabel = formatMergedGenderSelection(formValues.calculationMode);
-  return (
-    <div className="space-y-4 lg:sticky lg:top-24">
-      <GlowCard accent="violet" className="p-6">
-        <Badge tone="violet">Journey Preview</Badge>
-        <h3 className="mt-4 font-serif text-[1.9rem] text-[#151d22]">The chart reveal is staged in four deliberate steps.</h3>
-        <p className="mt-3 text-sm leading-7 text-[#151d22]/66">The wizard keeps the existing birth fields and logic intact, but turns the experience into a guided intake rather than a long static form.</p>
-        <div className="mt-6 grid gap-3">
-          <StatTile label="Current step" value={`${step + 1}. ${WIZARD_STEPS[step].label}`} hint={WIZARD_STEPS[step].detail} />
-          <StatTile label="Selection" value={selectionLabel} hint="This single choice fills the existing gender identity and Da Yun rule fields together." />
-          <StatTile label="Location status" value={formValues.birthPlace ? 'Matched from place search' : 'Manual review available'} hint={formValues.timezone || 'Timezone will appear here once set.'} />
-        </div>
-      </GlowCard>
-      <GlowCard accent="cyan" className="p-6">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-[#006a62]/62">What stays preserved</div>
-        <ul className="mt-4 space-y-3 text-sm leading-7 text-[#151d22]/66">
-          <li>All birth fields, validation rules, and location overrides remain available.</li>
-          <li>Local-first BaZi computation still runs in the browser with the same engine.</li>
-          <li>AI reading, Google sign-in, follow-up questions, and chart logging all remain untouched.</li>
-        </ul>
-      </GlowCard>
-    </div>
-  );
-}
-
 export default function BaziCalculator() {
   const [dob, setDob] = useState('1990-06-15');
   const [tob, setTob] = useState('08:30');
@@ -542,104 +516,103 @@ export default function BaziCalculator() {
   const displayPillarOrder = getDisplayPillarOrder(result?.unknownTime ?? false);
 
   return (
-    <section className="px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
+    <section className="px-4 py-8 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
       <div className="mx-auto max-w-6xl">
-        <div className="grid justify-center gap-6 lg:grid-cols-[minmax(0,560px)_280px] lg:items-start">
-          <div className="rounded-[2.5rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.74),rgba(255,255,255,0.58)_52%,rgba(240,250,255,0.7))] p-5 shadow-[0_28px_72px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:p-7">
-            <div>
-              <Badge tone="cyan">Birth chart intake</Badge>
-              <div className="mt-4 max-w-2xl">
-                <p className="font-zh text-3xl font-bold tracking-[0.22em] text-[#006a62]">八字命盤</p>
-                <h2 id="calculator-heading" className="mt-3 font-serif text-3xl tracking-[-0.03em] text-[#151d22] sm:text-[2.4rem]">
-                  Guided chart creation, one step at a time
-                </h2>
-                <p className="mt-4 text-sm leading-8 text-[#151d22]/66 sm:text-base">
-                  Every field, validator, and calculation stays intact. Move through the same
-                  intake flow, then review the full chart and analysis below.
-                </p>
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.86),rgba(255,255,255,0.72))] p-4 shadow-[0_20px_56px_rgba(0,106,98,0.08)] backdrop-blur-[20px] sm:p-6">
+            <h2 id="calculator-heading" className="sr-only">BaZi calculator form</h2>
+            <Stepper
+              steps={WIZARD_STEPS.map((step) => ({ ...step }))}
+              currentStep={currentStep}
+              onStepClick={(index) => {
+                if (index <= currentStep) {
+                  setShowStepValidation(false);
+                  setCalcError(null);
+                  moveToStep(index);
+                }
+              }}
+            />
+
+            <GlowCard accent="cyan" className="mt-5 p-5 sm:p-6">
+              <div key={currentStep} className="animate-reveal space-y-5">
+                {currentStep === 0 ? (
+                  <>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 1</div>
+                      <h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Gender and polarity</h3>
+                      <p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Choose one option. The calculator handles the internal mapping automatically.</p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Selection · 命盤設定</span>
+                        <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="This single choice updates both the displayed gender selection and the existing binary Da Yun calculation mode." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {MERGED_GENDER_OPTIONS.map((option) => {
+                          const selected = calculationMode === option.value;
+                          return (
+                            <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-5 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
+                              <input type="radio" name="mergedGenderSelection" value={option.value} checked={selected} onChange={() => handleMergedGenderChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
+                              <span className="min-w-0">
+                                <span className="flex items-center gap-3">
+                                  <span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span>
+                                  <span>
+                                    <span className="block text-sm font-semibold text-[#151d22]">{option.label}</span>
+                                    <span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span>
+                                  </span>
+                                </span>
+                                <span className="mt-3 block text-sm leading-7 text-[#151d22]/66">{option.description}</span>
+                                <span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
+                    </div>
+                  </>
+                ) : null}
+
+                {currentStep === 1 ? (
+                  <>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 2</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Birth date and time</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Use the recorded local birth time if known.</p></div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Date of Birth</label><input type="date" value={dob} onChange={(event) => { setShowStepValidation(false); setDob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.dob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.dob}</p> : null}</div>
+                      <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => { setShowStepValidation(false); setTob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.tob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.tob}</p> : null}<p className="mt-2 text-xs leading-6 text-[#151d22]/52">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
+                    </div>
+                    <label className="inline-flex items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58))] px-4 py-3 text-sm text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><input type="checkbox" checked={unknownTime} onChange={(event) => { setShowStepValidation(false); setUnknownTime(event.target.checked); }} className="h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" /><span>I don&apos;t know my birth time</span></label>
+                  </>
+                ) : null}
+
+                {currentStep === 2 ? (
+                  <>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Birthplace and timezone</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Search your birthplace, then adjust the technical details only if needed.</p></div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
+                      <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div>{showStepValidation && currentStepErrors.timezone ? <p className="mt-3 text-xs leading-6 text-[#874e58]">{currentStepErrors.timezone}</p> : null}<p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
+                    </div>
+                    <details className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] px-5 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-[#151d22]/56">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.longitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.longitude}</p> : null}</div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.latitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.latitude}</p> : null}</div></div></details>
+                  </>
+                ) : null}
+
+                {currentStep === 3 ? (
+                  <>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 4</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Review and calculate</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Check your inputs, then generate the chart.</p></div>
+                    <div className="grid gap-3 sm:grid-cols-2">{confirmationSummary.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}</div>
+                    <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(64,224,208,0.14),rgba(255,255,255,0.72))] px-4 py-4 text-sm leading-7 text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.16)]">Your chart is calculated locally first. Optional AI analysis only runs after the chart exists.</div>
+                  </>
+                ) : null}
               </div>
-
-              <div className="mt-8">
-                <Stepper
-                  steps={WIZARD_STEPS.map((step) => ({ ...step }))}
-                  currentStep={currentStep}
-                  onStepClick={(index) => {
-                    if (index <= currentStep) {
-                      setShowStepValidation(false);
-                      setCalcError(null);
-                      moveToStep(index);
-                    }
-                  }}
-                />
-              </div>
-
-              <GlowCard accent="cyan" className="mt-6 p-5 sm:p-6">
-                <div key={currentStep} className="animate-reveal space-y-5">
-                  {currentStep === 0 ? (
-                    <>
-                      <div>
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 1</div>
-                        <h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Gender and polarity</h3>
-                        <p className="mt-2 text-sm leading-7 text-[#151d22]/66">Choose one combined option. The calculator will keep the same internal fields and automatically map your selection to the existing classical Da Yun rule.</p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Selection · 命盤設定</span>
-                          <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="This single choice updates both the displayed gender selection and the existing binary Da Yun calculation mode." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
-                        </div>
-                        <p className="text-sm leading-7 text-[#151d22]/56">Choose one option below. No extra Yin/Yang step is required.</p>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {MERGED_GENDER_OPTIONS.map((option) => {
-                            const selected = calculationMode === option.value;
-                            return (
-                              <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-5 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
-                                <input type="radio" name="mergedGenderSelection" value={option.value} checked={selected} onChange={() => handleMergedGenderChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
-                                <span className="min-w-0"><span className="flex items-center gap-3"><span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span><span><span className="block text-sm font-semibold text-[#151d22]">{option.label}</span><span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span></span></span><span className="mt-3 block text-sm leading-7 text-[#151d22]/66">{option.description}</span><span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline}</span></span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                        {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
-                      </div>
-                    </>
-                  ) : null}
-
-                  {currentStep === 1 ? (
-                    <>
-                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 2</div><h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Birth date and recorded time</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">Enter the birth date and the recorded clock time from the certificate. Unknown time mode remains available and keeps the hour pillar unresolved.</p></div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Date of Birth</label><input type="date" value={dob} onChange={(event) => { setShowStepValidation(false); setDob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.dob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.dob}</p> : null}</div>
-                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => { setShowStepValidation(false); setTob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.tob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.tob}</p> : null}<p className="mt-2 text-xs leading-6 text-[#151d22]/52">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
-                      </div>
-                      <label className="inline-flex items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58))] px-4 py-3 text-sm text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><input type="checkbox" checked={unknownTime} onChange={(event) => { setShowStepValidation(false); setUnknownTime(event.target.checked); }} className="h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" /><span>I don&apos;t know my birth time</span></label>
-                    </>
-                  ) : null}
-
-                  {currentStep === 2 ? (
-                    <>
-                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Birthplace, timezone, and coordinates</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">Search the birthplace first, then fine-tune the timezone and coordinates manually if needed.</p></div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
-                        <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div>{showStepValidation && currentStepErrors.timezone ? <p className="mt-3 text-xs leading-6 text-[#874e58]">{currentStepErrors.timezone}</p> : null}<p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
-                      </div>
-                      <details className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] px-5 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-[#151d22]/56">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.longitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.longitude}</p> : null}</div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.latitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.latitude}</p> : null}</div></div></details>
-                    </>
-                  ) : null}
-
-                  {currentStep === 3 ? (
-                    <>
-                      <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 4</div><h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Confirmation and chart reveal</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">Review the exact details that will be sent into the current calculation engine, then generate the chart.</p></div>
-                      <div className="grid gap-3 sm:grid-cols-2">{confirmationSummary.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}</div>
-                      <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(64,224,208,0.14),rgba(255,255,255,0.72))] px-4 py-4 text-sm leading-7 text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.16)]">The calculation still runs locally through the current BaZi engine. AI analysis remains optional and only runs after the chart exists.</div>
-                    </>
-                  ) : null}
+              {calcError ? <div className="mt-5 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{calcError}</div> : null}
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-3">
+                  {currentStep > 0 ? <Button variant="ghost" size="md" onClick={goBack}>Back</Button> : null}
+                  {currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Next</Button> : <Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button>}
                 </div>
-                {calcError ? <div className="mt-5 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{calcError}</div> : null}
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-3">{currentStep > 0 ? <Button variant="ghost" size="md" onClick={goBack}>Back</Button> : null}{currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Next</Button> : <Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button>}</div></div>
-              </GlowCard>
-            </div>
+                <p className="text-xs leading-6 text-[#151d22]/48">{currentStep < WIZARD_STEPS.length - 1 ? `${currentStep + 1} of ${WIZARD_STEPS.length}` : 'Review complete'}</p>
+              </div>
+            </GlowCard>
           </div>
-          <WizardPreview formValues={formValues} step={currentStep} />
         </div>
         {result && chartData ? (
           <div key={resultAnchor} className="mt-10 space-y-6 animate-reveal">
