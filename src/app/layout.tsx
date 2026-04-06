@@ -90,7 +90,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${notoSerif.variable} h-full antialiased`}
     >
-      <head>
+      <body className="cosmic-shell min-h-full flex flex-col text-[#151d22]">
         <Script
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7343687256315400"
           strategy="afterInteractive"
@@ -108,8 +108,6 @@ export default function RootLayout({
             gtag('config', 'G-V0RH6KHWH9', { page_path: window.location.pathname });
           `}
         </Script>
-      </head>
-      <body className="cosmic-shell min-h-full flex flex-col text-[#151d22]">
         <StructuredData data={[buildOrganizationSchema(), buildWebsiteSchema()]} />
         <Providers>
           <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">

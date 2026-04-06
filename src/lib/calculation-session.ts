@@ -80,6 +80,13 @@ export function deserializeCalculationResult(value: StoredCalculationResult): {
   };
 }
 
+// Stable snapshot cache for useSyncExternalStore.
+// loadCalculationResult is called on every render; returning a new object
+// every time causes an infinite re-render loop (React error #185).
+// We cache by raw string so the same reference is returned when data is unchanged.
+let _snapshotRaw: string | null | undefined = undefined;
+let _snapshotResult: { formValues: AnalysisFormPayload; chartData: ChartData; result: BaziResult } | null = null;
+
 export function saveCalculationResult(params: {
   formValues: AnalysisFormPayload;
   chartData: ChartData;
@@ -87,7 +94,10 @@ export function saveCalculationResult(params: {
 }) {
   if (typeof window === 'undefined') return;
   const payload = serializeCalculationResult(params);
-  window.sessionStorage.setItem(CALCULATION_RESULT_KEY, JSON.stringify(payload));
+  const raw = JSON.stringify(payload);
+  window.sessionStorage.setItem(CALCULATION_RESULT_KEY, raw);
+  // Invalidate cache so the next load reflects the new save.
+  _snapshotRaw = undefined;
 }
 
 export function loadCalculationResult(): {
@@ -98,12 +108,23 @@ export function loadCalculationResult(): {
   if (typeof window === 'undefined') return null;
 
   const raw = window.sessionStorage.getItem(CALCULATION_RESULT_KEY);
-  if (!raw) return null;
+
+  // Return cached result if the raw data hasn't changed.
+  if (raw === _snapshotRaw) return _snapshotResult;
+
+  _snapshotRaw = raw;
+  if (!raw) {
+    _snapshotResult = null;
+    return null;
+  }
 
   try {
-    return deserializeCalculationResult(JSON.parse(raw) as StoredCalculationResult);
+    _snapshotResult = deserializeCalculationResult(JSON.parse(raw) as StoredCalculationResult);
+    return _snapshotResult;
   } catch {
     window.sessionStorage.removeItem(CALCULATION_RESULT_KEY);
+    _snapshotRaw = undefined;
+    _snapshotResult = null;
     return null;
   }
 }
@@ -111,4 +132,6 @@ export function loadCalculationResult(): {
 export function clearCalculationResult() {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem(CALCULATION_RESULT_KEY);
+  _snapshotRaw = undefined;
+  _snapshotResult = null;
 }
