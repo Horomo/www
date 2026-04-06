@@ -19,44 +19,42 @@ import {
   computeChartData,
 } from '@/lib/bazi';
 import { saveCalculationResult } from '@/lib/calculation-session';
-import { formatMergedGenderSelection, type CalculationGenderMode } from '@/lib/gender';
+import { formatGenderIdentity, type CalculationGenderMode, type GenderIdentity } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
 
-const MERGED_GENDER_OPTIONS: Array<{
+const GENDER_IDENTITY_OPTIONS: Array<{
+  value: GenderIdentity;
+  label: string;
+  tagline: string;
+  autoCalculationMode: CalculationGenderMode | null;
+}> = [
+  { value: 'male', label: 'Male', tagline: 'Yin/Yang automatically set to Yang (陽)', autoCalculationMode: 'male' },
+  { value: 'female', label: 'Female', tagline: 'Yin/Yang automatically set to Yin (陰)', autoCalculationMode: 'female' },
+  { value: 'non_binary', label: 'Non-binary', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
+  { value: 'other', label: 'Other', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
+];
+
+const YIN_YANG_OPTIONS: Array<{
   value: CalculationGenderMode;
   yinYang: string;
   pinyinLabel: string;
   label: string;
   tagline: string;
-  description: string;
 }> = [
-  {
-    value: 'male',
-    yinYang: '陽',
-    pinyinLabel: 'Yáng',
-    label: 'Male (Yang)',
-    tagline: 'Male identity with Yang polarity',
-    description: 'Maps internally to gender=male and yinYang/calculationMode=yang for the existing Da Yun rule.',
-  },
-  {
-    value: 'female',
-    yinYang: '陰',
-    pinyinLabel: 'Yīn',
-    label: 'Female (Yin)',
-    tagline: 'Female identity with Yin polarity',
-    description: 'Maps internally to gender=female and yinYang/calculationMode=yin for the existing Da Yun rule.',
-  },
+  { value: 'male', yinYang: '陽', pinyinLabel: 'Yáng', label: 'Yang', tagline: 'Active energy · Da Yun follows Yang rule' },
+  { value: 'female', yinYang: '陰', pinyinLabel: 'Yīn', label: 'Yin', tagline: 'Receptive energy · Da Yun follows Yin rule' },
 ];
 
 const WIZARD_STEPS = [
-  { id: 'identity', label: 'Identity', detail: 'Choose one merged gender and polarity option.' },
+  { id: 'identity', label: 'Identity', detail: 'Choose gender identity and Yin/Yang polarity.' },
   { id: 'birth', label: 'Birth', detail: 'Set date, time, and known-time status.' },
   { id: 'location', label: 'Location', detail: 'Confirm place, timezone, and coordinates.' },
   { id: 'confirm', label: 'Confirm', detail: 'Review the reading ritual before reveal.' },
 ] as const;
 
 type FormValues = AnalysisFormDraft;
-type StepFieldErrors = Partial<Record<'calculationMode' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
+type StepFieldErrors = Partial<Record<'genderIdentity' | 'calculationMode' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
 const TEXT_INPUT_CLASS = 'glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm text-[#151d22] placeholder:text-[#151d22]/40';
 
 function StatTile({ label, value, hint, className }: { label: string; value: string; hint?: string; className?: string }) {
@@ -87,26 +85,37 @@ export default function BaziCalculator() {
   const [showStepValidation, setShowStepValidation] = useState(false);
 
   const formValues: FormValues = { dob, tob, birthPlaceQuery, birthPlace, timezone, longitude, latitude, genderIdentity, genderOtherText, calculationMode, unknownTime };
+  const requiresYinYangSelection = genderIdentity !== '' && genderIdentity !== 'male' && genderIdentity !== 'female';
   useEffect(() => { trackEvent('calculation_mode_view', { screen_name: 'bazi_form' }); }, []);
 
   function syncFormState(values: FormValues) {
     setDob(values.dob); setTob(values.tob); setBirthPlaceQuery(values.birthPlaceQuery); setBirthPlace(values.birthPlace); setTimezone(values.timezone); setLongitude(values.longitude); setLatitude(values.latitude); setGenderIdentity(values.genderIdentity); setGenderOtherText(values.genderOtherText); setCalculationMode(values.calculationMode); setUnknownTime(values.unknownTime);
   }
 
-  function handleMergedGenderChange(next: CalculationGenderMode) {
+  function handleGenderIdentityChange(next: GenderIdentity) {
     setShowStepValidation(false);
     setGenderIdentity(next);
-    setGenderOtherText('');
-    if (next !== calculationMode) trackEvent('selection_changed', { previous_energy_type: calculationMode || undefined, energy_type: next, screen_name: 'bazi_form' });
-    trackEvent('calculation_mode_selected', { energy_type: next, screen_name: 'bazi_form' });
+    if (next !== 'other') setGenderOtherText('');
+    const auto = GENDER_IDENTITY_OPTIONS.find((o) => o.value === next)?.autoCalculationMode ?? null;
+    setCalculationMode(auto ?? '');
+    trackEvent('gender_identity_selected', { gender_identity: next, screen_name: 'bazi_form' });
+  }
+
+  function handleYinYangChange(next: CalculationGenderMode) {
+    setShowStepValidation(false);
     setCalculationMode(next);
+    trackEvent('yin_yang_selected', { calculation_mode: next, screen_name: 'bazi_form' });
   }
 
   const getStepFieldErrors = useCallback((step: number, values: FormValues): StepFieldErrors => {
     const errors: StepFieldErrors = {};
 
     if (step === 0) {
-      if (!values.calculationMode) errors.calculationMode = 'Choose one option so we can apply the existing gender and polarity mapping.';
+      if (!values.genderIdentity) {
+        errors.genderIdentity = 'Choose a gender identity to continue.';
+      } else if (!values.calculationMode) {
+        errors.calculationMode = 'Choose Yin or Yang polarity to continue.';
+      }
     }
     if (step === 1) {
       if (!values.dob) errors.dob = 'Enter date of birth.';
@@ -169,14 +178,19 @@ export default function BaziCalculator() {
   }
   function goBack() { setShowStepValidation(false); setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
 
-  const confirmationSummary = useMemo(() => [
-    ['Selection', formatMergedGenderSelection(calculationMode)],
-    ['Birth date', dob || 'Not set'],
-    ['Birth time', unknownTime ? 'Unknown time mode' : tob || 'Not set'],
-    ['Birth place', birthPlaceQuery || 'Not set'],
-    ['Timezone', timezone || 'Not set'],
-    ['Coordinates', `${latitude || '-'}, ${longitude || '-'}`],
-  ], [birthPlaceQuery, calculationMode, dob, latitude, longitude, timezone, tob, unknownTime]);
+  const confirmationSummary = useMemo(() => {
+    const genderLabel = genderIdentity ? formatGenderIdentity(genderIdentity as GenderIdentity, genderOtherText) : 'Not selected';
+    const yinYangLabel = calculationMode === 'male' ? 'Yang (陽) · Active energy' : calculationMode === 'female' ? 'Yin (陰) · Receptive energy' : 'Not selected';
+    return [
+      ['Gender', genderLabel],
+      ['Yin/Yang polarity', yinYangLabel],
+      ['Birth date', dob || 'Not set'],
+      ['Birth time', unknownTime ? 'Unknown time mode' : tob || 'Not set'],
+      ['Birth place', birthPlaceQuery || 'Not set'],
+      ['Timezone', timezone || 'Not set'],
+      ['Coordinates', `${latitude || '-'}, ${longitude || '-'}`],
+    ];
+  }, [birthPlaceQuery, calculationMode, dob, genderIdentity, genderOtherText, latitude, longitude, timezone, tob, unknownTime]);
 
   const currentStepErrors = getStepFieldErrors(currentStep, formValues);
 
@@ -205,36 +219,58 @@ export default function BaziCalculator() {
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 1</div>
                       <h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Gender and polarity</h3>
-                      <p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Choose one option. The calculator handles the internal mapping automatically.</p>
+                      <p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Choose your gender identity. Male and Female automatically set Yin/Yang. All other options let you choose polarity explicitly.</p>
                     </div>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Selection · 命盤設定</span>
-                        <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="This single choice updates both the displayed gender selection and the existing binary Da Yun calculation mode." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {MERGED_GENDER_OPTIONS.map((option) => {
-                          const selected = calculationMode === option.value;
+                      <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Gender identity · 性別</div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {GENDER_IDENTITY_OPTIONS.map((option) => {
+                          const selected = genderIdentity === option.value;
                           return (
-                            <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-5 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
-                              <input type="radio" name="mergedGenderSelection" value={option.value} checked={selected} onChange={() => handleMergedGenderChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
+                            <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-3 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-4 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
+                              <input type="radio" name="genderIdentity" value={option.value} checked={selected} onChange={() => handleGenderIdentityChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
                               <span className="min-w-0">
-                                <span className="flex items-center gap-3">
-                                  <span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span>
-                                  <span>
-                                    <span className="block text-sm font-semibold text-[#151d22]">{option.label}</span>
-                                    <span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span>
-                                  </span>
-                                </span>
-                                <span className="mt-3 block text-sm leading-7 text-[#151d22]/66">{option.description}</span>
-                                <span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline}</span>
+                                <span className="block text-sm font-semibold text-[#151d22]">{option.label}</span>
+                                <span className="mt-1 block text-xs leading-5 text-[#151d22]/48">{option.tagline}</span>
                               </span>
                             </label>
                           );
                         })}
                       </div>
-                      {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
+                      {genderIdentity === 'other' ? (
+                        <input type="text" value={genderOtherText} onChange={(e) => { setShowStepValidation(false); setGenderOtherText(e.target.value); }} placeholder="Describe your gender identity (optional)" className={cn(TEXT_INPUT_CLASS, 'mt-1')} />
+                      ) : null}
+                      {showStepValidation && currentStepErrors.genderIdentity ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.genderIdentity}</p> : null}
                     </div>
+                    {requiresYinYangSelection ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/56">Yin/Yang polarity · 陰陽</span>
+                          <span className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full bg-white/56 text-[10px] font-semibold text-[#151d22]/62 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]" title="Yin and Yang determine which Da Yun calculation rule is applied. This choice does not reflect gender identity." onMouseEnter={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })} onFocus={() => trackEvent('tooltip_opened', { interaction_type: 'tooltip', screen_name: 'bazi_form' })}>?</span>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {YIN_YANG_OPTIONS.map((option) => {
+                            const selected = calculationMode === option.value;
+                            return (
+                              <label key={option.value} data-selected={String(selected)} className="flex cursor-pointer items-start gap-4 rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] px-5 py-4 transition-all duration-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.18),0_18px_34px_rgba(0,106,98,0.07)] data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.24),0_18px_38px_rgba(64,224,208,0.1)]">
+                                <input type="radio" name="yinYangPolarity" value={option.value} checked={selected} onChange={() => handleYinYangChange(option.value)} className="mt-1 h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" />
+                                <span className="min-w-0">
+                                  <span className="flex items-center gap-3">
+                                    <span className="font-zh text-3xl font-bold text-[#006a62]">{option.yinYang}</span>
+                                    <span>
+                                      <span className="block text-sm font-semibold text-[#151d22]">{option.label}</span>
+                                      <span className="block text-xs text-[#151d22]/48">{option.pinyinLabel}</span>
+                                    </span>
+                                  </span>
+                                  <span className="mt-2 block text-xs uppercase tracking-[0.18em] text-[#151d22]/42">{option.tagline}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
 
