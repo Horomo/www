@@ -16,11 +16,11 @@ export default function Stepper({ steps, currentStep, onStepClick }: StepperProp
   return (
     <div className="space-y-4">
       <div
-        className="relative h-2 overflow-hidden rounded-full border border-white/10 bg-white/5"
+        className="relative h-2 overflow-hidden rounded-full bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
         aria-hidden="true"
       >
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.95),rgba(168,85,247,0.95),rgba(244,114,182,0.95))] shadow-[0_0_20px_rgba(56,189,248,0.35)] transition-[width] duration-500"
+          className="h-full rounded-full bg-[linear-gradient(90deg,#006a62,#40e0d0_55%,#ffb7c2)] shadow-[0_0_18px_rgba(64,224,208,0.25)] transition-[width] duration-500"
           style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
         />
       </div>
@@ -35,28 +35,28 @@ export default function Stepper({ steps, currentStep, onStepClick }: StepperProp
                 type="button"
                 onClick={() => onStepClick?.(index)}
                 className={cn(
-                  'group flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50',
+                  'group flex w-full items-start gap-3 rounded-[1.6rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.52))] px-3 py-3 text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#40e0d0]/40',
                   isCurrent
-                    ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_0_25px_rgba(34,211,238,0.18)]'
-                    : 'border-white/10 bg-white/5 hover:border-white/18 hover:bg-white/8',
+                    ? 'shadow-[inset_0_0_0_1px_rgba(64,224,208,0.28),0_16px_34px_rgba(64,224,208,0.14)]'
+                    : 'shadow-[inset_0_0_0_1px_rgba(255,255,255,0.52)] hover:brightness-[1.02] hover:shadow-[inset_0_0_0_1px_rgba(64,224,208,0.16),0_16px_34px_rgba(0,106,98,0.08)]',
                 )}
                 aria-current={isCurrent ? 'step' : undefined}
               >
                 <span
                   className={cn(
-                    'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
+                    'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
                     isComplete
-                      ? 'border-cyan-200/60 bg-cyan-300/20 text-cyan-50'
+                      ? 'bg-[linear-gradient(135deg,#006a62,#40e0d0)] text-white shadow-[0_10px_24px_rgba(64,224,208,0.22)]'
                       : isCurrent
-                        ? 'border-cyan-200/70 bg-cyan-300/20 text-cyan-50'
-                        : 'border-white/12 bg-white/6 text-slate-300',
+                        ? 'bg-[linear-gradient(135deg,rgba(64,224,208,0.18),rgba(255,255,255,0.88))] text-[#006a62] shadow-[inset_0_0_0_1px_rgba(64,224,208,0.28)]'
+                        : 'bg-white/54 text-[#151d22]/64 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7)]',
                   )}
                 >
                   {isComplete ? '✓' : index + 1}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-white">{step.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-slate-400">{step.detail}</span>
+                  <span className="block text-sm font-semibold text-[#151d22]">{step.label}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-[#151d22]/56">{step.detail}</span>
                 </span>
               </button>
             </li>

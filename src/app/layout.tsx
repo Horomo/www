@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, Noto_Serif_SC, Space_Grotesk } from 'next/font/google';
+import { Geist, Geist_Mono, Noto_Serif, Space_Grotesk } from 'next/font/google';
 import Script from 'next/script';
 import Link from 'next/link';
 
@@ -29,9 +29,9 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
 });
 
-const notoSerifSc = Noto_Serif_SC({
-  variable: '--font-noto-serif-sc',
-  weight: ['400', '600', '700'],
+const notoSerif = Noto_Serif({
+  variable: '--font-noto-serif',
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
 });
 
@@ -88,7 +88,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${notoSerifSc.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${notoSerif.variable} h-full antialiased`}
     >
       <head>
         <Script
@@ -104,34 +104,34 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className="cosmic-shell min-h-full flex flex-col">
+      <body className="cosmic-shell min-h-full flex flex-col text-[#151d22]">
         <StructuredData data={[buildOrganizationSchema(), buildWebsiteSchema()]} />
         <Providers>
-          <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(255,255,255,0.58)_48%,rgba(235,250,255,0.72))] px-4 py-3 shadow-[0_24px_60px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:px-6">
               <Link href="/" className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-[radial-gradient(circle_at_top,rgba(103,232,249,0.22),rgba(59,130,246,0.08)_50%,transparent_70%)] shadow-[0_0_30px_rgba(34,211,238,0.16)]">
-                  <span className="font-zh text-2xl font-bold text-slate-50">八字</span>
+                <span className="flex h-12 w-12 items-center justify-center rounded-[1.4rem] bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.92),rgba(64,224,208,0.34)_48%,rgba(255,183,194,0.24)_76%,transparent_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_14px_34px_rgba(64,224,208,0.12)]">
+                  <span className="font-zh text-2xl font-bold text-[#006a62]">八字</span>
                 </span>
                 <span>
-                  <span className="block text-sm font-semibold text-slate-50">Horomo</span>
-                  <span className="block text-xs text-slate-400">Cosmic BaZi Atlas</span>
+                  <span className="block font-serif text-xl text-[#151d22]">Horomo</span>
+                  <span className="block text-[11px] uppercase tracking-[0.28em] text-[#006a62]/70">Celestial Day Atlas</span>
                 </span>
               </Link>
-              <nav aria-label="Primary" className="hidden flex-wrap items-center gap-5 text-sm text-slate-300 md:flex">
-                <Link href="/#calculator" className="transition-colors hover:text-cyan-100">
+              <nav aria-label="Primary" className="hidden flex-wrap items-center gap-2 rounded-full bg-white/36 px-3 py-2 text-sm text-[#151d22]/72 backdrop-blur-[18px] md:flex">
+                <Link href="/#calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Calculator
                 </Link>
-                <Link href="/learn" className="transition-colors hover:text-cyan-100">
+                <Link href="/learn" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Learn
                 </Link>
-                <Link href="/learn/day-master" className="transition-colors hover:text-cyan-100">
+                <Link href="/learn/day-master" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Day Master
                 </Link>
-                <Link href="/learn/ten-gods" className="transition-colors hover:text-cyan-100">
+                <Link href="/learn/ten-gods" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Ten Gods
                 </Link>
-                <Link href="/learn/luck-pillars" className="transition-colors hover:text-cyan-100">
+                <Link href="/learn/luck-pillars" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Luck Pillars
                 </Link>
               </nav>
@@ -144,17 +144,17 @@ export default function RootLayout({
             </div>
           </header>
           <div className="flex-1">{children}</div>
-          <footer className="border-t border-white/10 bg-slate-950/75">
-            <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-slate-300 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
+          <footer className="mt-12 px-4 pb-8 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl flex-col gap-4 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.74),rgba(255,255,255,0.58)_54%,rgba(255,248,226,0.72))] px-5 py-7 text-sm text-[#151d22]/70 shadow-[0_24px_60px_rgba(0,106,98,0.07)] backdrop-blur-[24px] md:flex-row md:items-center md:justify-between">
               <p>
                 Horomo helps you calculate a BaZi chart with true solar time, Day Master context,
                 Ten Gods, hidden stems, and Da Yun cycles.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link href="/" className="hover:text-cyan-100">Home</Link>
-                <Link href="/learn" className="hover:text-cyan-100">Guides</Link>
-                <Link href="/learn/what-is-ba-zi" className="hover:text-cyan-100">What Is BaZi</Link>
-                <Link href="/learn/element-distribution" className="hover:text-cyan-100">Element Distribution</Link>
+                <Link href="/" className="transition-colors hover:text-[#006a62]">Home</Link>
+                <Link href="/learn" className="transition-colors hover:text-[#006a62]">Guides</Link>
+                <Link href="/learn/what-is-ba-zi" className="transition-colors hover:text-[#006a62]">What Is BaZi</Link>
+                <Link href="/learn/element-distribution" className="transition-colors hover:text-[#006a62]">Element Distribution</Link>
               </div>
             </div>
           </footer>

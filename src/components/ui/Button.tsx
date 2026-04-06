@@ -7,11 +7,11 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border border-cyan-300/35 bg-[linear-gradient(135deg,rgba(72,214,255,0.95),rgba(168,85,247,0.92)_58%,rgba(244,114,182,0.88))] text-slate-950 shadow-[0_0_35px_rgba(56,189,248,0.28)] hover:-translate-y-0.5 hover:shadow-[0_0_45px_rgba(168,85,247,0.38)] focus-visible:ring-cyan-300/60',
+    'bg-[linear-gradient(135deg,#006a62,#40e0d0_60%,#9bf3eb)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_14px_32px_rgba(64,224,208,0.22)] hover:-translate-y-0.5 hover:brightness-[1.03] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_18px_38px_rgba(64,224,208,0.28)] focus-visible:ring-[#40e0d0]/45 before:absolute before:inset-[1px] before:rounded-full before:bg-[linear-gradient(180deg,rgba(255,255,255,0.32),transparent_42%)] before:content-[\'\']',
   secondary:
-    'border border-white/12 bg-white/8 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_30px_rgba(15,23,42,0.32)] hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-white/12 focus-visible:ring-cyan-300/40',
+    'bg-[linear-gradient(180deg,rgba(255,255,255,0.58),rgba(255,255,255,0.28))] text-[#006a62] shadow-[inset_0_0_0_1px_rgba(0,106,98,0.14),inset_0_1px_0_rgba(255,255,255,0.82)] hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,255,255,0.4))] hover:text-[#005750] focus-visible:ring-[#40e0d0]/35',
   ghost:
-    'border border-transparent bg-transparent text-slate-200 hover:bg-white/8 hover:text-white focus-visible:ring-cyan-300/30',
+    'bg-transparent text-[#151d22]/72 hover:bg-white/40 hover:text-[#151d22] focus-visible:ring-[#40e0d0]/25',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
@@ -28,7 +28,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function buttonClassName(variant: ButtonVariant = 'primary', size: ButtonSize = 'md') {
   return cn(
-    'inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-[0.02em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60',
+    'relative inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-[0.08em] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60',
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],
   );
@@ -44,8 +44,10 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button className={cn(buttonClassName(variant, size), className)} {...props}>
-      {icon}
-      {children}
+      <span className="relative z-10 inline-flex items-center gap-2">
+        {icon}
+        {children}
+      </span>
     </button>
   );
 }

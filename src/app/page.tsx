@@ -52,15 +52,16 @@ export default function Home() {
     <main>
       <StructuredData data={buildFaqSchema(homeFaqs)} />
 
-      <section className="relative overflow-hidden border-b border-white/8">
-        <div className="absolute inset-0 cosmic-grid opacity-20" aria-hidden="true" />
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8 lg:py-24">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 cosmic-grid opacity-30" aria-hidden="true" />
+        <div className="absolute inset-x-0 top-0 h-[26rem] bg-[radial-gradient(circle_at_20%_20%,rgba(64,224,208,0.22),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(255,183,194,0.28),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.48),transparent_65%)]" aria-hidden="true" />
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-14 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8 lg:pb-18 lg:pt-22">
           <div>
             <Badge tone="cyan">Four Pillars of Destiny</Badge>
-            <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[0.95] tracking-[-0.03em] text-[#151d22] sm:text-6xl lg:text-[5.2rem]">
               BaZi calculator for Day Master, Ten Gods, hidden stems, and Da Yun cycles
             </h1>
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+            <p className="mt-8 max-w-3xl text-lg leading-8 text-[#151d22]/72">
               Horomo is built for people who want more than a basic BaZi chart. It calculates the
               Four Pillars with true solar time handling, then surfaces the chart structure you need
               to read Day Master context, element distribution, hidden stems, and major luck cycles.
@@ -85,8 +86,8 @@ export default function Home() {
                 ['Journey timing view', 'Luck cycles presented as a navigable path with the current decade highlighted.'],
               ].map(([title, copy], index) => (
                 <GlowCard key={title} accent={index === 0 ? 'cyan' : index === 1 ? 'violet' : 'pink'} className="p-5">
-                  <h2 className="text-lg font-semibold text-white">{title}</h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">{copy}</p>
+                  <h2 className="font-serif text-[1.45rem] leading-tight text-[#151d22]">{title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-[#151d22]/66">{copy}</p>
                 </GlowCard>
               ))}
             </div>
@@ -94,8 +95,8 @@ export default function Home() {
 
           <GlowCard accent="gold" className="p-6 sm:p-7 lg:mt-8">
             <GuideArtwork seed={9} className="animate-float-slow" />
-            <h2 className="mt-6 text-lg font-semibold text-white">What you can inspect here</h2>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-300">
+            <h2 className="mt-6 font-serif text-[1.65rem] text-[#151d22]">What you can inspect here</h2>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[#151d22]/68">
               <li>Four Pillars chart with visible stem and branch breakdown.</li>
               <li>Day Master summary tied to the computed chart.</li>
               <li>Hidden stems and Ten Gods pattern visibility.</li>
@@ -103,7 +104,7 @@ export default function Home() {
               <li>Da Yun timing context for major luck pillars.</li>
             </ul>
             <div className="cosmic-divider mt-6" />
-            <p className="mt-5 text-sm leading-7 text-slate-400">
+            <p className="mt-5 text-sm leading-7 text-[#151d22]/58">
               The experience stays readable and structured, but the presentation now builds
               anticipation before the reveal and reward once the chart is generated.
             </p>
@@ -114,22 +115,22 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-6 md:grid-cols-3">
           <GlowCard accent="cyan" interactive className="p-6">
-            <h2 className="text-xl font-semibold text-white">Built for chart accuracy</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
+            <h2 className="font-serif text-[1.7rem] text-[#151d22]">Built for chart accuracy</h2>
+            <p className="mt-3 text-sm leading-7 text-[#151d22]/66">
               True solar time handling helps keep the chart stable around boundary cases where a
               timezone or daylight saving adjustment can change the pillar output.
             </p>
           </GlowCard>
           <GlowCard accent="violet" interactive className="p-6">
-            <h2 className="text-xl font-semibold text-white">Readable analysis layers</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
+            <h2 className="font-serif text-[1.7rem] text-[#151d22]">Readable analysis layers</h2>
+            <p className="mt-3 text-sm leading-7 text-[#151d22]/66">
               The calculator keeps the core tables visible so Day Master, hidden stems, Ten Gods,
               and element summaries stay tied to the source chart instead of generic text.
             </p>
           </GlowCard>
           <GlowCard accent="pink" interactive className="p-6">
-            <h2 className="text-xl font-semibold text-white">Ready for deeper learning</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">
+            <h2 className="font-serif text-[1.7rem] text-[#151d22]">Ready for deeper learning</h2>
+            <p className="mt-3 text-sm leading-7 text-[#151d22]/66">
               The learn hub covers the exact informational topics users search for before and after
               using a BaZi calculator.
             </p>
@@ -145,10 +146,10 @@ export default function Home() {
         <div className="flex items-end justify-between gap-6">
           <div>
             <Badge tone="violet">Learn the system</Badge>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+            <h2 className="mt-4 font-serif text-4xl tracking-[-0.02em] text-[#151d22]">
               Learn how to read the chart
             </h2>
-            <p className="mt-3 max-w-3xl text-base leading-8 text-slate-300">
+            <p className="mt-3 max-w-3xl text-base leading-8 text-[#151d22]/66">
               These guides are designed to support high-intent searches and help visitors understand
               the chart after they calculate it.
             </p>
@@ -165,16 +166,16 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-t border-white/8 bg-slate-950/35">
+      <section className="mt-8">
         <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-semibold tracking-tight text-white">BaZi calculator FAQ</h2>
+          <h2 className="font-serif text-4xl tracking-[-0.02em] text-[#151d22]">BaZi calculator FAQ</h2>
           <div className="mt-8 space-y-4">
             {homeFaqs.map((item) => (
-              <details key={item.question} className="rounded-[24px] border border-white/10 bg-white/6 p-5 backdrop-blur-sm">
-                <summary className="cursor-pointer text-lg font-semibold text-white">
+              <details key={item.question} className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.56))] p-5 shadow-[0_18px_44px_rgba(0,106,98,0.06)] backdrop-blur-[18px]">
+                <summary className="cursor-pointer text-lg font-semibold text-[#151d22]">
                   {item.question}
                 </summary>
-                <p className="mt-3 text-base leading-8 text-slate-300">{item.answer}</p>
+                <p className="mt-3 text-base leading-8 text-[#151d22]/66">{item.answer}</p>
               </details>
             ))}
           </div>

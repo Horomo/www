@@ -18,15 +18,15 @@ export default function LearnGuideCard({ guide, index }: LearnGuideCardProps) {
       <div className="mt-5 flex items-start justify-between gap-3">
         <div>
           <Badge tone="violet">Guide</Badge>
-          <h2 className="mt-3 text-xl font-semibold leading-tight text-white">
-            <Link href={guide.href} className="transition-colors hover:text-cyan-100">
+          <h2 className="mt-3 font-serif text-[1.65rem] leading-tight text-[#151d22]">
+            <Link href={guide.href} className="transition-colors hover:text-[#006a62]">
               {guide.title}
             </Link>
           </h2>
         </div>
       </div>
-      <p className="mt-3 text-sm leading-7 text-slate-300">{guide.excerpt}</p>
-      <p className="mt-3 text-sm leading-7 text-slate-400">{guide.description}</p>
+      <p className="mt-3 text-sm leading-7 text-[#151d22]/72">{guide.excerpt}</p>
+      <p className="mt-3 text-sm leading-7 text-[#151d22]/58">{guide.description}</p>
       <div className="mt-5">
         <Link href={guide.href} className={buttonClassName('secondary', 'sm')}>
           Read guide
