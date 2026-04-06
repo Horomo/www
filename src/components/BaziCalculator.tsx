@@ -93,6 +93,7 @@ const PILLAR_META = [
 type PillarKey = (typeof PILLAR_META)[number]['key'];
 type FormValues = AnalysisFormDraft;
 type FollowUpItem = { question: string; answer: string | null; loading: boolean; error: string | null };
+type StepFieldErrors = Partial<Record<'calculationMode' | 'genderOtherText' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
 
 const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
   { question: '', answer: null, loading: false, error: null },
@@ -103,6 +104,11 @@ const EMPTY_FOLLOW_UPS: FollowUpItem[] = [
 const AUTH_STATE_KEY = 'horomo-auth-preserved-form';
 const TEXT_INPUT_CLASS = 'glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm text-[#151d22] placeholder:text-[#151d22]/40';
 const TEXTAREA_CLASS = 'glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm text-[#151d22] placeholder:text-[#151d22]/40';
+const DISPLAY_PILLAR_ORDER: PillarKey[] = ['year', 'month', 'day', 'hour'];
+
+function getDisplayPillarOrder(unknownTime: boolean): PillarKey[] {
+  return unknownTime ? DISPLAY_PILLAR_ORDER.slice(0, 3) : DISPLAY_PILLAR_ORDER;
+}
 
 function elColor(el: string): string {
   switch (el) {
@@ -388,6 +394,7 @@ export default function BaziCalculator() {
   const [signingIn, setSigningIn] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [activeLuckCycle, setActiveLuckCycle] = useState(0);
+  const [showStepValidation, setShowStepValidation] = useState(false);
   const { data: session, status: sessionStatus } = useSession();
   const currentYear = new Date().getUTCFullYear();
 
@@ -399,40 +406,59 @@ export default function BaziCalculator() {
   }
 
   function handleGenderIdentityChange(nextIdentity: GenderIdentity) {
+    setShowStepValidation(false);
     setGenderIdentity(nextIdentity);
     if (nextIdentity === 'male' || nextIdentity === 'female') return void setCalculationMode(nextIdentity);
     setCalculationMode('');
   }
 
   function handleCalculationModeChange(next: CalculationGenderMode) {
+    setShowStepValidation(false);
     if (next !== calculationMode) trackEvent('selection_changed', { previous_energy_type: calculationMode || undefined, energy_type: next, screen_name: 'bazi_form' });
     trackEvent('calculation_mode_selected', { energy_type: next, screen_name: 'bazi_form' });
     setCalculationMode(next);
   }
 
-  function validateStep(step: number, values: FormValues): string | null {
+  const getStepFieldErrors = useCallback((step: number, values: FormValues): StepFieldErrors => {
+    const errors: StepFieldErrors = {};
+
     if (step === 0) {
-      if (!values.calculationMode) return 'Please choose a calculation mode for classical Da Yun rules.';
-      if (values.genderIdentity === 'other' && !values.genderOtherText.trim()) return 'Please add a short self-description or choose another gender identity option.';
+      if (!values.calculationMode) errors.calculationMode = 'Choose a calculation mode for classical Da Yun rules.';
+      if (values.genderIdentity === 'other' && !values.genderOtherText.trim()) {
+        errors.genderOtherText = 'Add a short self-description or choose another identity option.';
+      }
     }
     if (step === 1) {
-      if (!values.dob) return 'Please enter date of birth.';
-      if (!values.unknownTime && !values.tob) return "Please enter time of birth, or check 'I don't know my birth time'.";
+      if (!values.dob) errors.dob = 'Enter date of birth.';
+      if (!values.unknownTime && !values.tob) {
+        errors.tob = "Enter time of birth, or check 'I don't know my birth time'.";
+      }
     }
     if (step === 2) {
       const lng = parseFloat(values.longitude); const lat = parseFloat(values.latitude);
-      if (!values.timezone) return 'Please choose a birth place or enter a timezone manually.';
-      if (Number.isNaN(lng) || lng < -180 || lng > 180) return 'Longitude must be between -180 and 180.';
-      if (Number.isNaN(lat) || lat < -90 || lat > 90) return 'Latitude must be between -90 and 90.';
+      if (!values.timezone) errors.timezone = 'Choose a birth place or enter a timezone manually.';
+      if (Number.isNaN(lng) || lng < -180 || lng > 180) errors.longitude = 'Longitude must be between -180 and 180.';
+      if (Number.isNaN(lat) || lat < -90 || lat > 90) errors.latitude = 'Latitude must be between -90 and 90.';
     }
-    return null;
-  }
+
+    return errors;
+  }, []);
+
+  const validateStep = useCallback((step: number, values: FormValues): string | null => {
+    return Object.values(getStepFieldErrors(step, values))[0] ?? null;
+  }, [getStepFieldErrors]);
 
   const calculate = useCallback((values: FormValues) => {
     const normalizedValues = finalizeAnalysisFormPayload(values);
-    const error = validateStep(0, values) ?? validateStep(1, values) ?? validateStep(2, values);
-    if (error) return void setCalcError(error);
+    const firstInvalidStep = [0, 1, 2].find((step) => validateStep(step, values));
+    const error = firstInvalidStep === undefined ? null : validateStep(firstInvalidStep, values);
+    if (error) {
+      setShowStepValidation(true);
+      if (firstInvalidStep !== undefined) moveToStep(firstInvalidStep);
+      return void setCalcError(error);
+    }
     if (!normalizedValues) return void setCalcError('Please review the gender identity and calculation fields.');
+    setShowStepValidation(false);
     setCalcError(null);
     try {
       const lng = parseFloat(values.longitude);
@@ -441,7 +467,7 @@ export default function BaziCalculator() {
       syncFormState(normalizedValues); setResult(computedResult); setChartData(computedChartData); setCalculatedFormValues(normalizedValues); setAnalysis(null); setFollowUps(EMPTY_FOLLOW_UPS); setAnalysisError(null); setCurrentStep(3);
       fetch('/api/log-chart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildAnalyzeRequestBody({ formValues: normalizedValues, result: computedResult, chartData: computedChartData })) }).catch(() => {});
     } catch (error: unknown) { setCalcError(`Calculation error: ${error instanceof Error ? error.message : String(error)}`); }
-  }, []);
+  }, [validateStep]);
 
   useEffect(() => {
     const rawSavedState = sessionStorage.getItem(AUTH_STATE_KEY); if (!rawSavedState) return; sessionStorage.removeItem(AUTH_STATE_KEY);
@@ -506,11 +532,20 @@ export default function BaziCalculator() {
     } catch (error: unknown) { updateFollowUp(index, { loading: false, error: error instanceof Error ? error.message : 'Unknown error' }); }
   }
 
-  function handleBirthPlaceQueryChange(value: string) { setBirthPlaceQuery(value); setBirthPlace(null); }
-  function handleBirthPlaceSelect(place: PlaceSearchResult) { setBirthPlace(place); setBirthPlaceQuery([place.name, place.admin1, place.country].filter(Boolean).join(', ')); setTimezone(place.timezone); setLongitude(place.longitude.toFixed(4)); setLatitude(place.latitude.toFixed(4)); }
+  function handleBirthPlaceQueryChange(value: string) { setShowStepValidation(false); setBirthPlaceQuery(value); setBirthPlace(null); }
+  function handleBirthPlaceSelect(place: PlaceSearchResult) { setShowStepValidation(false); setBirthPlace(place); setBirthPlaceQuery([place.name, place.admin1, place.country].filter(Boolean).join(', ')); setTimezone(place.timezone); setLongitude(place.longitude.toFixed(4)); setLatitude(place.latitude.toFixed(4)); }
   function moveToStep(nextStep: number) { startTransition(() => setCurrentStep(nextStep)); }
-  function goNext() { const error = validateStep(currentStep, formValues); if (error) return void setCalcError(error); setCalcError(null); moveToStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1)); }
-  function goBack() { setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
+  function goNext() {
+    const error = validateStep(currentStep, formValues);
+    if (error) {
+      setShowStepValidation(true);
+      return void setCalcError(error);
+    }
+    setShowStepValidation(false);
+    setCalcError(null);
+    moveToStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1));
+  }
+  function goBack() { setShowStepValidation(false); setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
 
   const confirmationSummary = useMemo(() => [
     ['Gender identity', formatGenderIdentity(genderIdentity, genderOtherText)],
@@ -524,6 +559,8 @@ export default function BaziCalculator() {
 
   const resultAnchor = result ? `${fmtDate(result.displayDate)}-${result.pillars.day.stem.zh}-${result.pillars.day.branch.zh}` : 'empty';
   const activeDaYun = result?.daYun?.pillars[activeLuckCycle] ?? null;
+  const currentStepErrors = getStepFieldErrors(currentStep, formValues);
+  const displayPillarOrder = getDisplayPillarOrder(result?.unknownTime ?? false);
 
   return (
     <section className="px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="calculator-heading">
@@ -549,6 +586,7 @@ export default function BaziCalculator() {
                   currentStep={currentStep}
                   onStepClick={(index) => {
                     if (index <= currentStep) {
+                      setShowStepValidation(false);
                       setCalcError(null);
                       moveToStep(index);
                     }
@@ -576,7 +614,8 @@ export default function BaziCalculator() {
                       {genderIdentity === 'other' ? (
                         <div>
                           <label htmlFor="gender-other-text" className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Optional self-description</label>
-                          <input id="gender-other-text" type="text" value={genderOtherText} onChange={(event) => setGenderOtherText(event.target.value)} placeholder="Enter a label if you want to share one" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />
+                          <input id="gender-other-text" type="text" value={genderOtherText} onChange={(event) => { setShowStepValidation(false); setGenderOtherText(event.target.value); }} placeholder="Enter a label if you want to share one" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />
+                          {showStepValidation && currentStepErrors.genderOtherText ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.genderOtherText}</p> : null}
                         </div>
                       ) : null}
                       <div className="space-y-3">
@@ -596,6 +635,7 @@ export default function BaziCalculator() {
                             );
                           })}
                         </div>
+                        {showStepValidation && currentStepErrors.calculationMode ? <p className="text-xs leading-6 text-[#874e58]">{currentStepErrors.calculationMode}</p> : null}
                       </div>
                     </>
                   ) : null}
@@ -604,10 +644,10 @@ export default function BaziCalculator() {
                     <>
                       <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 2</div><h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Birth date and recorded time</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">Enter the birth date and the recorded clock time from the certificate. Unknown time mode remains available and keeps the hour pillar unresolved.</p></div>
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Date of Birth</label><input type="date" value={dob} onChange={(event) => setDob(event.target.value)} className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div>
-                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => setTob(event.target.value)} className={cn(TEXT_INPUT_CLASS, 'mt-2')} /><p className="mt-2 text-xs leading-6 text-[#151d22]/52">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
+                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Date of Birth</label><input type="date" value={dob} onChange={(event) => { setShowStepValidation(false); setDob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.dob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.dob}</p> : null}</div>
+                        <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => { setShowStepValidation(false); setTob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.tob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.tob}</p> : null}<p className="mt-2 text-xs leading-6 text-[#151d22]/52">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
                       </div>
-                      <label className="inline-flex items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58))] px-4 py-3 text-sm text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><input type="checkbox" checked={unknownTime} onChange={(event) => setUnknownTime(event.target.checked)} className="h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" /><span>I don&apos;t know my birth time</span></label>
+                      <label className="inline-flex items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58))] px-4 py-3 text-sm text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><input type="checkbox" checked={unknownTime} onChange={(event) => { setShowStepValidation(false); setUnknownTime(event.target.checked); }} className="h-4 w-4 border-white/20 bg-transparent text-[#006a62] focus:ring-[#40e0d0]" /><span>I don&apos;t know my birth time</span></label>
                     </>
                   ) : null}
 
@@ -616,9 +656,9 @@ export default function BaziCalculator() {
                       <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[2rem] text-[#151d22]">Birthplace, timezone, and coordinates</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">Search the birthplace first, then fine-tune the timezone and coordinates manually if needed.</p></div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
-                        <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div><p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
+                        <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div>{showStepValidation && currentStepErrors.timezone ? <p className="mt-3 text-xs leading-6 text-[#874e58]">{currentStepErrors.timezone}</p> : null}<p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
                       </div>
-                      <details className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] px-5 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-[#151d22]/56">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div></div></details>
+                      <details className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] px-5 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-[#151d22]/56">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.longitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.longitude}</p> : null}</div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.latitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.latitude}</p> : null}</div></div></details>
                     </>
                   ) : null}
 
@@ -631,7 +671,7 @@ export default function BaziCalculator() {
                   ) : null}
                 </div>
                 {calcError ? <div className="mt-5 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{calcError}</div> : null}
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-3"><Button variant="ghost" size="md" onClick={goBack} disabled={currentStep === 0}>Previous</Button>{currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Continue</Button> : null}</div><Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button></div>
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><div className="flex gap-3">{currentStep > 0 ? <Button variant="ghost" size="md" onClick={goBack}>Back</Button> : null}{currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Next</Button> : <Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button>}</div></div>
               </GlowCard>
             </div>
           </div>
@@ -643,10 +683,10 @@ export default function BaziCalculator() {
               <GlowCard accent="gold" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="gold">Character Profile</Badge><h3 className="mt-4 font-serif text-4xl text-[#151d22]">{result.pillars.day.stem.zh} {result.pillars.day.stem.pinyin} Day Master</h3><p className="mt-3 text-sm leading-8 text-[#151d22]/66">{getDayMasterNote(result.pillars.day.stem)}. The result surface now clusters the pillar story, timing, and analysis into focused panels without changing any source data.</p></div><div className="flex flex-wrap gap-2"><Badge tone="cyan">{formatCalculationGenderModeDisplay(result.daYun?.calculationMode ?? calculatedFormValues?.calculationMode ?? 'male')}</Badge><Badge tone="violet">{formatGenderIdentity(calculatedFormValues?.genderIdentity ?? genderIdentity, calculatedFormValues?.genderOtherText ?? genderOtherText)}</Badge></div></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatTile label="Day Master stem" value={`${result.pillars.day.stem.zh} (${result.pillars.day.stem.pinyin})`} hint={`${EL_LABEL[result.pillars.day.stem.element].zh} ${EL_LABEL[result.pillars.day.stem.element].en}`} /><StatTile label="Polarity" value={result.pillars.day.stem.yin ? 'Yin' : 'Yang'} hint="The core polarity of the Day Master stem." /><StatTile label="Clock / solar" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : `${fmtDate(result.displayDate)} -> ${fmtDate(result.tstDate)}`} hint={result.unknownTime ? 'Hour pillar is intentionally left unknown.' : result.displayTzLabel} /><StatTile label="Luck cycle start" value={result.daYun ? `${result.daYun.startYears} yrs${result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}` : 'Unavailable'} hint={result.daYun ? `${result.daYun.forward ? 'Forward' : 'Backward'} from ${result.daYun.jie.name}` : 'Requires full chart'} /></div></GlowCard>
               <GlowCard accent="violet" className="p-6"><div className="text-[11px] uppercase tracking-[0.22em] text-[#874e58]/62">Result briefing</div><div className="mt-4 space-y-4"><StatTile label="Local display" value={result.unknownTime ? fmtDate(result.displayDate).split(' ')[0] : fmtDate(result.displayDate)} hint={result.displayTzLabel} /><StatTile label="True solar time" value={result.unknownTime ? 'Not calculated' : fmtDate(result.tstDate)} hint={result.unknownTime ? 'Unknown birth time skips the hour pillar.' : 'Astronomically corrected time'} /><StatTile label="Current focus" value={activeDaYun ? `${activeDaYun.ageStart}-${activeDaYun.ageEnd}` : 'Luck cycles pending'} hint={activeDaYun ? `${activeDaYun.yearStart}-${activeDaYun.yearEnd}` : 'Use the journey map below'} /></div></GlowCard>
             </div>
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{PILLAR_META.map((meta) => <PillarCard key={meta.key} result={result} keyName={meta.key} currentYear={currentYear} />)}</div>
+            <div className="grid gap-5 lg:grid-cols-4">{displayPillarOrder.map((keyName) => <PillarCard key={keyName} result={result} keyName={keyName} currentYear={currentYear} />)}</div>
             {!result.unknownTime ? <TSTCard result={result} /> : null}
             <div className="grid gap-6 xl:grid-cols-2"><ChartContainer eyebrow="Chart pulse" title="5 Structures · 五行格局" description="The structure view is now drawn as a soft radial field, preserving the same underlying counts."><RadarGlowChart structureCounts={chartData.structureCounts} structureEls={chartData.structureEls} /></ChartContainer><ChartContainer eyebrow="Pattern loadout" title="10 Gods · 十神分布" description="All hidden stems are still included. The presentation now reads like a ranked signal board."><NeonBars tenGodsCount={chartData.tenGodsCount} /></ChartContainer></div>
-            <GlowCard accent="cyan" className="p-6"><div><Badge tone="cyan">Source Matrix</Badge><h3 className="mt-3 font-serif text-[1.8rem] text-[#151d22]">Detailed pillar and Ten Gods reference</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">The original analytical detail remains available here for practitioners who want the raw matrix view.</p></div><div className="cosmic-scrollbar mt-6 overflow-x-auto"><table className="min-w-[720px] w-full text-sm"><thead><tr className="text-xs uppercase tracking-[0.18em] text-[#151d22]/44"><th className="py-3 pr-4 text-left">Pillar</th><th className="py-3 px-2 text-center">Stem</th><th className="py-3 px-2 text-center">Stem God</th><th className="py-3 px-2 text-center">Branch</th><th className="py-3 px-2 text-center">Branch God</th></tr></thead><tbody>{((result.unknownTime ? ['day', 'month', 'year'] : ['hour', 'day', 'month', 'year']) as PillarKey[]).map((keyName) => { const summary = getPillarSummary(result, keyName); if (!summary) return null; const meta = PILLAR_META.find((item) => item.key === keyName)!; return <tr key={keyName} className="text-[#151d22]/74"><td className="py-3 pr-4"><div className="font-medium text-[#151d22]">{meta.label}</div><div className="text-xs text-[#151d22]/44">{meta.zh}</div></td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.stem.element))}>{summary.pillar.stem.zh}</div><div className="text-xs text-[#151d22]/44">{summary.pillar.stem.pinyin}</div></td><td className="py-3 px-2 text-center">{summary.stemGod ? <div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.stemGod.zh] || '')}>{TG_ABBR[summary.stemGod.zh] || 'TG'}</Badge><span className="text-xs text-[#151d22]/62">{summary.stemGod.zh} {summary.stemGod.pinyin}</span></div> : <span className="text-xs text-[#151d22]/44">Day Master</span>}</td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.branch.element))}>{summary.pillar.branch.zh}</div><div className="text-xs text-[#151d22]/44">{summary.pillar.branch.pinyin}</div></td><td className="py-3 px-2 text-center"><div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.branchGod.zh] || '')}>{TG_ABBR[summary.branchGod.zh] || 'TG'}</Badge><span className="text-xs text-[#151d22]/62">{summary.branchGod.zh} {summary.branchGod.pinyin}</span></div></td></tr>; })}</tbody></table></div><p className="mt-3 text-xs leading-6 text-[#151d22]/52">Branch God shows main qi (主氣) only. The charts above continue to count all hidden stems (藏干).</p></GlowCard>
+            <GlowCard accent="cyan" className="p-6"><div><Badge tone="cyan">Source Matrix</Badge><h3 className="mt-3 font-serif text-[1.8rem] text-[#151d22]">Detailed pillar and Ten Gods reference</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">The original analytical detail remains available here for practitioners who want the raw matrix view.</p></div><div className="cosmic-scrollbar mt-6 overflow-x-auto"><table className="min-w-[720px] w-full text-sm"><thead><tr className="text-xs uppercase tracking-[0.18em] text-[#151d22]/44"><th className="py-3 pr-4 text-left">Pillar</th><th className="py-3 px-2 text-center">Stem</th><th className="py-3 px-2 text-center">Stem God</th><th className="py-3 px-2 text-center">Branch</th><th className="py-3 px-2 text-center">Branch God</th></tr></thead><tbody>{displayPillarOrder.map((keyName) => { const summary = getPillarSummary(result, keyName); if (!summary) return null; const meta = PILLAR_META.find((item) => item.key === keyName)!; return <tr key={keyName} className="text-[#151d22]/74"><td className="py-3 pr-4"><div className="font-medium text-[#151d22]">{meta.label}</div><div className="text-xs text-[#151d22]/44">{meta.zh}</div></td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.stem.element))}>{summary.pillar.stem.zh}</div><div className="text-xs text-[#151d22]/44">{summary.pillar.stem.pinyin}</div></td><td className="py-3 px-2 text-center">{summary.stemGod ? <div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.stemGod.zh] || '')}>{TG_ABBR[summary.stemGod.zh] || 'TG'}</Badge><span className="text-xs text-[#151d22]/62">{summary.stemGod.zh} {summary.stemGod.pinyin}</span></div> : <span className="text-xs text-[#151d22]/44">Day Master</span>}</td><td className="py-3 px-2 text-center"><div className={cn('font-zh text-2xl font-bold', elColor(summary.pillar.branch.element))}>{summary.pillar.branch.zh}</div><div className="text-xs text-[#151d22]/44">{summary.pillar.branch.pinyin}</div></td><td className="py-3 px-2 text-center"><div className="flex items-center justify-center gap-2"><Badge tone={tgBadgeTone(TG_ABBR[summary.branchGod.zh] || '')}>{TG_ABBR[summary.branchGod.zh] || 'TG'}</Badge><span className="text-xs text-[#151d22]/62">{summary.branchGod.zh} {summary.branchGod.pinyin}</span></div></td></tr>; })}</tbody></table></div><p className="mt-3 text-xs leading-6 text-[#151d22]/52">Branch God shows main qi (主氣) only. The charts above continue to count all hidden stems (藏干).</p></GlowCard>
             {result.daYun ? <GlowCard accent="pink" className="p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><Badge tone="pink">Journey Map</Badge><h3 className="mt-3 font-serif text-[2rem] text-[#151d22]">Major Luck Cycles · 大運</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">The cycle stream now reads like a navigable progression path, while keeping the same decade markers and start-age logic.</p></div><div className="rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.22),rgba(255,255,255,0.68))] px-4 py-3 text-sm text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(255,183,194,0.18)]"><div>Direction: <span className="font-semibold text-[#151d22]">{result.daYun.forward ? 'Forward 順行' : 'Backward 逆行'}</span></div><div className="mt-1">Energy polarity: <span className="font-semibold text-[#151d22]">{formatCalculationGenderModeDisplay(result.daYun.calculationMode)}</span></div><div className="mt-1 text-xs text-[#151d22]/48">{result.daYun.ruleNote}</div></div></div><div className="mt-6 flex flex-wrap gap-3"><Button variant="secondary" size="sm" onClick={() => setActiveLuckCycle((current) => Math.max(current - 1, 0))} disabled={activeLuckCycle === 0}>Previous cycle</Button><Button variant="secondary" size="sm" onClick={() => setActiveLuckCycle((current) => Math.min(current + 1, result.daYun!.pillars.length - 1))} disabled={activeLuckCycle === result.daYun.pillars.length - 1}>Next cycle</Button></div><div className="cosmic-scrollbar mt-6 overflow-x-auto"><div className="flex min-w-max items-center gap-4 pb-3">{result.daYun.pillars.map((pillar, index) => { const isActive = index === activeLuckCycle; const isCurrent = currentYear >= pillar.yearStart && currentYear <= pillar.yearEnd; return <button key={`${pillar.cycleIdx}-${pillar.yearStart}`} type="button" onClick={() => setActiveLuckCycle(index)} className={cn('relative flex min-w-[138px] flex-col items-center rounded-[28px] px-4 py-4 text-center transition-all duration-300', isActive ? 'bg-[linear-gradient(135deg,rgba(64,224,208,0.18),rgba(255,255,255,0.82))] shadow-[inset_0_0_0_1px_rgba(64,224,208,0.22),0_18px_36px_rgba(64,224,208,0.12)]' : 'bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(255,255,255,0.58))] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] hover:brightness-[1.02]')}>{isCurrent ? <span className="absolute right-3 top-3 h-3 w-3 rounded-full bg-[#40e0d0] shadow-[0_0_16px_rgba(64,224,208,0.7)]" /> : null}<div className="text-[11px] uppercase tracking-[0.18em] text-[#151d22]/44">Cycle {index + 1}</div><div className="mt-2 text-xs text-[#151d22]/64">Age {pillar.ageStart}-{pillar.ageEnd}</div><div className="text-xs text-[#151d22]/46">{pillar.yearStart}-{pillar.yearEnd}</div><div className={cn('mt-4 font-zh text-3xl font-bold', elColor(pillar.stem.element))}>{pillar.stem.zh}</div><div className="my-2 h-px w-full bg-[linear-gradient(90deg,transparent,rgba(0,106,98,0.16),transparent)]" /><div className={cn('font-zh text-3xl font-bold', elColor(pillar.branch.element))}>{pillar.branch.zh}</div><div className="mt-2 text-xs text-[#151d22]/46">{pillar.stem.pinyin} / {pillar.branch.pinyin}</div></button>; })}</div></div>{activeDaYun ? <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]"><div className="rounded-[28px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.58))] p-5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-[11px] uppercase tracking-[0.2em] text-[#151d22]/46">Focused cycle</div><h4 className="mt-3 text-xl font-semibold text-[#151d22]">Age {activeDaYun.ageStart}-{activeDaYun.ageEnd} · {activeDaYun.yearStart}-{activeDaYun.yearEnd}</h4><p className="mt-3 text-sm leading-7 text-[#151d22]/66">Nearest solar term: <span className="font-semibold text-[#151d22]">{result.daYun.jie.name}</span>. Luck begins at <span className="font-semibold text-[#151d22]">{result.daYun.startYears} yrs{result.daYun.startMonths > 0 ? ` ${result.daYun.startMonths} mths` : ''}</span>.</p></div><div className="grid gap-3"><StatTile label="Stem" value={`${activeDaYun.stem.zh} ${activeDaYun.stem.pinyin}`} hint={EL_LABEL[activeDaYun.stem.element].en} /><StatTile label="Branch" value={`${activeDaYun.branch.zh} ${activeDaYun.branch.pinyin}`} hint={activeDaYun.branch.animal} /></div></div> : null}</GlowCard> : null}
             <GlowCard accent="violet" className="p-6 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><Badge tone="gold">AI Insight Panel</Badge><h3 className="mt-3 font-serif text-[2rem] text-[#151d22]">AI Reading · 八字解析</h3><p className="mt-2 text-sm leading-7 text-[#151d22]/66">The optional AI layer is now framed as a premium highlight panel, but it still uses the same authentication flow and endpoint.</p></div>{sessionStatus === 'authenticated' && session.user ? <div className="rounded-2xl bg-[linear-gradient(135deg,rgba(252,212,0,0.16),rgba(255,255,255,0.68))] px-4 py-3 text-sm text-[#151d22]/68 shadow-[inset_0_0_0_1px_rgba(112,93,0,0.12)]">Signed in as <span className="font-semibold text-[#151d22]">{session.user.email ?? session.user.name ?? 'Google user'}</span><button type="button" onClick={() => signOut({ callbackUrl: '/' })} className="ml-3 text-[#006a62] transition-colors hover:text-[#00564f]">Sign out</button></div> : null}</div><div className="mt-6 flex flex-wrap gap-3">{sessionStatus === 'loading' ? <Button variant="secondary" size="lg" disabled>Checking sign-in...</Button> : sessionStatus === 'authenticated' ? <Button variant="primary" size="lg" onClick={runAnalysis} disabled={loadingAnalysis}>{loadingAnalysis ? 'Analyzing...' : 'Analyze with AI · 用AI解析'}</Button> : <Button variant="secondary" size="lg" onClick={handleGoogleSignIn} disabled={signingIn}>{signingIn ? 'Redirecting to Google...' : 'Sign in with Google'}</Button>}</div>{loginError ? <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{loginError}</div> : null}{analysisError ? <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{analysisError}</div> : null}{analysis ? <><div className="mt-6 rounded-[28px] bg-[linear-gradient(135deg,rgba(255,248,228,0.78),rgba(255,255,255,0.64))] p-5 text-sm leading-8 text-[#151d22]/78 whitespace-pre-wrap shadow-[inset_0_0_0_1px_rgba(112,93,0,0.1)]">{analysis.split('\n').map((line, index) => <p key={`${line}-${index}`} className={line.trim() === '' ? 'mt-3' : ''}><RenderMd text={line} /></p>)}</div><div className="mt-6"><div><h4 className="font-serif text-[1.5rem] text-[#151d22]">Ask 3 More Questions</h4><p className="mt-1 text-sm leading-7 text-[#151d22]/66">Ask about career, relationships, timing, strengths, or any other point in this chart.</p></div><div className="mt-5 grid gap-4">{followUps.map((item, index) => <div key={index} className="rounded-[28px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.58))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/44">Question {index + 1}</label><textarea value={item.question} onChange={(event) => updateFollowUp(index, { question: event.target.value, error: null })} rows={3} placeholder="e.g. What does this chart suggest about career direction over the next 3 years?" className={cn(TEXTAREA_CLASS, 'mt-3')} /><div className="mt-3 flex flex-wrap items-center gap-3"><Button variant="secondary" size="sm" onClick={() => runFollowUp(index)} disabled={item.loading}>{item.loading ? 'Asking...' : `Ask Question ${index + 1}`}</Button><span className="text-xs leading-6 text-[#151d22]/48">Each answer is returned separately and does not overwrite the main reading.</span></div>{item.error ? <div className="mt-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,183,194,0.42),rgba(255,255,255,0.62))] px-4 py-3 text-sm text-[#874e58] shadow-[inset_0_0_0_1px_rgba(135,78,88,0.14)]">{item.error}</div> : null}{item.answer ? <div className="mt-3 rounded-2xl bg-[linear-gradient(135deg,rgba(255,248,228,0.7),rgba(255,255,255,0.62))] px-4 py-4 text-sm leading-8 text-[#151d22]/76 whitespace-pre-wrap shadow-[inset_0_0_0_1px_rgba(112,93,0,0.08)]">{item.answer.split('\n').map((line, lineIndex) => <p key={`${line}-${lineIndex}`} className={line.trim() === '' ? 'mt-3' : ''}><RenderMd text={line} /></p>)}</div> : null}</div>)}</div></div></> : null}</GlowCard>
           </div>
