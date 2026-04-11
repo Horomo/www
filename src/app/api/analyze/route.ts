@@ -147,7 +147,7 @@ Provide analysis in these sections:
    Be honest about both sides — do not list only positives.
 
 2. Element Distribution
-   Which elements dominate across visible and hidden stems, and what is notably
+   Which elements appear most often across visible and hidden stems, and what is notably
    absent. A missing element is as significant as a dominant one — explain what
    the absence means for this person's life pattern.
 
