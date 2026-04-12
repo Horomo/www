@@ -101,7 +101,7 @@ export default function BirthPlaceSearch(props: BirthPlaceSearchProps) {
               >
                 <div className="text-sm font-medium text-[#151d22]">{formatPlaceLabel(place)}</div>
                 <div className="text-xs text-[#151d22]/56">
-                  {place.timezone} · {place.latitude.toFixed(2)}, {place.longitude.toFixed(2)}
+                  {place.timezone} / {place.latitude.toFixed(2)}, {place.longitude.toFixed(2)}
                 </div>
               </button>
             ))}
@@ -114,9 +114,9 @@ export default function BirthPlaceSearch(props: BirthPlaceSearchProps) {
       {selectedPlace && (
         <div className="rounded-2xl bg-[linear-gradient(135deg,rgba(64,224,208,0.16),rgba(255,255,255,0.62))] px-4 py-3 text-xs text-[#151d22]/68 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.16)]">
           <span className="font-medium text-[#151d22]">{formatPlaceLabel(selectedPlace)}</span>
-          {' · '}
+          {' / '}
           {selectedPlace.timezone}
-          {' · '}
+          {' / '}
           {selectedPlace.latitude.toFixed(2)}, {selectedPlace.longitude.toFixed(2)}
         </div>
       )}
