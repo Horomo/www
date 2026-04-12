@@ -2,6 +2,30 @@
 
 ## 2026-04-12
 
+- `audit: verify Da Yun hourly-scoring phase against the agreed implementation spec`
+  Performed a code-and-test audit of the member-only hourly scoring feature, checking Da Yun reuse, active-cycle selection, timezone-aware `today` handling, score-layer transparency, category modifiers, UI breakdowns, explanation behavior, scope control, and whether `npm test`, `npm run lint`, and `npm run build` were actually passing.
+
+- `fix: replace year-only active Da Yun matching with date-accurate cycle selection`
+  Removed the coarse calendar-year lookup in hourly scoring and switched active Da Yun resolution to use the natal chart's existing Da Yun engine data plus the actual cycle start boundary derived from `startYears` and `startMonths`, using the user's local date/time instead of only `yearStart`/`yearEnd`.
+
+- `fix: align active Da Yun interpretation across hourly scoring and AI analysis`
+  Updated the analyze route to resolve the current Da Yun through the same date-accurate helper used by hourly scoring, so both feature paths now interpret the active cycle consistently from the same underlying BaZi engine data.
+
+- `feat: add shared BaZi-engine helpers for precise Da Yun boundary resolution`
+  Added reusable helpers in the core BaZi engine to project UTC instants into the user's timezone, compute each Da Yun cycle's real start date from the natal chart, and select the active Da Yun pillar for an exact local reference date.
+
+- `fix: clean hourly-scoring UI text and remove mojibake from user-facing strings`
+  Repaired corrupted Hourly UI copy, including slot labels, loading text, score separators, Day Master summary formatting, Active Da Yun headings, and strongest-slot breakdown strings so the feature renders cleanly and remains understandable.
+
+- `test: add boundary and timezone regression coverage for active Da Yun selection`
+  Added targeted tests proving the active Da Yun changes at the actual first-cycle start boundary rather than at a plain year boundary, and proving the hourly feature's `today` label follows the saved profile timezone rather than UTC around local midnight edges.
+
+- `test: strengthen explanation and UI-string proofs for hourly scoring`
+  Extended test coverage so extreme-slot explanations must still include both the short-term hour effect and long-term Da Yun effect after the fixes, and added UI-oriented assertions that hourly-scoring labels and formatted strings remain clean and free of mojibake.
+
+- `chore: re-verify the completed Da Yun hourly-scoring phase`
+  Re-ran `npm test`, `npm run lint`, and `npm run build` after the audit fixes; all three commands passed, confirming the phase was brought from incomplete to complete without changing the underlying base hourly scoring behavior.
+
 - `feat: extend hourly scoring with Liu Nian, Liu Yue, and Liu Ri timing layers`
   Added additive current-year, current-month, and current-day influence layers on top of the existing natal base scoring and active Da Yun flow, while preserving the underlying hourly scoring architecture and member/profile behavior.
 
