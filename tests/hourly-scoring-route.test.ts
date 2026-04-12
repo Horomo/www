@@ -26,7 +26,7 @@ test('hourly scoring API rejects unauthenticated requests', async () => {
   const response = await handleHourlyScoringGet(request as unknown as NextRequest, {
     getSession: async () => null,
     fetchProfile: async () => null,
-    computeScoring: async () => computeHourlyScoring(baseProfile),
+    computeScoring: () => computeHourlyScoring(baseProfile),
   });
 
   assert.equal(response.status, 401);
@@ -63,5 +63,5 @@ test('hourly scoring API computes fresh scoring from the saved profile', async (
   assert.deepEqual(body.profile, baseProfile);
   assert.equal(Array.isArray(body.scoring?.slots), true);
   assert.equal(body.scoring?.slots.length, 12);
-  assert.ok(body.scoring?.strongestPositiveSlots.every((slot) => slot.totalScore === Math.max(...body.scoring.slots.map((s) => s.totalScore))));
+  assert.ok(body.scoring?.strongestPositiveSlots.every((slot: { finalScore: number }) => slot.finalScore === Math.max(...body.scoring.slots.map((s: { finalScore: number }) => s.finalScore))));
 });

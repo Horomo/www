@@ -9,6 +9,7 @@ import {
   parseAnalyzeRequestBody,
   recomputeAnalysisChartPayload,
 } from '@/lib/analysis-payload';
+import { getActiveDaYunPillarForDate } from '@/lib/bazi';
 import { formatCalculationGenderMode, formatGenderIdentity } from '@/lib/gender';
 
 const AI_MODEL = 'gpt-4o-mini';
@@ -80,14 +81,22 @@ export async function handleAnalyzeRequest(
 
   const { birthInfo } = parsedBody;
   const { pillars, chartData, daYun: rawDaYun } = computedChart;
-  const [birthYear, birthMonth, birthDay] = birthInfo.dob.split('-').map(Number);
   const now = new Date();
-  const currentYear = now.getUTCFullYear();
-  const hasHadBirthdayThisYear =
-    now.getUTCMonth() + 1 > birthMonth
-    || (now.getUTCMonth() + 1 === birthMonth && now.getUTCDate() >= birthDay);
-  const personAge = currentYear - birthYear - (hasHadBirthdayThisYear ? 0 : 1);
-  const daYun = rawDaYun?.pillars.find((pillar) => personAge >= pillar.ageStart && personAge <= pillar.ageEnd) ?? null;
+  const resolvedDaYun = rawDaYun
+    ? {
+      ...rawDaYun,
+      jie: {
+        ...rawDaYun.jie,
+        date: new Date(rawDaYun.jie.date),
+      },
+    }
+    : null;
+  const daYun = getActiveDaYunPillarForDate(
+    resolvedDaYun,
+    new Date(computedChart.tstDate),
+    now,
+    birthInfo.timezone,
+  );
   const requestId = crypto.randomUUID();
   const mode = parsedBody.mode ?? 'initial';
   const followUpQuestion = parsedBody.followUpQuestion?.trim() ?? '';

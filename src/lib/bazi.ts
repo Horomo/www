@@ -505,6 +505,69 @@ export function computeDaYun(
  * Get the UTC offset in minutes for a given date in an IANA timezone.
  * Positive = ahead of UTC (e.g., Asia/Bangkok = +420).
  */
+function addUtcYearsMonths(date: Date, years: number, months: number): Date {
+  const result = new Date(Date.UTC(
+    date.getUTCFullYear() + years,
+    date.getUTCMonth() + months,
+    1,
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds(),
+    date.getUTCMilliseconds(),
+  ));
+  const maxDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(date.getUTCDate(), maxDay));
+  return result;
+}
+
+export function projectDateToTimezone(date: Date, ianaTimezone: string): Date {
+  const formatter = createDateTimeFormatter(ianaTimezone);
+  const localParts = getLocalDateTimeParts(date, formatter);
+
+  return new Date(Date.UTC(
+    localParts.year,
+    localParts.month - 1,
+    localParts.day,
+    localParts.hour,
+    localParts.minute,
+    localParts.second,
+  ));
+}
+
+export function getDaYunCycleStartDate(birthDate: Date, daYun: DaYun, pillarIndex: number): Date {
+  return addUtcYearsMonths(
+    birthDate,
+    daYun.startYears + pillarIndex * 10,
+    daYun.startMonths,
+  );
+}
+
+export function getActiveDaYunPillarForDate(
+  daYun: DaYun | null,
+  birthDate: Date,
+  referenceDate: Date,
+  ianaTimezone: string,
+): DaYunPillar | null {
+  if (!daYun || daYun.pillars.length === 0) return null;
+
+  const localReference = projectDateToTimezone(referenceDate, ianaTimezone);
+  const firstCycleStart = getDaYunCycleStartDate(birthDate, daYun, 0);
+  if (localReference < firstCycleStart) {
+    return null;
+  }
+
+  let activePillar = daYun.pillars[0];
+  for (let index = 1; index < daYun.pillars.length; index += 1) {
+    const cycleStart = getDaYunCycleStartDate(birthDate, daYun, index);
+    if (localReference < cycleStart) {
+      break;
+    }
+    activePillar = daYun.pillars[index];
+  }
+
+  return activePillar;
+}
+
 export function getUtcOffsetMinutes(date: Date, ianaTimezone: string): number {
   const formatter = createDateTimeFormatter(ianaTimezone);
   const localParts = getLocalDateTimeParts(date, formatter);
