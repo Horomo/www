@@ -1,14 +1,15 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { signIn, useSession } from 'next-auth/react';
 
 import BirthPlaceSearch from '@/components/BirthPlaceSearch';
+import {
+  HourlyScoringResultContent,
+} from '@/components/hourly-scoring/HourlyScoringSections';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import GlowCard from '@/components/ui/GlowCard';
 import { finalizeAnalysisFormPayload, type AnalysisFormDraft, type AnalysisFormPayload } from '@/lib/analysis-payload';
-import { type HourlyScoreCategories, type HourlyScoringResult, type HourSlotScore, type TransitLayerSummary } from '@/lib/hourly-scoring';
+import { type HourlyScoringResult } from '@/lib/hourly-scoring';
 import { type CalculationGenderMode, type GenderIdentity } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
 
@@ -18,8 +19,8 @@ const GENDER_IDENTITY_OPTIONS: Array<{
   tagline: string;
   autoCalculationMode: CalculationGenderMode | null;
 }> = [
-  { value: 'male', label: 'Male', tagline: 'Yin/Yang automatically set to Yang (陽)', autoCalculationMode: 'male' },
-  { value: 'female', label: 'Female', tagline: 'Yin/Yang automatically set to Yin (陰)', autoCalculationMode: 'female' },
+  { value: 'male', label: 'Male', tagline: 'Yin/Yang automatically set to Yang', autoCalculationMode: 'male' },
+  { value: 'female', label: 'Female', tagline: 'Yin/Yang automatically set to Yin', autoCalculationMode: 'female' },
   { value: 'non_binary', label: 'Non-binary', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
   { value: 'prefer_not_to_say', label: 'Prefer not to say', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
   { value: 'other', label: 'Other', tagline: 'Choose Yin or Yang polarity below', autoCalculationMode: null },
@@ -27,11 +28,10 @@ const GENDER_IDENTITY_OPTIONS: Array<{
 
 const YIN_YANG_OPTIONS: Array<{
   value: CalculationGenderMode;
-  yinYang: string;
   label: string;
 }> = [
-  { value: 'male', yinYang: '陽', label: 'Yang (male polarity)' },
-  { value: 'female', yinYang: '陰', label: 'Yin (female polarity)' },
+  { value: 'male', label: 'Yang polarity' },
+  { value: 'female', label: 'Yin polarity' },
 ];
 
 const DEFAULT_FORM_VALUES: AnalysisFormDraft = {
@@ -50,114 +50,31 @@ const DEFAULT_FORM_VALUES: AnalysisFormDraft = {
 
 export const LOADING_SAVED_PROFILE_TEXT = 'Loading saved profile...';
 export const SAVING_PROFILE_TEXT = 'Saving your profile...';
-export const ACTIVE_DA_YUN_SEPARATOR = ' / ';
-export const SLOT_SEPARATOR = ' - ';
-export const SCORE_BREAKDOWN_SEPARATOR = ' | ';
+export { formatActiveDaYunElements, formatActiveDaYunHeadline, formatSlotHeading, formatSlotScoreBreakdown, HourlyScoringResultContent } from '@/components/hourly-scoring/HourlyScoringSections';
 
-export function formatActiveDaYunHeadline(scoringResult: NonNullable<HourlyScoringResult['activeDaYun']>) {
-  return `${scoringResult.stem.zh}${scoringResult.branch.zh} ages ${scoringResult.ageStart}-${scoringResult.ageEnd}`;
+function SectionEyebrow({ children }: { children: React.ReactNode }) {
+  return <div className="text-[11px] uppercase tracking-[0.28em] text-[#0d5d56]/62">{children}</div>;
 }
 
-export function formatActiveDaYunElements(scoringResult: NonNullable<HourlyScoringResult['activeDaYun']>) {
-  return `${scoringResult.elements.stem} stem${ACTIVE_DA_YUN_SEPARATOR}${scoringResult.elements.branch} branch`;
-}
-
-export function formatSlotHeading(slot: HourSlotScore) {
-  return `${slot.hourLabel}${SLOT_SEPARATOR}${slot.branch.zh}`;
-}
-
-export function formatSlotScoreBreakdown(slot: HourSlotScore) {
-  return `Base ${slot.baseScore >= 0 ? '+' : ''}${slot.baseScore}${SCORE_BREAKDOWN_SEPARATOR}Da Yun ${slot.daYunModifier >= 0 ? '+' : ''}${slot.daYunModifier}${SCORE_BREAKDOWN_SEPARATOR}Year ${slot.liuNianModifier >= 0 ? '+' : ''}${slot.liuNianModifier}${SCORE_BREAKDOWN_SEPARATOR}Month ${slot.liuYueModifier >= 0 ? '+' : ''}${slot.liuYueModifier}${SCORE_BREAKDOWN_SEPARATOR}Day ${slot.liuRiModifier >= 0 ? '+' : ''}${slot.liuRiModifier}${SCORE_BREAKDOWN_SEPARATOR}Final ${slot.finalScore >= 0 ? '+' : ''}${slot.finalScore}`;
-}
-
-function formatLayerName(layer: TransitLayerSummary) {
-  switch (layer.kind) {
-    case 'liuNian':
-      return 'Liu Nian';
-    case 'liuYue':
-      return 'Liu Yue';
-    case 'liuRi':
-      return 'Liu Ri';
-  }
-}
-
-function formatTransitLayerHeadline(layer: TransitLayerSummary) {
-  return `${layer.stem.zh}${layer.branch.zh} ${formatLayerName(layer)}`;
-}
-
-function LayerSummaryCard({
-  badge,
-  title,
+function FormField({
+  label,
+  children,
   description,
-  modifier,
-  elements,
-  tenGods,
-  categoryModifier,
 }: {
-  badge: string;
-  title: string;
-  description: string;
-  modifier: number;
-  elements: string;
-  tenGods: string;
-  categoryModifier: HourlyScoreCategories;
+  label: string;
+  children: React.ReactNode;
+  description?: string;
 }) {
   return (
-    <GlowCard accent="violet" className="p-5">
-      <Badge tone="violet">{badge}</Badge>
-      <h3 className="mt-3 font-serif text-2xl text-[#151d22]">{title}</h3>
-      <p className="mt-2 text-sm leading-7 text-[#151d22]/66">{description}</p>
-      <div className="mt-4 grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-        <div><span className="font-semibold text-[#151d22]">Elements</span> {elements}</div>
-        <div><span className="font-semibold text-[#151d22]">Ten Gods</span> {tenGods}</div>
-        <div><span className="font-semibold text-[#151d22]">Score modifier</span> {modifier >= 0 ? '+' : ''}{modifier}</div>
-        <div>
-          <span className="font-semibold text-[#151d22]">Category background</span> career {categoryModifier.career >= 0 ? '+' : ''}{categoryModifier.career},
-          wealth {categoryModifier.wealth >= 0 ? '+' : ''}{categoryModifier.wealth},
-          love {categoryModifier.love >= 0 ? '+' : ''}{categoryModifier.love},
-          health {categoryModifier.health >= 0 ? '+' : ''}{categoryModifier.health}
-        </div>
-      </div>
-    </GlowCard>
-  );
-}
-
-function ScoreChip({ score }: { score: number }) {
-  const tone = score > 0 ? 'cyan' : score < 0 ? 'danger' : 'default';
-  return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tone === 'cyan' ? 'bg-[#d9fbf6]/80 text-[#006a62]' : tone === 'danger' ? 'bg-[#ffe4ea]/90 text-[#b91c1c]' : 'bg-[#f8fafc]/90 text-[#475569]'}`}>
-      {score >= 0 ? '+' : ''}{score}
-    </span>
-  );
-}
-
-function BreakdownValue({ value }: { value: number }) {
-  return <span className="font-semibold text-[#151d22]">{value >= 0 ? '+' : ''}{value}</span>;
-}
-
-function TableRow({ slot }: { slot: HourSlotScore }) {
-  return (
-    <tr className="border-t border-slate-200/70">
-      <td className="whitespace-nowrap py-4 pr-4 text-sm text-[#151d22]/84">{slot.hourLabel}</td>
-      <td className="whitespace-nowrap py-4 pr-4 text-sm text-[#151d22]/84">{slot.branch.zh} ({slot.branch.animal})</td>
-      <td className="whitespace-nowrap py-4 pr-4 text-sm text-[#151d22]/84">{slot.stem.zh}{slot.branch.zh}</td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.tenGod.zh}</td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.baseScore} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.daYunModifier} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuNianModifier} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuYueModifier} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuRiModifier} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><ScoreChip score={slot.finalScore} /></td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.categoryScores.career}</td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.categoryScores.wealth}</td>
-      <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.categoryScores.love}</td>
-      <td className="py-4 text-sm text-[#151d22]/84">{slot.categoryScores.health}</td>
-    </tr>
+    <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#48605c]">
+      {label}
+      <div className="mt-2">{children}</div>
+      {description ? <div className="mt-2 text-[11px] normal-case tracking-normal text-[#5b6f6d]">{description}</div> : null}
+    </label>
   );
 }
 
 export default function HourlyScoringPanel() {
-  const { status } = useSession();
   const [formValues, setFormValues] = useState<AnalysisFormDraft>(DEFAULT_FORM_VALUES);
   const [savedProfile, setSavedProfile] = useState<AnalysisFormPayload | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -198,9 +115,8 @@ export default function HourlyScoringPanel() {
   }
 
   useEffect(() => {
-    if (status !== 'authenticated') return;
     loadHourlyScoring();
-  }, [status]);
+  }, []);
 
   const hasSavedProfile = Boolean(savedProfile);
   const canEditYinYang = formValues.genderIdentity !== 'male' && formValues.genderIdentity !== 'female';
@@ -253,214 +169,227 @@ export default function HourlyScoringPanel() {
     }
   };
 
-  if (status === 'loading') {
-    return (
-      <div className="mx-auto mt-10 max-w-5xl rounded-[2rem] bg-white/90 p-8 text-center shadow-[0_30px_90px_rgba(0,106,98,0.08)]">
-        <p className="text-sm text-[#151d22]/72">Checking your membership status...</p>
-      </div>
-    );
-  }
-
-  if (status === 'unauthenticated') {
-    return (
-      <div className="mx-auto mt-10 max-w-5xl rounded-[2rem] bg-white/90 p-8 shadow-[0_30px_90px_rgba(0,106,98,0.08)]">
-        <div className="flex flex-col gap-5 text-center">
-          <Badge tone="gold">Members only</Badge>
-          <h2 className="font-serif text-3xl text-[#151d22]">Sign in to unlock your hourly BaZi score</h2>
-          <p className="max-w-2xl mx-auto text-sm leading-7 text-[#151d22]/70">
-            Sign in to save your birth profile and get your BaZi 2-hour scoring for today without re-entering details each time.
-          </p>
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Button variant="primary" size="lg" onClick={() => signIn('google')}>
-              Sign in with Google
-            </Button>
-            <Button variant="secondary" size="lg" onClick={() => window.location.assign('/calculator')}>
-              Back to calculator
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto mt-10 max-w-6xl space-y-8">
-      <GlowCard accent="cyan" className="p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Badge tone="cyan">Member feature</Badge>
-            <h2 className="mt-3 font-serif text-3xl text-[#151d22]">Your saved BaZi profile</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
-              Use your saved birth information to compute today&apos;s fresh hourly scores without re-entering your details.
+    <div className="mx-auto mt-10 max-w-7xl space-y-8 md:mt-12 md:space-y-10">
+      <section className="rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(240,248,247,0.78))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.06)] md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-end">
+          <div className="pr-2 lg:pr-8">
+            <SectionEyebrow>Saved Profile</SectionEyebrow>
+            <h2 className="mt-3 max-w-[15ch] font-serif text-[2.2rem] leading-[0.99] tracking-[-0.035em] text-[#16302d] md:text-[3.1rem]">
+              Your private chart profile, prepared for daily scoring
+            </h2>
+            <p className="mt-5 max-w-2xl text-sm leading-8 text-[#35514d] md:text-[15px]">
+              The calculation model stays exactly as it is. This surface simply reframes your saved profile as the entry point to today&apos;s timing analysis.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" size="md" onClick={() => setIsEditing(true)}>
-              {hasSavedProfile ? 'Edit saved profile' : 'Set up profile'}
-            </Button>
+
+          <div className="rounded-[2.1rem] bg-[linear-gradient(160deg,rgba(232,248,244,0.88),rgba(255,255,255,0.84)_54%,rgba(247,252,252,0.92))] p-6 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
+            <div className="text-[11px] uppercase tracking-[0.24em] text-[#5b6f6d]">Profile status</div>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Badge tone="cyan">{hasSavedProfile ? 'Saved to account' : 'Profile needed'}</Badge>
+              {savedProfile ? <Badge tone="default">{savedProfile.birthPlaceQuery}</Badge> : null}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Birth date</div>
+                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.dob ?? formValues.dob}</div>
+              </div>
+              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Birth time</div>
+                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.unknownTime ? 'Unknown' : savedProfile?.tob ?? formValues.tob}</div>
+              </div>
+              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Timezone</div>
+                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.timezone ?? formValues.timezone}</div>
+              </div>
+            </div>
+            <div className="mt-6">
+              <Button variant="secondary" size="md" onClick={() => setIsEditing(true)}>
+                {hasSavedProfile ? 'Edit saved profile' : 'Set up profile'}
+              </Button>
+            </div>
           </div>
         </div>
-      </GlowCard>
+      </section>
 
       {error ? (
-        <div className="rounded-[2rem] bg-[#fff1f2] px-6 py-5 text-sm text-[#991b1b] shadow-[inset_0_0_0_1px_rgba(153,27,27,0.12)]">
+        <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(255,241,244,0.92),rgba(255,255,255,0.9))] px-6 py-5 text-sm text-[#8f4655] shadow-[inset_0_0_0_1px_rgba(143,70,85,0.12)]">
           {error}
         </div>
       ) : null}
 
-      {(profileLoading || profileSaving) && (
-        <div className="rounded-[2rem] bg-white/90 px-6 py-8 shadow-[0_18px_40px_rgba(0,106,98,0.08)]">
-          <p className="text-sm text-[#151d22]/72">
+      {(profileLoading || profileSaving) && !scoringResult && !isEditing ? (
+        <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(242,249,248,0.9))] p-6 shadow-[0_18px_42px_rgba(13,93,86,0.05)]">
+          <p className="text-sm text-[#35514d]">
             {profileLoading ? LOADING_SAVED_PROFILE_TEXT : SAVING_PROFILE_TEXT}
           </p>
         </div>
-      )}
+      ) : null}
 
       {(isEditing || !hasSavedProfile) ? (
-        <form onSubmit={handleSaveProfile} className="grid gap-6 rounded-[2rem] bg-white/90 p-6 shadow-[0_18px_40px_rgba(0,106,98,0.08)]">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSaveProfile} className="grid gap-6 rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(241,249,248,0.92))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.08)] md:p-8">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
             <div>
-              <label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">Gender identity</label>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {GENDER_IDENTITY_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-slate-300">
-                    <input
-                      type="radio"
-                      name="genderIdentity"
-                      value={option.value}
-                      checked={formValues.genderIdentity === option.value}
-                      onChange={() => {
-                        const nextCalculationMode = option.autoCalculationMode ?? '';
-                        setFormValues((current) => ({
-                          ...current,
-                          genderIdentity: option.value,
-                          calculationMode: nextCalculationMode,
-                          genderOtherText: option.value === 'other' ? current.genderOtherText : '',
-                        }));
-                      }}
-                      className="mt-1 h-4 w-4 text-[#006a62]"
-                    />
-                    <span className="min-w-0 text-sm">
-                      <span className="font-semibold text-[#151d22]">{option.label}</span>
-                      <span className="block text-xs text-[#151d22]/60">{option.tagline}</span>
-                    </span>
-                  </label>
-                ))}
+              <SectionEyebrow>Profile Editor</SectionEyebrow>
+              <h3 className="mt-3 font-serif text-[2rem] leading-tight text-[#16302d]">Save the profile used for every hourly request</h3>
+              <p className="mt-3 max-w-2xl text-sm leading-8 text-[#35514d]">
+                This keeps auth, saved-profile behavior, and scoring input exactly as before. The redesign only changes how the profile setup is presented.
+              </p>
+            </div>
+            <div className="rounded-[2rem] bg-white/70 p-5 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-[#5b6f6d]">Profile summary</div>
+              <p className="mt-3 text-sm leading-7 text-[#35514d]">
+                This saved birth profile will be reused for all future hourly scoring requests.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge tone="default">{formValues.birthPlaceQuery || 'Birth location pending'}</Badge>
+                <Badge tone="default">{formValues.timezone}</Badge>
+                <Badge tone="default">{formValues.unknownTime ? 'Unknown birth time' : formValues.tob}</Badge>
               </div>
             </div>
+          </div>
 
-            {canEditYinYang ? (
-              <div>
-                <label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">Yin/Yang polarity</label>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {YIN_YANG_OPTIONS.map((option) => (
-                    <label key={option.value} className="flex cursor-pointer items-center gap-3 rounded-[1.6rem] border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-slate-300">
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section className="rounded-[2.2rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(242,249,248,0.82))] p-5 shadow-[0_18px_42px_rgba(13,93,86,0.045)]">
+              <FormField label="Gender identity">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {GENDER_IDENTITY_OPTIONS.map((option) => (
+                    <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-[1.5rem] bg-white/70 px-4 py-3 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)] transition hover:bg-white/86">
                       <input
                         type="radio"
-                        name="calculationMode"
+                        name="genderIdentity"
                         value={option.value}
-                        checked={formValues.calculationMode === option.value}
-                        onChange={() => setFormValues((current) => ({ ...current, calculationMode: option.value }))}
-                        className="mt-1 h-4 w-4 text-[#006a62]"
+                        checked={formValues.genderIdentity === option.value}
+                        onChange={() => {
+                          const nextCalculationMode = option.autoCalculationMode ?? '';
+                          setFormValues((current) => ({
+                            ...current,
+                            genderIdentity: option.value,
+                            calculationMode: nextCalculationMode,
+                            genderOtherText: option.value === 'other' ? current.genderOtherText : '',
+                          }));
+                        }}
+                        className="mt-1 h-4 w-4 text-[#0d5d56]"
                       />
-                      <span className="text-sm text-[#151d22]">{option.label}</span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold text-[#16302d]">{option.label}</span>
+                        <span className="mt-1 block text-xs leading-6 text-[#5b6f6d]">{option.tagline}</span>
+                      </span>
                     </label>
                   ))}
                 </div>
+              </FormField>
+
+              {canEditYinYang ? (
+                <div className="mt-6">
+                  <FormField label="Yin/Yang polarity">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {YIN_YANG_OPTIONS.map((option) => (
+                        <label key={option.value} className="flex cursor-pointer items-center gap-3 rounded-[1.5rem] bg-white/70 px-4 py-3 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)] transition hover:bg-white/86">
+                          <input
+                            type="radio"
+                            name="calculationMode"
+                            value={option.value}
+                            checked={formValues.calculationMode === option.value}
+                            onChange={() => setFormValues((current) => ({ ...current, calculationMode: option.value }))}
+                            className="mt-1 h-4 w-4 text-[#0d5d56]"
+                          />
+                          <span className="text-sm text-[#16302d]">{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </FormField>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="rounded-[2.2rem] bg-[linear-gradient(180deg,rgba(247,250,245,0.82),rgba(255,255,255,0.8))] p-5 shadow-[0_18px_42px_rgba(13,93,86,0.04)]">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="Date of birth">
+                  <input
+                    type="date"
+                    value={formValues.dob}
+                    onChange={(event) => setFormValues((current) => ({ ...current, dob: event.target.value }))}
+                    className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
+                  />
+                </FormField>
+
+                <FormField label="Time of birth" description="Use the recorded local clock time at the birthplace. DST is detected by timezone.">
+                  <input
+                    type="time"
+                    value={formValues.tob}
+                    disabled={formValues.unknownTime}
+                    onChange={(event) => setFormValues((current) => ({ ...current, tob: event.target.value }))}
+                    className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
+                  />
+                </FormField>
               </div>
-            ) : null}
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">
-              Date of birth
-              <input
-                type="date"
-                value={formValues.dob}
-                onChange={(event) => setFormValues((current) => ({ ...current, dob: event.target.value }))}
-                className="mt-2 glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm"
-              />
-            </label>
-
-            <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">
-              Time of birth
-              <input
-                type="time"
-                value={formValues.tob}
-                disabled={formValues.unknownTime}
-                onChange={(event) => setFormValues((current) => ({ ...current, tob: event.target.value }))}
-                className="mt-2 glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm"
-              />
-              <div className="mt-2 text-xs text-[#151d22]/56">
-                Use the recorded local clock time at the birthplace. DST is detected by timezone.
-              </div>
-            </label>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-[1.4rem] bg-slate-50 px-4 py-3 text-sm text-[#151d22]/74">
-            <input
-              type="checkbox"
-              checked={formValues.unknownTime}
-              onChange={(event) => setFormValues((current) => ({ ...current, unknownTime: event.target.checked }))}
-              className="h-4 w-4 text-[#006a62]"
-            />
-            <span>I don&apos;t know my birth time</span>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <BirthPlaceSearch
-              value={formValues.birthPlaceQuery}
-              onChange={(value) => setFormValues((current) => ({ ...current, birthPlaceQuery: value, birthPlace: null }))}
-              onSelect={handleBirthPlaceSelect}
-              selectedPlace={formValues.birthPlace}
-            />
-
-            <div className="grid gap-4">
-              <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">
-                Timezone
+              <label className="mt-4 flex items-center gap-3 rounded-[1.5rem] bg-white/70 px-4 py-3 text-sm text-[#35514d] shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
                 <input
-                  type="text"
-                  value={formValues.timezone}
-                  onChange={(event) => setFormValues((current) => ({ ...current, timezone: event.target.value }))}
-                  className="mt-2 glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm"
-                  placeholder="e.g. Asia/Bangkok"
+                  type="checkbox"
+                  checked={formValues.unknownTime}
+                  onChange={(event) => setFormValues((current) => ({ ...current, unknownTime: event.target.checked }))}
+                  className="h-4 w-4 text-[#0d5d56]"
                 />
+                <span>I don&apos;t know my birth time</span>
               </label>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">
-                  Longitude
-                  <input
-                    type="number"
-                    value={formValues.longitude}
-                    onChange={(event) => setFormValues((current) => ({ ...current, longitude: event.target.value }))}
-                    className="mt-2 glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm"
-                    step="0.01"
-                    min="-180"
-                    max="180"
-                  />
-                </label>
-                <label className="block text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/64">
-                  Latitude
-                  <input
-                    type="number"
-                    value={formValues.latitude}
-                    onChange={(event) => setFormValues((current) => ({ ...current, latitude: event.target.value }))}
-                    className="mt-2 glass-input w-full rounded-[1.4rem] px-4 py-3 text-sm"
-                    step="0.01"
-                    min="-90"
-                    max="90"
-                  />
-                </label>
-              </div>
-            </div>
+            </section>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-            <div>
-              <div className="text-xs uppercase tracking-[0.24em] text-[#151d22]/48">Profile summary</div>
-              <div className="mt-2 text-sm text-[#151d22]/70">This birth profile is saved to your account and used for all future hourly scoring requests.</div>
+          <section className="rounded-[2.3rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(242,249,248,0.82))] p-5 shadow-[0_18px_42px_rgba(13,93,86,0.045)]">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+              <BirthPlaceSearch
+                value={formValues.birthPlaceQuery}
+                onChange={(value) => setFormValues((current) => ({ ...current, birthPlaceQuery: value, birthPlace: null }))}
+                onSelect={handleBirthPlaceSelect}
+                selectedPlace={formValues.birthPlace}
+              />
+
+              <div className="grid gap-4">
+                <FormField label="Timezone">
+                  <input
+                    type="text"
+                    value={formValues.timezone}
+                    onChange={(event) => setFormValues((current) => ({ ...current, timezone: event.target.value }))}
+                    className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
+                    placeholder="e.g. Asia/Bangkok"
+                  />
+                </FormField>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Longitude">
+                    <input
+                      type="number"
+                      value={formValues.longitude}
+                      onChange={(event) => setFormValues((current) => ({ ...current, longitude: event.target.value }))}
+                      className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
+                      step="0.01"
+                      min="-180"
+                      max="180"
+                    />
+                  </FormField>
+
+                  <FormField label="Latitude">
+                    <input
+                      type="number"
+                      value={formValues.latitude}
+                      onChange={(event) => setFormValues((current) => ({ ...current, latitude: event.target.value }))}
+                      className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
+                      step="0.01"
+                      min="-90"
+                      max="90"
+                    />
+                  </FormField>
+                </div>
+              </div>
             </div>
+          </section>
+
+          <div className="flex flex-col gap-3 border-t border-white/50 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-2xl text-sm leading-7 text-[#35514d]">
+              Saving updates refreshes the same hourly scoring endpoint and preserves the existing account-based profile flow.
+            </p>
             <Button type="submit" variant="primary" size="lg" disabled={profileSaving}>
               {profileSaving ? SAVING_PROFILE_TEXT : hasSavedProfile ? 'Update profile' : 'Save profile'}
             </Button>
@@ -472,142 +401,3 @@ export default function HourlyScoringPanel() {
     </div>
   );
 }
-
-export function HourlyScoringResultContent({ scoringResult }: { scoringResult: HourlyScoringResult }) {
-  return (
-    <div className="space-y-8">
-      <GlowCard accent="gold" className="p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Badge tone="gold">Today only</Badge>
-            <h2 className="mt-3 font-serif text-3xl text-[#151d22]">Hourly scoring for {scoringResult.currentDateLabel}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
-              Scores are recomputed fresh from your saved birth profile and today&apos;s timing layers. The hour is the immediate trigger, while Da Yun, Liu Nian, Liu Yue, and Liu Ri stack on top as longer background conditions.
-            </p>
-          </div>
-          <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-            <div><span className="font-semibold text-[#151d22]">Day Master</span> {scoringResult.dmZh} / {scoringResult.dmElement}</div>
-            <div><span className="font-semibold text-[#151d22]">Strength</span> {scoringResult.dmStrength}</div>
-            <div><span className="font-semibold text-[#151d22]">Useful God</span> {scoringResult.usefulGod}</div>
-          </div>
-        </div>
-      </GlowCard>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        {scoringResult.activeDaYun ? (
-          <LayerSummaryCard
-            badge="Active Da Yun"
-            title={formatActiveDaYunHeadline(scoringResult.activeDaYun)}
-            description={`This cycle covers ${scoringResult.activeDaYun.yearStart}-${scoringResult.activeDaYun.yearEnd}. It acts as the long-term climate behind today's faster time layers.`}
-            modifier={scoringResult.activeDaYun.modifier}
-            elements={formatActiveDaYunElements(scoringResult.activeDaYun)}
-            tenGods={`${scoringResult.activeDaYun.stemTenGod.en} / ${scoringResult.activeDaYun.branchTenGod.en}`}
-            categoryModifier={scoringResult.activeDaYun.categoryModifier}
-          />
-        ) : null}
-
-        {scoringResult.liuNian ? (
-          <LayerSummaryCard
-            badge="Liu Nian"
-            title={formatTransitLayerHeadline(scoringResult.liuNian)}
-            description="Liu Nian is the yearly climate. It nudges every slot without replacing the hour trigger."
-            modifier={scoringResult.liuNian.modifier}
-            elements={`${scoringResult.liuNian.elements.stem} stem / ${scoringResult.liuNian.elements.branch} branch`}
-            tenGods={`${scoringResult.liuNian.stemTenGod.en} / ${scoringResult.liuNian.branchTenGod.en}`}
-            categoryModifier={scoringResult.liuNian.categoryModifier}
-          />
-        ) : null}
-
-        {scoringResult.liuYue ? (
-          <LayerSummaryCard
-            badge="Liu Yue"
-            title={formatTransitLayerHeadline(scoringResult.liuYue)}
-            description="Liu Yue is the monthly weather. It adds a shorter timing bias on top of the year and Da Yun."
-            modifier={scoringResult.liuYue.modifier}
-            elements={`${scoringResult.liuYue.elements.stem} stem / ${scoringResult.liuYue.elements.branch} branch`}
-            tenGods={`${scoringResult.liuYue.stemTenGod.en} / ${scoringResult.liuYue.branchTenGod.en}`}
-            categoryModifier={scoringResult.liuYue.categoryModifier}
-          />
-        ) : null}
-
-        {scoringResult.liuRi ? (
-          <LayerSummaryCard
-            badge="Liu Ri"
-            title={formatTransitLayerHeadline(scoringResult.liuRi)}
-            description="Liu Ri is the daily condition. It is the closest shared background layer before the two-hour slot fires."
-            modifier={scoringResult.liuRi.modifier}
-            elements={`${scoringResult.liuRi.elements.stem} stem / ${scoringResult.liuRi.elements.branch} branch`}
-            tenGods={`${scoringResult.liuRi.stemTenGod.en} / ${scoringResult.liuRi.branchTenGod.en}`}
-            categoryModifier={scoringResult.liuRi.categoryModifier}
-          />
-        ) : null}
-      </div>
-
-      <GlowCard accent="cyan" className="p-6">
-        <div className="mb-4 text-sm text-[#151d22]/70">
-          Category columns include the hour&apos;s base Ten God contribution plus the Da Yun, Liu Nian, Liu Yue, and Liu Ri category backgrounds.
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr className="bg-slate-100 text-xs uppercase tracking-[0.22em] text-[#151d22]/60">
-                <th className="py-3 pr-4">Slot</th>
-                <th className="py-3 pr-4">Branch</th>
-                <th className="py-3 pr-4">Hour stem</th>
-                <th className="py-3 pr-4">Ten God</th>
-                <th className="py-3 pr-4">Base</th>
-                <th className="py-3 pr-4">Da Yun</th>
-                <th className="py-3 pr-4">Year</th>
-                <th className="py-3 pr-4">Month</th>
-                <th className="py-3 pr-4">Day</th>
-                <th className="py-3 pr-4">Final</th>
-                <th className="py-3 pr-4">Career</th>
-                <th className="py-3 pr-4">Wealth</th>
-                <th className="py-3 pr-4">Love</th>
-                <th className="py-3 py-3">Health</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scoringResult.slots.map((slot) => (
-                <TableRow key={slot.branchIdx} slot={slot} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </GlowCard>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <GlowCard accent="violet" className="p-6">
-          <h3 className="font-serif text-2xl text-[#151d22]">Strongest positive slot{scoringResult.strongestPositiveSlots.length === 1 ? '' : 's'}</h3>
-          <div className="mt-4 space-y-4">
-            {scoringResult.strongestPositiveSlots.map((slot) => (
-              <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.14)]">
-                <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
-                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                  {formatSlotScoreBreakdown(slot)}
-                </div>
-                <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
-              </div>
-            ))}
-          </div>
-        </GlowCard>
-
-        <GlowCard accent="pink" className="p-6">
-          <h3 className="font-serif text-2xl text-[#151d22]">Strongest negative slot{scoringResult.strongestNegativeSlots.length === 1 ? '' : 's'}</h3>
-          <div className="mt-4 space-y-4">
-            {scoringResult.strongestNegativeSlots.map((slot) => (
-              <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.14)]">
-                <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
-                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                  {formatSlotScoreBreakdown(slot)}
-                </div>
-                <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
-              </div>
-            ))}
-          </div>
-        </GlowCard>
-      </div>
-    </div>
-  );
-}
-
