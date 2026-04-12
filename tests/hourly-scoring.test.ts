@@ -101,12 +101,12 @@ test('today-only scoring returns 12 slots and includes extreme slot selection', 
   assert.ok(result.currentDateLabel.includes('2026-04-11'));
   assert.ok(Array.isArray(result.strongestPositiveSlots));
   assert.ok(Array.isArray(result.strongestNegativeSlots));
-  assert.ok(result.strongestPositiveSlots.every((slot) => slot.totalScore === Math.max(...result.slots.map((s) => s.totalScore))));
-  assert.ok(result.strongestNegativeSlots.every((slot) => slot.totalScore === Math.min(...result.slots.map((s) => s.totalScore))));
+  assert.ok(result.strongestPositiveSlots.every((slot) => slot.finalScore === Math.max(...result.slots.map((s) => s.finalScore))));
+  assert.ok(result.strongestNegativeSlots.every((slot) => slot.finalScore === Math.min(...result.slots.map((s) => s.finalScore))));
 });
 
 test('computed slot category contributions are consistent with Ten God mapping', () => {
-  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), { includeDaYun: false });
 
   for (const slot of result.slots) {
     const isCareer = ['正官', '偏官', '食神', '傷官'].includes(slot.tenGod.zh);
@@ -115,10 +115,109 @@ test('computed slot category contributions are consistent with Ten God mapping',
     const isLove = ['比肩', '劫財', '食神', '傷官', '正官', '偏官'].includes(slot.tenGod.zh);
     const isHealth = ['正印', '偏印'].includes(slot.tenGod.zh);
 
-    assert.equal(slot.categoryScores.career, isCareer ? slot.totalScore : 0);
-    assert.equal(slot.categoryScores.wealth, isRobWealth ? -slot.totalScore : isWealth ? slot.totalScore : 0);
-    assert.equal(slot.categoryScores.love, isLove ? slot.totalScore : 0);
-    assert.equal(slot.categoryScores.health, isHealth ? slot.totalScore : 0);
+    assert.equal(slot.baseCategoryScores.career, isCareer ? slot.baseScore : 0);
+    assert.equal(slot.baseCategoryScores.wealth, isRobWealth ? -slot.baseScore : isWealth ? slot.baseScore : 0);
+    assert.equal(slot.baseCategoryScores.love, isLove ? slot.baseScore : 0);
+    assert.equal(slot.baseCategoryScores.health, isHealth ? slot.baseScore : 0);
+  }
+});
+
+test('active Da Yun is selected for the known profile and reference date', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+
+  assert.ok(result.activeDaYun);
+  assert.equal(result.activeDaYun?.stem.zh, '乙');
+  assert.equal(result.activeDaYun?.branch.zh, '酉');
+  assert.equal(result.activeDaYun?.ageStart, 27);
+  assert.equal(result.activeDaYun?.ageEnd, 36);
+  assert.equal(result.activeDaYun?.yearStart, 2017);
+  assert.equal(result.activeDaYun?.yearEnd, 2026);
+});
+
+test('baseScore remains unchanged when the Da Yun layer is disabled', () => {
+  const withDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+  const withoutDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), { includeDaYun: false });
+
+  assert.deepEqual(
+    withDaYun.slots.map((slot) => slot.baseScore),
+    withoutDaYun.slots.map((slot) => slot.baseScore),
+  );
+  assert.ok(withoutDaYun.slots.every((slot) => slot.daYunModifier === 0 && slot.finalScore === slot.baseScore));
+  assert.equal(withoutDaYun.activeDaYun, null);
+});
+
+test('finalScore changes predictably when Da Yun is active', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+
+  assert.ok(result.activeDaYun);
+  assert.ok(result.slots.every((slot) => slot.finalScore === slot.baseScore + slot.daYunModifier));
+});
+
+test('Da Yun modifier helper produces predictable unfavorable output', () => {
+  const modifier = hourly.getDaYunModifier(
+    0,
+    {
+      cycleIdx: 0,
+      stemIdx: 7,
+      branchIdx: 9,
+      stem: { zh: '辛', pinyin: 'Xin', element: 'metal', yin: true },
+      branch: { zh: '酉', pinyin: 'You', element: 'metal', yin: true, animal: 'Rooster' },
+      ageStart: 30,
+      ageEnd: 39,
+      yearStart: 2020,
+      yearEnd: 2029,
+    },
+    'wood',
+    ['wood', 'water'],
+    ['earth', 'metal'],
+    'wood',
+    'balanced',
+  );
+
+  assert.equal(modifier?.modifier, -2);
+});
+
+test('Da Yun category modifiers respond to Ten God themes', () => {
+  const wealthModifier = hourly.getDaYunCategoryModifier(0, {
+    cycleIdx: 0,
+    stemIdx: 5,
+    branchIdx: 1,
+    stem: { zh: '己', pinyin: 'Ji', element: 'earth', yin: true },
+    branch: { zh: '丑', pinyin: 'Chou', element: 'earth', yin: true, animal: 'Ox' },
+    ageStart: 20,
+    ageEnd: 29,
+    yearStart: 2010,
+    yearEnd: 2019,
+  });
+  const healthModifier = hourly.getDaYunCategoryModifier(0, {
+    cycleIdx: 0,
+    stemIdx: 9,
+    branchIdx: 0,
+    stem: { zh: '癸', pinyin: 'Gui', element: 'water', yin: true },
+    branch: { zh: '子', pinyin: 'Zi', element: 'water', yin: false, animal: 'Rat' },
+    ageStart: 20,
+    ageEnd: 29,
+    yearStart: 2010,
+    yearEnd: 2019,
+  });
+
+  assert.equal(wealthModifier.wealth, 1);
+  assert.equal(healthModifier.health, 1);
+});
+
+test('explanations include Da Yun context only for extreme slots', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+  const extremeBranchIndexes = new Set([
+    ...result.strongestPositiveSlots.map((slot) => slot.branchIdx),
+    ...result.strongestNegativeSlots.map((slot) => slot.branchIdx),
+  ]);
+
+  for (const slot of result.slots) {
+    if (extremeBranchIndexes.has(slot.branchIdx)) {
+      assert.match(slot.explanation ?? '', /Da Yun/);
+    } else {
+      assert.equal(slot.explanation, null);
+    }
   }
 });
 
