@@ -1,0 +1,13 @@
+﻿
+> bazi-next@0.1.0 test
+> tsx --test tests/*.test.ts
+
+npm.cmd : '"node"' is not recognized as an internal or external command,
+At line:1 char:1645
++ ... \.dotnet\tools; & 'C:\Program Files\nodejs\npm.cmd' test 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ('"node"' is not...ternal command, 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+operable program or batch file.

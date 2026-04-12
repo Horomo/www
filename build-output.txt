@@ -1,0 +1,49 @@
+
+> bazi-next@0.1.0 build
+> next build
+
+▲ Next.js 16.2.2 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.5s
+  Running TypeScript ...
+  Finished TypeScript in 4.3s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/25) ...
+  Generating static pages using 7 workers (6/25) 
+  Generating static pages using 7 workers (12/25) 
+  Generating static pages using 7 workers (18/25) 
+✓ Generating static pages using 7 workers (25/25) in 1435ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/hourly-scoring
+├ ƒ /api/log-chart
+├ ƒ /api/places/search
+├ ƒ /api/profile
+├ ƒ /auth/error
+├ ○ /calculator
+├ ƒ /calculator/hourly
+├ ○ /calculator/result
+├ ○ /learn
+├ ● /learn/[slug]
+│ ├ /learn/what-is-ba-zi
+│ ├ /learn/day-master
+│ ├ /learn/ten-gods
+│ └ [+3 more paths]
+├ ○ /manifest.webmanifest
+├ ○ /opengraph-image
+├ ○ /robots.txt
+├ ○ /sitemap.xml
+└ ○ /twitter-image
+
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+
