@@ -16,9 +16,9 @@ const DESKTOP_NAV_ITEMS: NavItem[] = [
     isActive: (pathname) => pathname === '/calculator' || pathname === '/calculator/result',
   },
   {
-    href: '/calculator/hourly',
+    href: '/hourly',
     label: 'Hourly Score',
-    isActive: (pathname) => pathname === '/calculator/hourly',
+    isActive: (pathname) => pathname === '/hourly',
   },
   {
     href: '/',

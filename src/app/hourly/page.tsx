@@ -3,20 +3,20 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 
 import HourlyScoringPanel from '@/components/HourlyScoringPanel';
-import { buildMetadata } from '@/lib/seo';
 import { authOptions } from '@/lib/auth';
+import { buildMetadata } from '@/lib/seo';
 
 export const metadata = buildMetadata({
   title: 'BaZi 2-Hour Scoring',
   description: 'Member-only BaZi 2-hour scoring for today, with saved birth profile support and hourly career, wealth, love, and health scores.',
-  path: '/calculator/hourly',
+  path: '/hourly',
   keywords: ['bazi hourly score', 'two hour score', 'member-only ba zi', 'today scoring', 'hourly fortune'],
 });
 
 export default async function HourlyScoringPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
-    redirect('/api/auth/signin?callbackUrl=/calculator/hourly');
+    redirect('/api/auth/signin?callbackUrl=/hourly');
   }
 
   return (

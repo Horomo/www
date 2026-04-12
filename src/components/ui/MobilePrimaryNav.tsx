@@ -11,9 +11,9 @@ type NavItem = {
 
 const MOBILE_NAV_ITEMS: NavItem[] = [
   {
-    href: '/calculator/hourly',
+    href: '/hourly',
     label: 'Hourly Score',
-    isActive: (pathname) => pathname === '/calculator/hourly',
+    isActive: (pathname) => pathname === '/hourly',
   },
   {
     href: '/calculator',
