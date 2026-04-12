@@ -123,14 +123,6 @@ test('current time layers reuse the existing pillar engine for a known local dat
   assert.equal(result.liuRi?.stem.pinyin, todayBazi.pillars.day.stem.pinyin);
   assert.equal(result.liuRi?.branch.zh, todayBazi.pillars.day.branch.zh);
   assert.equal(result.liuRi?.branch.pinyin, todayBazi.pillars.day.branch.pinyin);
-  return;
-
-  assert.equal(result.currentDateLabel, '2026-04-11');
-  assert.equal(result.liuNian?.stem.element, 'fire');
-  assert.equal(result.liuNian?.branch.animal, 'Horse');
-  assert.equal(result.liuYue?.stem.element, 'water');
-  assert.equal(result.liuYue?.branch.animal, 'Dragon');
-  assert.equal(result.liuRi?.stem.zh + result.liuRi?.branch.zh, '乙卯');
 });
 
 test('computed slot category contributions are consistent with Ten God mapping', () => {
