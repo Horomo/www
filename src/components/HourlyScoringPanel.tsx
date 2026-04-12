@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import BirthPlaceSearch from '@/components/BirthPlaceSearch';
 import {
@@ -69,6 +69,15 @@ function sanitizeCoordinateInput(value: string) {
   return next;
 }
 
+function formatDateInputValue(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 function FormField({
   label,
   children,
@@ -96,14 +105,21 @@ export default function HourlyScoringPanel() {
   const [isEditing, setIsEditing] = useState(false);
   const [scoringResult, setScoringResult] = useState<HourlyScoringResult | null>(null);
   const [isCoordinateOverrideEnabled, setIsCoordinateOverrideEnabled] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
-  async function loadHourlyScoring() {
+  const loadHourlyScoring = useCallback(async (dateOverride?: string) => {
     setProfileLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/hourly-scoring');
+      const requestedDate = dateOverride ?? selectedDate;
+      const params = new URLSearchParams();
+      if (requestedDate) {
+        params.set('date', requestedDate);
+      }
+
+      const response = await fetch(`/api/hourly-scoring${params.size ? `?${params.toString()}` : ''}`);
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.error ?? 'Unable to load hourly scoring.');
@@ -114,11 +130,13 @@ export default function HourlyScoringPanel() {
         setSavedProfile(json.profile);
         setFormValues({ ...json.profile });
         setIsCoordinateOverrideEnabled(!json.profile.birthPlace);
+        setSelectedDate(requestedDate || json.scoring?.currentDateLabel || formatDateInputValue(new Date(), json.profile.timezone));
         setIsEditing(false);
         setScoringResult(json.scoring);
       } else {
         setSavedProfile(null);
         setIsCoordinateOverrideEnabled(true);
+        setSelectedDate(requestedDate || formatDateInputValue(new Date(), formValues.timezone));
         setIsEditing(true);
         setScoringResult(null);
       }
@@ -129,11 +147,11 @@ export default function HourlyScoringPanel() {
     } finally {
       setProfileLoading(false);
     }
-  }
+  }, [formValues.timezone, selectedDate]);
 
   useEffect(() => {
-    loadHourlyScoring();
-  }, []);
+    void loadHourlyScoring();
+  }, [loadHourlyScoring]);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -148,6 +166,7 @@ export default function HourlyScoringPanel() {
   const hasSavedProfile = Boolean(savedProfile);
   const canEditYinYang = formValues.genderIdentity !== 'male' && formValues.genderIdentity !== 'female';
   const coordinatesLockedFromPlace = Boolean(formValues.birthPlace) && !isCoordinateOverrideEnabled;
+  const activeTimezone = savedProfile?.timezone ?? formValues.timezone;
 
   const startEditing = () => {
     if (savedProfile) {
@@ -211,12 +230,24 @@ export default function HourlyScoringPanel() {
       setFormValues({ ...json.profile });
       setIsEditing(false);
       setError(null);
-      await loadHourlyScoring();
+      await loadHourlyScoring(selectedDate || formatDateInputValue(new Date(), json.profile.timezone));
     } catch (saveError: unknown) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save your profile.');
     } finally {
       setProfileSaving(false);
     }
+  };
+
+  const handleSelectedDateChange = async (nextDate: string) => {
+    setSelectedDate(nextDate);
+    if (!nextDate) return;
+    await loadHourlyScoring(nextDate);
+  };
+
+  const handleResetToToday = async () => {
+    const today = formatDateInputValue(new Date(), activeTimezone);
+    setSelectedDate(today);
+    await loadHourlyScoring(today);
   };
 
   return (
@@ -258,6 +289,29 @@ export default function HourlyScoringPanel() {
                 {hasSavedProfile ? 'Edit saved profile' : 'Set up profile'}
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[2.1rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(242,249,248,0.84))] p-5 shadow-[0_18px_42px_rgba(13,93,86,0.05)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <SectionEyebrow>Viewing Date</SectionEyebrow>
+            <h3 className="mt-3 font-serif text-[1.75rem] leading-tight text-[#16302d]">Choose the day you want to read</h3>
+            <p className="mt-2 text-sm leading-7 text-[#35514d]">
+              Hourly scoring still uses the same birth profile and timing logic, but now you can inspect a specific day instead of only the current date.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => void handleSelectedDateChange(event.target.value)}
+              className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm sm:w-auto"
+            />
+            <Button type="button" variant="secondary" size="md" onClick={() => void handleResetToToday()}>
+              Today
+            </Button>
           </div>
         </div>
       </section>

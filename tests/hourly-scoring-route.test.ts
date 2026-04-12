@@ -65,3 +65,22 @@ test('hourly scoring API computes fresh scoring from the saved profile', async (
   assert.equal(body.scoring?.slots.length, 12);
   assert.ok(body.scoring?.strongestPositiveSlots.every((slot: { finalScore: number }) => slot.finalScore === Math.max(...body.scoring.slots.map((s: { finalScore: number }) => s.finalScore))));
 });
+
+test('hourly scoring API uses a requested local date when provided', async () => {
+  const request = new Request('http://localhost/api/hourly-scoring?date=2026-04-14');
+  let receivedReferenceDate: Date | undefined;
+
+  const response = await handleHourlyScoringGet(request as unknown as NextRequest, {
+    getSession: async () => ({ user: { email: 'member@example.com' } }),
+    fetchProfile: async () => baseProfile,
+    computeScoring: (profile, referenceDate) => {
+      receivedReferenceDate = referenceDate;
+      return computeHourlyScoring(profile, referenceDate ?? new Date('2026-04-12T00:00:00Z'));
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.ok(receivedReferenceDate instanceof Date);
+  const body = await response.json();
+  assert.equal(body.scoring?.currentDateLabel, '2026-04-14');
+});
