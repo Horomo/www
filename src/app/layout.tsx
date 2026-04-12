@@ -4,6 +4,7 @@ import Script from 'next/script';
 import Link from 'next/link';
 
 import StructuredData from '@/components/StructuredData';
+import MobilePrimaryNav from '@/components/ui/MobilePrimaryNav';
 import Badge from '@/components/ui/Badge';
 import { buttonClassName } from '@/components/ui/Button';
 import {
@@ -152,20 +153,7 @@ export default function RootLayout({
                   </Link>
                 </div>
               </div>
-              <nav aria-label="Primary mobile" className="mt-3 flex items-center gap-2 overflow-x-auto rounded-[1.6rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(244,251,250,0.84))] px-3 py-3 text-sm text-[#151d22]/78 shadow-[0_18px_40px_rgba(0,106,98,0.06)] backdrop-blur-[18px] md:hidden">
-                <Link href="/calculator/hourly" className="shrink-0 rounded-full bg-[#0d5d56] px-4 py-2.5 font-medium text-white shadow-[0_12px_28px_rgba(13,93,86,0.22)]">
-                  Hourly Score
-                </Link>
-                <Link href="/calculator" className="shrink-0 rounded-full bg-white/72 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
-                  Calculator
-                </Link>
-                <Link href="/" className="shrink-0 rounded-full bg-white/56 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
-                  Home
-                </Link>
-                <Link href="/learn" className="shrink-0 rounded-full bg-white/56 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
-                  Learn
-                </Link>
-              </nav>
+              <MobilePrimaryNav />
             </div>
           </header>
           <div className="flex-1">{children}</div>
