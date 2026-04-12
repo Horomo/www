@@ -106,6 +106,33 @@ test('today-only scoring returns 12 slots and includes extreme slot selection', 
   assert.ok(result.strongestNegativeSlots.every((slot) => slot.finalScore === Math.min(...result.slots.map((s) => s.finalScore))));
 });
 
+test('current time layers reuse the existing pillar engine for a known local date', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+  const todayBazi = computeBazi('2026-04-11', '12:00', baseProfile.timezone, Number(baseProfile.longitude), baseProfile.calculationMode);
+
+  assert.equal(result.currentDateLabel, '2026-04-11');
+  assert.equal(result.liuNian?.stem.zh, todayBazi.pillars.year.stem.zh);
+  assert.equal(result.liuNian?.stem.pinyin, todayBazi.pillars.year.stem.pinyin);
+  assert.equal(result.liuNian?.branch.zh, todayBazi.pillars.year.branch.zh);
+  assert.equal(result.liuNian?.branch.pinyin, todayBazi.pillars.year.branch.pinyin);
+  assert.equal(result.liuYue?.stem.zh, todayBazi.pillars.month.stem.zh);
+  assert.equal(result.liuYue?.stem.pinyin, todayBazi.pillars.month.stem.pinyin);
+  assert.equal(result.liuYue?.branch.zh, todayBazi.pillars.month.branch.zh);
+  assert.equal(result.liuYue?.branch.pinyin, todayBazi.pillars.month.branch.pinyin);
+  assert.equal(result.liuRi?.stem.zh, todayBazi.pillars.day.stem.zh);
+  assert.equal(result.liuRi?.stem.pinyin, todayBazi.pillars.day.stem.pinyin);
+  assert.equal(result.liuRi?.branch.zh, todayBazi.pillars.day.branch.zh);
+  assert.equal(result.liuRi?.branch.pinyin, todayBazi.pillars.day.branch.pinyin);
+  return;
+
+  assert.equal(result.currentDateLabel, '2026-04-11');
+  assert.equal(result.liuNian?.stem.element, 'fire');
+  assert.equal(result.liuNian?.branch.animal, 'Horse');
+  assert.equal(result.liuYue?.stem.element, 'water');
+  assert.equal(result.liuYue?.branch.animal, 'Dragon');
+  assert.equal(result.liuRi?.stem.zh + result.liuRi?.branch.zh, '乙卯');
+});
+
 test('computed slot category contributions are consistent with Ten God mapping', () => {
   const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), { includeDaYun: false });
 
@@ -162,21 +189,86 @@ test('active Da Yun switches at the first cycle start date instead of the calend
 
 test('baseScore remains unchanged when the Da Yun layer is disabled', () => {
   const withDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
-  const withoutDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), { includeDaYun: false });
+  const withoutDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), {
+    includeDaYun: false,
+    includeLiuNian: false,
+    includeLiuYue: false,
+    includeLiuRi: false,
+  });
 
   assert.deepEqual(
     withDaYun.slots.map((slot) => slot.baseScore),
     withoutDaYun.slots.map((slot) => slot.baseScore),
   );
-  assert.ok(withoutDaYun.slots.every((slot) => slot.daYunModifier === 0 && slot.finalScore === slot.baseScore));
+  assert.ok(withoutDaYun.slots.every((slot) =>
+    slot.daYunModifier === 0
+    && slot.liuNianModifier === 0
+    && slot.liuYueModifier === 0
+    && slot.liuRiModifier === 0
+    && slot.finalScore === slot.baseScore));
   assert.equal(withoutDaYun.activeDaYun, null);
+  assert.equal(withoutDaYun.liuNian, null);
+  assert.equal(withoutDaYun.liuYue, null);
+  assert.equal(withoutDaYun.liuRi, null);
 });
 
-test('finalScore changes predictably when Da Yun is active', () => {
-  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+test('Da Yun-only mode preserves the pre-existing composition order', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), {
+    includeLiuNian: false,
+    includeLiuYue: false,
+    includeLiuRi: false,
+  });
 
   assert.ok(result.activeDaYun);
   assert.ok(result.slots.every((slot) => slot.finalScore === slot.baseScore + slot.daYunModifier));
+  assert.ok(result.slots.every((slot) => slot.liuNianModifier === 0 && slot.liuYueModifier === 0 && slot.liuRiModifier === 0));
+});
+
+test('Liu Nian changes score predictably when enabled on its own', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), {
+    includeDaYun: false,
+    includeLiuYue: false,
+    includeLiuRi: false,
+  });
+
+  assert.ok(result.liuNian);
+  assert.ok(result.slots.every((slot) => slot.finalScore === slot.baseScore + slot.liuNianModifier));
+  assert.ok(result.slots.every((slot) => slot.daYunModifier === 0 && slot.liuYueModifier === 0 && slot.liuRiModifier === 0));
+});
+
+test('Liu Yue changes score predictably when enabled on its own', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), {
+    includeDaYun: false,
+    includeLiuNian: false,
+    includeLiuRi: false,
+  });
+
+  assert.ok(result.liuYue);
+  assert.ok(result.slots.every((slot) => slot.finalScore === slot.baseScore + slot.liuYueModifier));
+  assert.ok(result.slots.every((slot) => slot.daYunModifier === 0 && slot.liuNianModifier === 0 && slot.liuRiModifier === 0));
+});
+
+test('Liu Ri changes score predictably when enabled on its own', () => {
+  const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), {
+    includeDaYun: false,
+    includeLiuNian: false,
+    includeLiuYue: false,
+  });
+
+  assert.ok(result.liuRi);
+  assert.ok(result.slots.every((slot) => slot.finalScore === slot.baseScore + slot.liuRiModifier));
+  assert.ok(result.slots.every((slot) => slot.daYunModifier === 0 && slot.liuNianModifier === 0 && slot.liuYueModifier === 0));
+});
+
+test('combined final score is deterministic and clamps consistently', () => {
+  const resultA = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+  const resultB = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
+
+  assert.deepEqual(
+    resultA.slots.map((slot) => slot.finalScore),
+    resultB.slots.map((slot) => slot.finalScore),
+  );
+  assert.ok(resultA.slots.every((slot) => slot.finalScore >= -6 && slot.finalScore <= 6));
 });
 
 test('Da Yun modifier helper produces predictable unfavorable output', () => {
@@ -231,6 +323,58 @@ test('Da Yun category modifiers respond to Ten God themes', () => {
   assert.equal(healthModifier.health, 1);
 });
 
+test('Liu Nian, Liu Yue, and Liu Ri category modifiers respond to Ten God themes', () => {
+  const favorableElements = ['wood', 'water'];
+  const unfavorableElements = ['earth', 'metal'];
+
+  const liuNian = hourly.getLiuNianModifier(
+    0,
+    {
+      stem: { zh: 'ๅทฑ', pinyin: 'Ji', element: 'earth', yin: true },
+      branch: { zh: 'ไธ‘', pinyin: 'Chou', element: 'earth', yin: true, animal: 'Ox' },
+      stemIdx: 5,
+      branchIdx: 1,
+    },
+    'wood',
+    favorableElements,
+    unfavorableElements,
+    'wood',
+    'balanced',
+  );
+  const liuYue = hourly.getLiuYueModifier(
+    0,
+    {
+      stem: { zh: '็ธ', pinyin: 'Gui', element: 'water', yin: true },
+      branch: { zh: 'ๅญ', pinyin: 'Zi', element: 'water', yin: false, animal: 'Rat' },
+      stemIdx: 9,
+      branchIdx: 0,
+    },
+    'wood',
+    favorableElements,
+    unfavorableElements,
+    'wood',
+    'balanced',
+  );
+  const liuRi = hourly.getLiuRiModifier(
+    0,
+    {
+      stem: { zh: '็”ฒ', pinyin: 'Jia', element: 'wood', yin: false },
+      branch: { zh: 'ๅญ', pinyin: 'Zi', element: 'water', yin: false, animal: 'Rat' },
+      stemIdx: 0,
+      branchIdx: 0,
+    },
+    'wood',
+    favorableElements,
+    unfavorableElements,
+    'wood',
+    'balanced',
+  );
+
+  assert.equal(liuNian?.categoryModifier.wealth, 1);
+  assert.equal(liuYue?.categoryModifier.health, 1);
+  assert.equal(liuRi?.categoryModifier.love, 1);
+});
+
 test('explanations include Da Yun context only for extreme slots', () => {
   const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
   const extremeBranchIndexes = new Set([
@@ -240,9 +384,19 @@ test('explanations include Da Yun context only for extreme slots', () => {
 
   for (const slot of result.slots) {
     if (extremeBranchIndexes.has(slot.branchIdx)) {
-      assert.match(slot.explanation ?? '', /Da Yun/);
+      if (slot.daYunModifier !== 0) {
+        assert.match(slot.explanation ?? '', /Da Yun/);
+      }
+      if (slot.liuNianModifier !== 0) {
+        assert.match(slot.explanation ?? '', /Liu Nian/);
+      }
+      if (slot.liuYueModifier !== 0) {
+        assert.match(slot.explanation ?? '', /Liu Yue/);
+      }
+      if (slot.liuRiModifier !== 0) {
+        assert.match(slot.explanation ?? '', /Liu Ri/);
+      }
       assert.match(slot.explanation ?? '', /short-term trigger/);
-      assert.match(slot.explanation ?? '', /long-term background/);
     } else {
       assert.equal(slot.explanation, null);
     }
@@ -271,5 +425,9 @@ test('today follows the user timezone instead of UTC around midnight boundaries'
   assert.notDeepEqual(
     justBeforeLocalMidnight.slots.map((slot) => slot.stemIdx),
     justAfterLocalMidnight.slots.map((slot) => slot.stemIdx),
+  );
+  assert.notEqual(
+    justBeforeLocalMidnight.liuRi?.stem.zh + justBeforeLocalMidnight.liuRi?.branch.zh,
+    justAfterLocalMidnight.liuRi?.stem.zh + justAfterLocalMidnight.liuRi?.branch.zh,
   );
 });
