@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import GlowCard from '@/components/ui/GlowCard';
 import { finalizeAnalysisFormPayload, type AnalysisFormDraft, type AnalysisFormPayload } from '@/lib/analysis-payload';
-import { type HourlyScoringResult, type HourSlotScore } from '@/lib/hourly-scoring';
+import { type HourlyScoreCategories, type HourlyScoringResult, type HourSlotScore, type TransitLayerSummary } from '@/lib/hourly-scoring';
 import { type CalculationGenderMode, type GenderIdentity } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
 
@@ -67,7 +67,59 @@ export function formatSlotHeading(slot: HourSlotScore) {
 }
 
 export function formatSlotScoreBreakdown(slot: HourSlotScore) {
-  return `Base ${slot.baseScore >= 0 ? '+' : ''}${slot.baseScore}${SCORE_BREAKDOWN_SEPARATOR}Da Yun ${slot.daYunModifier >= 0 ? '+' : ''}${slot.daYunModifier}${SCORE_BREAKDOWN_SEPARATOR}Final ${slot.finalScore >= 0 ? '+' : ''}${slot.finalScore}`;
+  return `Base ${slot.baseScore >= 0 ? '+' : ''}${slot.baseScore}${SCORE_BREAKDOWN_SEPARATOR}Da Yun ${slot.daYunModifier >= 0 ? '+' : ''}${slot.daYunModifier}${SCORE_BREAKDOWN_SEPARATOR}Year ${slot.liuNianModifier >= 0 ? '+' : ''}${slot.liuNianModifier}${SCORE_BREAKDOWN_SEPARATOR}Month ${slot.liuYueModifier >= 0 ? '+' : ''}${slot.liuYueModifier}${SCORE_BREAKDOWN_SEPARATOR}Day ${slot.liuRiModifier >= 0 ? '+' : ''}${slot.liuRiModifier}${SCORE_BREAKDOWN_SEPARATOR}Final ${slot.finalScore >= 0 ? '+' : ''}${slot.finalScore}`;
+}
+
+function formatLayerName(layer: TransitLayerSummary) {
+  switch (layer.kind) {
+    case 'liuNian':
+      return 'Liu Nian';
+    case 'liuYue':
+      return 'Liu Yue';
+    case 'liuRi':
+      return 'Liu Ri';
+  }
+}
+
+function formatTransitLayerHeadline(layer: TransitLayerSummary) {
+  return `${layer.stem.zh}${layer.branch.zh} ${formatLayerName(layer)}`;
+}
+
+function LayerSummaryCard({
+  badge,
+  title,
+  description,
+  modifier,
+  elements,
+  tenGods,
+  categoryModifier,
+}: {
+  badge: string;
+  title: string;
+  description: string;
+  modifier: number;
+  elements: string;
+  tenGods: string;
+  categoryModifier: HourlyScoreCategories;
+}) {
+  return (
+    <GlowCard accent="violet" className="p-5">
+      <Badge tone="violet">{badge}</Badge>
+      <h3 className="mt-3 font-serif text-2xl text-[#151d22]">{title}</h3>
+      <p className="mt-2 text-sm leading-7 text-[#151d22]/66">{description}</p>
+      <div className="mt-4 grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
+        <div><span className="font-semibold text-[#151d22]">Elements</span> {elements}</div>
+        <div><span className="font-semibold text-[#151d22]">Ten Gods</span> {tenGods}</div>
+        <div><span className="font-semibold text-[#151d22]">Score modifier</span> {modifier >= 0 ? '+' : ''}{modifier}</div>
+        <div>
+          <span className="font-semibold text-[#151d22]">Category background</span> career {categoryModifier.career >= 0 ? '+' : ''}{categoryModifier.career},
+          wealth {categoryModifier.wealth >= 0 ? '+' : ''}{categoryModifier.wealth},
+          love {categoryModifier.love >= 0 ? '+' : ''}{categoryModifier.love},
+          health {categoryModifier.health >= 0 ? '+' : ''}{categoryModifier.health}
+        </div>
+      </div>
+    </GlowCard>
+  );
 }
 
 function ScoreChip({ score }: { score: number }) {
@@ -92,6 +144,9 @@ function TableRow({ slot }: { slot: HourSlotScore }) {
       <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.tenGod.zh}</td>
       <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.baseScore} /></td>
       <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.daYunModifier} /></td>
+      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuNianModifier} /></td>
+      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuYueModifier} /></td>
+      <td className="py-4 pr-4 text-sm text-[#151d22]/84"><BreakdownValue value={slot.liuRiModifier} /></td>
       <td className="py-4 pr-4 text-sm text-[#151d22]/84"><ScoreChip score={slot.finalScore} /></td>
       <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.categoryScores.career}</td>
       <td className="py-4 pr-4 text-sm text-[#151d22]/84">{slot.categoryScores.wealth}</td>
@@ -412,123 +467,146 @@ export default function HourlyScoringPanel() {
           </div>
         </form>
       ) : scoringResult ? (
-        <div className="space-y-8">
-          <GlowCard accent="gold" className="p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <Badge tone="gold">Today only</Badge>
-                <h2 className="mt-3 font-serif text-3xl text-[#151d22]">Hourly scoring for {scoringResult.currentDateLabel}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
-                  Scores are recomputed fresh from your saved birth profile and today&apos;s day stem. The hour is the short-term trigger, while the active Da Yun acts as the longer-term background layer.
-                </p>
-              </div>
-              <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-                <div><span className="font-semibold text-[#151d22]">Day Master</span> {scoringResult.dmZh} / {scoringResult.dmElement}</div>
-                <div><span className="font-semibold text-[#151d22]">Strength</span> {scoringResult.dmStrength}</div>
-                <div><span className="font-semibold text-[#151d22]">Useful God</span> {scoringResult.usefulGod}</div>
-              </div>
-            </div>
-          </GlowCard>
+        <HourlyScoringResultContent scoringResult={scoringResult} />
+      ) : null}
+    </div>
+  );
+}
 
-          {scoringResult.activeDaYun ? (
-            <GlowCard accent="violet" className="p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <Badge tone="violet">Active Da Yun</Badge>
-                  <h3 className="mt-3 font-serif text-2xl text-[#151d22]">
-                    {formatActiveDaYunHeadline(scoringResult.activeDaYun)}
-                  </h3>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
-                    This cycle covers {scoringResult.activeDaYun.yearStart}-{scoringResult.activeDaYun.yearEnd}. It does not replace the hourly score; it reweights each slot as the long-term climate around today&apos;s hour trigger.
-                  </p>
-                </div>
-                <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-                  <div><span className="font-semibold text-[#151d22]">Elements</span> {formatActiveDaYunElements(scoringResult.activeDaYun)}</div>
-                  <div><span className="font-semibold text-[#151d22]">Ten Gods</span> {scoringResult.activeDaYun.stemTenGod.en} / {scoringResult.activeDaYun.branchTenGod.en}</div>
-                  <div><span className="font-semibold text-[#151d22]">Score modifier</span> {scoringResult.activeDaYun.modifier >= 0 ? '+' : ''}{scoringResult.activeDaYun.modifier}</div>
-                </div>
-              </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {scoringResult.activeDaYun.elementInfluences.map((influence) => (
-                  <div key={`${influence.source}-${influence.element}`} className="rounded-[1.3rem] bg-white/85 p-4 text-sm text-[#151d22]/78 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.12)]">
-                    <div className="font-semibold text-[#151d22] capitalize">{influence.source} element: {influence.element}</div>
-                    <div className="mt-1">Relation: {influence.relation}</div>
-                    <div className="mt-1">Modifier: {influence.modifier >= 0 ? '+' : ''}{influence.modifier}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 text-sm text-[#151d22]/70">
-                Category background: career {scoringResult.activeDaYun.categoryModifier.career >= 0 ? '+' : ''}{scoringResult.activeDaYun.categoryModifier.career},
-                wealth {scoringResult.activeDaYun.categoryModifier.wealth >= 0 ? '+' : ''}{scoringResult.activeDaYun.categoryModifier.wealth},
-                love {scoringResult.activeDaYun.categoryModifier.love >= 0 ? '+' : ''}{scoringResult.activeDaYun.categoryModifier.love},
-                health {scoringResult.activeDaYun.categoryModifier.health >= 0 ? '+' : ''}{scoringResult.activeDaYun.categoryModifier.health}.
-              </div>
-            </GlowCard>
-          ) : null}
-
-          <GlowCard accent="cyan" className="p-6">
-            <div className="mb-4 text-sm text-[#151d22]/70">
-              Category columns include the hour&apos;s base Ten God contribution plus the active Da Yun category background.
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
-                <thead>
-                  <tr className="bg-slate-100 text-xs uppercase tracking-[0.22em] text-[#151d22]/60">
-                    <th className="py-3 pr-4">Slot</th>
-                    <th className="py-3 pr-4">Branch</th>
-                    <th className="py-3 pr-4">Hour stem</th>
-                    <th className="py-3 pr-4">Ten God</th>
-                    <th className="py-3 pr-4">Base</th>
-                    <th className="py-3 pr-4">Da Yun</th>
-                    <th className="py-3 pr-4">Final</th>
-                    <th className="py-3 pr-4">Career</th>
-                    <th className="py-3 pr-4">Wealth</th>
-                    <th className="py-3 pr-4">Love</th>
-                    <th className="py-3 py-3">Health</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scoringResult.slots.map((slot) => (
-                    <TableRow key={slot.branchIdx} slot={slot} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </GlowCard>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <GlowCard accent="violet" className="p-6">
-              <h3 className="font-serif text-2xl text-[#151d22]">Strongest positive slot{scoringResult.strongestPositiveSlots.length === 1 ? '' : 's'}</h3>
-              <div className="mt-4 space-y-4">
-                {scoringResult.strongestPositiveSlots.map((slot) => (
-                  <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.14)]">
-                    <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
-                    <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                      {formatSlotScoreBreakdown(slot)}
-                    </div>
-                    <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
-                  </div>
-                ))}
-              </div>
-            </GlowCard>
-
-            <GlowCard accent="pink" className="p-6">
-              <h3 className="font-serif text-2xl text-[#151d22]">Strongest negative slot{scoringResult.strongestNegativeSlots.length === 1 ? '' : 's'}</h3>
-              <div className="mt-4 space-y-4">
-                {scoringResult.strongestNegativeSlots.map((slot) => (
-                  <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.14)]">
-                    <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
-                    <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                      {formatSlotScoreBreakdown(slot)}
-                    </div>
-                    <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
-                  </div>
-                ))}
-              </div>
-            </GlowCard>
+export function HourlyScoringResultContent({ scoringResult }: { scoringResult: HourlyScoringResult }) {
+  return (
+    <div className="space-y-8">
+      <GlowCard accent="gold" className="p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <Badge tone="gold">Today only</Badge>
+            <h2 className="mt-3 font-serif text-3xl text-[#151d22]">Hourly scoring for {scoringResult.currentDateLabel}</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
+              Scores are recomputed fresh from your saved birth profile and today&apos;s timing layers. The hour is the immediate trigger, while Da Yun, Liu Nian, Liu Yue, and Liu Ri stack on top as longer background conditions.
+            </p>
+          </div>
+          <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
+            <div><span className="font-semibold text-[#151d22]">Day Master</span> {scoringResult.dmZh} / {scoringResult.dmElement}</div>
+            <div><span className="font-semibold text-[#151d22]">Strength</span> {scoringResult.dmStrength}</div>
+            <div><span className="font-semibold text-[#151d22]">Useful God</span> {scoringResult.usefulGod}</div>
           </div>
         </div>
-      ) : null}
+      </GlowCard>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        {scoringResult.activeDaYun ? (
+          <LayerSummaryCard
+            badge="Active Da Yun"
+            title={formatActiveDaYunHeadline(scoringResult.activeDaYun)}
+            description={`This cycle covers ${scoringResult.activeDaYun.yearStart}-${scoringResult.activeDaYun.yearEnd}. It acts as the long-term climate behind today's faster time layers.`}
+            modifier={scoringResult.activeDaYun.modifier}
+            elements={formatActiveDaYunElements(scoringResult.activeDaYun)}
+            tenGods={`${scoringResult.activeDaYun.stemTenGod.en} / ${scoringResult.activeDaYun.branchTenGod.en}`}
+            categoryModifier={scoringResult.activeDaYun.categoryModifier}
+          />
+        ) : null}
+
+        {scoringResult.liuNian ? (
+          <LayerSummaryCard
+            badge="Liu Nian"
+            title={formatTransitLayerHeadline(scoringResult.liuNian)}
+            description="Liu Nian is the yearly climate. It nudges every slot without replacing the hour trigger."
+            modifier={scoringResult.liuNian.modifier}
+            elements={`${scoringResult.liuNian.elements.stem} stem / ${scoringResult.liuNian.elements.branch} branch`}
+            tenGods={`${scoringResult.liuNian.stemTenGod.en} / ${scoringResult.liuNian.branchTenGod.en}`}
+            categoryModifier={scoringResult.liuNian.categoryModifier}
+          />
+        ) : null}
+
+        {scoringResult.liuYue ? (
+          <LayerSummaryCard
+            badge="Liu Yue"
+            title={formatTransitLayerHeadline(scoringResult.liuYue)}
+            description="Liu Yue is the monthly weather. It adds a shorter timing bias on top of the year and Da Yun."
+            modifier={scoringResult.liuYue.modifier}
+            elements={`${scoringResult.liuYue.elements.stem} stem / ${scoringResult.liuYue.elements.branch} branch`}
+            tenGods={`${scoringResult.liuYue.stemTenGod.en} / ${scoringResult.liuYue.branchTenGod.en}`}
+            categoryModifier={scoringResult.liuYue.categoryModifier}
+          />
+        ) : null}
+
+        {scoringResult.liuRi ? (
+          <LayerSummaryCard
+            badge="Liu Ri"
+            title={formatTransitLayerHeadline(scoringResult.liuRi)}
+            description="Liu Ri is the daily condition. It is the closest shared background layer before the two-hour slot fires."
+            modifier={scoringResult.liuRi.modifier}
+            elements={`${scoringResult.liuRi.elements.stem} stem / ${scoringResult.liuRi.elements.branch} branch`}
+            tenGods={`${scoringResult.liuRi.stemTenGod.en} / ${scoringResult.liuRi.branchTenGod.en}`}
+            categoryModifier={scoringResult.liuRi.categoryModifier}
+          />
+        ) : null}
+      </div>
+
+      <GlowCard accent="cyan" className="p-6">
+        <div className="mb-4 text-sm text-[#151d22]/70">
+          Category columns include the hour&apos;s base Ten God contribution plus the Da Yun, Liu Nian, Liu Yue, and Liu Ri category backgrounds.
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-xs uppercase tracking-[0.22em] text-[#151d22]/60">
+                <th className="py-3 pr-4">Slot</th>
+                <th className="py-3 pr-4">Branch</th>
+                <th className="py-3 pr-4">Hour stem</th>
+                <th className="py-3 pr-4">Ten God</th>
+                <th className="py-3 pr-4">Base</th>
+                <th className="py-3 pr-4">Da Yun</th>
+                <th className="py-3 pr-4">Year</th>
+                <th className="py-3 pr-4">Month</th>
+                <th className="py-3 pr-4">Day</th>
+                <th className="py-3 pr-4">Final</th>
+                <th className="py-3 pr-4">Career</th>
+                <th className="py-3 pr-4">Wealth</th>
+                <th className="py-3 pr-4">Love</th>
+                <th className="py-3 py-3">Health</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scoringResult.slots.map((slot) => (
+                <TableRow key={slot.branchIdx} slot={slot} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlowCard>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <GlowCard accent="violet" className="p-6">
+          <h3 className="font-serif text-2xl text-[#151d22]">Strongest positive slot{scoringResult.strongestPositiveSlots.length === 1 ? '' : 's'}</h3>
+          <div className="mt-4 space-y-4">
+            {scoringResult.strongestPositiveSlots.map((slot) => (
+              <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.14)]">
+                <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
+                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
+                  {formatSlotScoreBreakdown(slot)}
+                </div>
+                <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
+              </div>
+            ))}
+          </div>
+        </GlowCard>
+
+        <GlowCard accent="pink" className="p-6">
+          <h3 className="font-serif text-2xl text-[#151d22]">Strongest negative slot{scoringResult.strongestNegativeSlots.length === 1 ? '' : 's'}</h3>
+          <div className="mt-4 space-y-4">
+            {scoringResult.strongestNegativeSlots.map((slot) => (
+              <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.14)]">
+                <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
+                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
+                  {formatSlotScoreBreakdown(slot)}
+                </div>
+                <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
+              </div>
+            ))}
+          </div>
+        </GlowCard>
+      </div>
     </div>
   );
 }

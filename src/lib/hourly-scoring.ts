@@ -15,6 +15,7 @@ import {
   type ChartData,
   type Stem,
   type Branch,
+  type Pillar,
   type TenGod,
 } from '@/lib/bazi';
 import type { AnalysisFormPayload } from '@/lib/analysis-payload';
@@ -37,14 +38,32 @@ export interface HourlyScoreMetadata {
   isStrongClash: boolean;
 }
 
-export interface DaYunElementInfluence {
+export type TimeLayerKind = 'daYun' | 'liuNian' | 'liuYue' | 'liuRi';
+
+export interface TimeLayerElementInfluence {
   source: 'stem' | 'branch';
   element: string;
   relation: 'usefulGod' | 'favorable' | 'neutral' | 'unfavorable' | 'strongClash';
   modifier: number;
 }
 
+export interface TransitLayerSummary {
+  kind: TimeLayerKind;
+  stem: Stem;
+  branch: Branch;
+  stemTenGod: TenGod;
+  branchTenGod: TenGod;
+  elements: {
+    stem: string;
+    branch: string;
+  };
+  elementInfluences: TimeLayerElementInfluence[];
+  modifier: number;
+  categoryModifier: HourlyScoreCategories;
+}
+
 export interface ActiveDaYunSummary {
+  kind: 'daYun';
   cycleIdx: number;
   stem: Stem;
   branch: Branch;
@@ -58,7 +77,7 @@ export interface ActiveDaYunSummary {
     stem: string;
     branch: string;
   };
-  elementInfluences: DaYunElementInfluence[];
+  elementInfluences: TimeLayerElementInfluence[];
   modifier: number;
   categoryModifier: HourlyScoreCategories;
 }
@@ -74,10 +93,16 @@ export interface HourSlotScore {
   tenGod: TenGod;
   baseScore: number;
   daYunModifier: number;
+  liuNianModifier: number;
+  liuYueModifier: number;
+  liuRiModifier: number;
   finalScore: number;
   totalScore: number;
   baseCategoryScores: HourlyScoreCategories;
   daYunCategoryModifier: HourlyScoreCategories;
+  liuNianCategoryModifier: HourlyScoreCategories;
+  liuYueCategoryModifier: HourlyScoreCategories;
+  liuRiCategoryModifier: HourlyScoreCategories;
   categoryScores: HourlyScoreCategories;
   explanation: string | null;
   debug: HourlyScoreMetadata;
@@ -92,6 +117,9 @@ export interface HourlyScoringResult {
   unfavorableElements: string[];
   usefulGod: string;
   activeDaYun: ActiveDaYunSummary | null;
+  liuNian: TransitLayerSummary | null;
+  liuYue: TransitLayerSummary | null;
+  liuRi: TransitLayerSummary | null;
   strongestPositiveSlots: HourSlotScore[];
   strongestNegativeSlots: HourSlotScore[];
   slots: HourSlotScore[];
@@ -99,6 +127,9 @@ export interface HourlyScoringResult {
 
 export interface ComputeHourlyScoringOptions {
   includeDaYun?: boolean;
+  includeLiuNian?: boolean;
+  includeLiuYue?: boolean;
+  includeLiuRi?: boolean;
 }
 
 const BRANCH_START_HOURS = [23, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21];
@@ -158,6 +189,10 @@ function formatLocalDate(date: Date, timezone: string): string {
     day: '2-digit',
     hour12: false,
   }).format(date).replace(',', '');
+}
+
+function formatSignedValue(value: number) {
+  return `${value >= 0 ? '+' : ''}${value}`;
 }
 
 function getLocalDateParts(date: Date, timezone: string) {
@@ -325,7 +360,7 @@ function classifyDaYunInfluence(
   unfavorableElements: string[],
   dmElement: string,
   dmStrength: DayMasterStrength,
-): DaYunElementInfluence['relation'] {
+): TimeLayerElementInfluence['relation'] {
   if (isStrongClash(dmElement, dmStrength, element)) {
     return 'strongClash';
   }
@@ -345,7 +380,7 @@ function classifyDaYunInfluence(
   return 'neutral';
 }
 
-function getDaYunElementModifier(relation: DaYunElementInfluence['relation']) {
+function getDaYunElementModifier(relation: TimeLayerElementInfluence['relation']) {
   switch (relation) {
     case 'usefulGod':
     case 'favorable':
@@ -370,13 +405,16 @@ export function getActiveDaYunPillar(
   return getActiveDaYunPillarForDate(daYun, birthDate, referenceDate, timezone);
 }
 
-export function getDaYunCategoryModifier(dayMasterStemIdx: number, activeDaYun: DaYunPillar | null): HourlyScoreCategories {
-  if (!activeDaYun) {
+function getTransitLayerCategoryModifier(
+  dayMasterStemIdx: number,
+  pillar: Pick<Pillar, 'stemIdx' | 'branchIdx'> | null,
+): HourlyScoreCategories {
+  if (!pillar) {
     return emptyCategoryScores();
   }
 
-  const branchMainStemIdx = getBranchMainStem(activeDaYun.branchIdx);
-  const stemContribution = getCategoryContributions(tenGod(dayMasterStemIdx, activeDaYun.stemIdx).en, 1);
+  const branchMainStemIdx = getBranchMainStem(pillar.branchIdx);
+  const stemContribution = getCategoryContributions(tenGod(dayMasterStemIdx, pillar.stemIdx).en, 1);
   const branchContribution = getCategoryContributions(tenGod(dayMasterStemIdx, branchMainStemIdx).en, 1);
   const combined = sumCategoryScores(stemContribution, branchContribution);
 
@@ -386,6 +424,147 @@ export function getDaYunCategoryModifier(dayMasterStemIdx: number, activeDaYun: 
     love: clamp(combined.love, -1, 1),
     health: clamp(combined.health, -1, 1),
   };
+}
+
+export function getDaYunCategoryModifier(dayMasterStemIdx: number, activeDaYun: DaYunPillar | null): HourlyScoreCategories {
+  return getTransitLayerCategoryModifier(dayMasterStemIdx, activeDaYun);
+}
+
+function buildTransitLayerSummary(
+  kind: TimeLayerKind,
+  dayMasterStemIdx: number,
+  pillar: Pillar | null,
+  usefulGod: string,
+  favorableElements: string[],
+  unfavorableElements: string[],
+  dmElement: string,
+  dmStrength: DayMasterStrength,
+): TransitLayerSummary | null {
+  if (!pillar) {
+    return null;
+  }
+
+  const stemTenGod = tenGod(dayMasterStemIdx, pillar.stemIdx);
+  const branchMainStemIdx = getBranchMainStem(pillar.branchIdx);
+  const branchTenGod = tenGod(dayMasterStemIdx, branchMainStemIdx);
+  const elementInfluences: TimeLayerElementInfluence[] = [
+    {
+      source: 'stem' as const,
+      element: pillar.stem.element,
+      relation: classifyDaYunInfluence(
+        pillar.stem.element,
+        usefulGod,
+        favorableElements,
+        unfavorableElements,
+        dmElement,
+        dmStrength,
+      ),
+      modifier: 0,
+    },
+    {
+      source: 'branch' as const,
+      element: pillar.branch.element,
+      relation: classifyDaYunInfluence(
+        pillar.branch.element,
+        usefulGod,
+        favorableElements,
+        unfavorableElements,
+        dmElement,
+        dmStrength,
+      ),
+      modifier: 0,
+    },
+  ].map((item): TimeLayerElementInfluence => ({
+    ...item,
+    modifier: getDaYunElementModifier(item.relation),
+  }));
+
+  let modifier = 0;
+  if (elementInfluences.some((item) => item.relation === 'strongClash')) {
+    modifier = -2;
+  } else if (elementInfluences.some((item) => item.relation === 'usefulGod' || item.relation === 'favorable')) {
+    modifier = 1;
+  } else if (elementInfluences.some((item) => item.relation === 'unfavorable')) {
+    modifier = -1;
+  }
+
+  return {
+    kind,
+    stem: pillar.stem,
+    branch: pillar.branch,
+    stemTenGod,
+    branchTenGod,
+    elements: {
+      stem: pillar.stem.element,
+      branch: pillar.branch.element,
+    },
+    elementInfluences,
+    modifier,
+    categoryModifier: getTransitLayerCategoryModifier(dayMasterStemIdx, pillar),
+  };
+}
+
+export function getLiuNianModifier(
+  dayMasterStemIdx: number,
+  pillar: Pillar | null,
+  usefulGod: string,
+  favorableElements: string[],
+  unfavorableElements: string[],
+  dmElement: string,
+  dmStrength: DayMasterStrength,
+) {
+  return buildTransitLayerSummary(
+    'liuNian',
+    dayMasterStemIdx,
+    pillar,
+    usefulGod,
+    favorableElements,
+    unfavorableElements,
+    dmElement,
+    dmStrength,
+  );
+}
+
+export function getLiuYueModifier(
+  dayMasterStemIdx: number,
+  pillar: Pillar | null,
+  usefulGod: string,
+  favorableElements: string[],
+  unfavorableElements: string[],
+  dmElement: string,
+  dmStrength: DayMasterStrength,
+) {
+  return buildTransitLayerSummary(
+    'liuYue',
+    dayMasterStemIdx,
+    pillar,
+    usefulGod,
+    favorableElements,
+    unfavorableElements,
+    dmElement,
+    dmStrength,
+  );
+}
+
+export function getLiuRiModifier(
+  dayMasterStemIdx: number,
+  pillar: Pillar | null,
+  usefulGod: string,
+  favorableElements: string[],
+  unfavorableElements: string[],
+  dmElement: string,
+  dmStrength: DayMasterStrength,
+) {
+  return buildTransitLayerSummary(
+    'liuRi',
+    dayMasterStemIdx,
+    pillar,
+    usefulGod,
+    favorableElements,
+    unfavorableElements,
+    dmElement,
+    dmStrength,
+  );
 }
 
 export function getDaYunModifier(
@@ -401,51 +580,28 @@ export function getDaYunModifier(
     return null;
   }
 
-  const stemTenGod = tenGod(dayMasterStemIdx, activeDaYun.stemIdx);
-  const branchMainStemIdx = getBranchMainStem(activeDaYun.branchIdx);
-  const branchTenGod = tenGod(dayMasterStemIdx, branchMainStemIdx);
-  const elementInfluences: DaYunElementInfluence[] = [
+  const transitLayer = buildTransitLayerSummary(
+    'daYun',
+    dayMasterStemIdx,
     {
-      source: 'stem' as const,
-      element: activeDaYun.stem.element,
-      relation: classifyDaYunInfluence(
-        activeDaYun.stem.element,
-        usefulGod,
-        favorableElements,
-        unfavorableElements,
-        dmElement,
-        dmStrength,
-      ),
-      modifier: 0,
+      stem: activeDaYun.stem,
+      branch: activeDaYun.branch,
+      stemIdx: activeDaYun.stemIdx,
+      branchIdx: activeDaYun.branchIdx,
     },
-    {
-      source: 'branch' as const,
-      element: activeDaYun.branch.element,
-      relation: classifyDaYunInfluence(
-        activeDaYun.branch.element,
-        usefulGod,
-        favorableElements,
-        unfavorableElements,
-        dmElement,
-        dmStrength,
-      ),
-      modifier: 0,
-    },
-  ].map((item): DaYunElementInfluence => ({
-    ...item,
-    modifier: getDaYunElementModifier(item.relation),
-  }));
+    usefulGod,
+    favorableElements,
+    unfavorableElements,
+    dmElement,
+    dmStrength,
+  );
 
-  let modifier = 0;
-  if (elementInfluences.some((item) => item.relation === 'strongClash')) {
-    modifier = -2;
-  } else if (elementInfluences.some((item) => item.relation === 'usefulGod' || item.relation === 'favorable')) {
-    modifier = 1;
-  } else if (elementInfluences.some((item) => item.relation === 'unfavorable')) {
-    modifier = -1;
+  if (!transitLayer) {
+    return null;
   }
 
   return {
+    kind: 'daYun',
     cycleIdx: activeDaYun.cycleIdx,
     stem: activeDaYun.stem,
     branch: activeDaYun.branch,
@@ -453,15 +609,12 @@ export function getDaYunModifier(
     ageEnd: activeDaYun.ageEnd,
     yearStart: activeDaYun.yearStart,
     yearEnd: activeDaYun.yearEnd,
-    stemTenGod,
-    branchTenGod,
-    elements: {
-      stem: activeDaYun.stem.element,
-      branch: activeDaYun.branch.element,
-    },
-    elementInfluences,
-    modifier,
-    categoryModifier: getDaYunCategoryModifier(dayMasterStemIdx, activeDaYun),
+    stemTenGod: transitLayer.stemTenGod,
+    branchTenGod: transitLayer.branchTenGod,
+    elements: transitLayer.elements,
+    elementInfluences: transitLayer.elementInfluences,
+    modifier: transitLayer.modifier,
+    categoryModifier: transitLayer.categoryModifier,
   };
 }
 
@@ -502,8 +655,44 @@ function describeDaYun(activeDaYun: ActiveDaYunSummary | null, daYunModifier: nu
   return `Your active Da Yun ${periodLabel} is neutral here, so the long-term background does not change the short-term score.`;
 }
 
-function buildExtremeSlotExplanation(slot: HourSlotScore, usefulGod: string, activeDaYun: ActiveDaYunSummary | null) {
-  return `${describeBaseScore(slot, usefulGod)} ${describeDaYun(activeDaYun, slot.daYunModifier)}`;
+function describeTransitLayer(layer: TransitLayerSummary | null, layerModifier: number) {
+  if (!layer || layerModifier === 0) {
+    return null;
+  }
+
+  const kindLabel = layer.kind === 'liuNian'
+    ? 'Liu Nian'
+    : layer.kind === 'liuYue'
+      ? 'Liu Yue'
+      : 'Liu Ri';
+  const periodLabel = `${layer.stem.zh}${layer.branch.zh}`;
+  if (layerModifier > 0) {
+    return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements support the chart's useful or favorable side.`;
+  }
+
+  return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements press against the natal balance.`;
+}
+
+function buildExtremeSlotExplanation(
+  slot: HourSlotScore,
+  usefulGod: string,
+  activeDaYun: ActiveDaYunSummary | null,
+  liuNian: TransitLayerSummary | null,
+  liuYue: TransitLayerSummary | null,
+  liuRi: TransitLayerSummary | null,
+) {
+  const layerSentences = [
+    slot.daYunModifier !== 0 ? describeDaYun(activeDaYun, slot.daYunModifier) : null,
+    describeTransitLayer(liuNian, slot.liuNianModifier),
+    describeTransitLayer(liuYue, slot.liuYueModifier),
+    describeTransitLayer(liuRi, slot.liuRiModifier),
+  ].filter(Boolean);
+
+  if (layerSentences.length === 0) {
+    return `${describeBaseScore(slot, usefulGod)} The wider Da Yun, year, month, and day layers stay neutral here, so this slot mostly reflects the hour trigger.`;
+  }
+
+  return `${describeBaseScore(slot, usefulGod)} ${layerSentences.join(' ')}`;
 }
 
 export function computeHourlyScoring(
@@ -512,6 +701,9 @@ export function computeHourlyScoring(
   options: ComputeHourlyScoringOptions = {},
 ): HourlyScoringResult {
   const includeDaYun = options.includeDaYun ?? true;
+  const includeLiuNian = options.includeLiuNian ?? true;
+  const includeLiuYue = options.includeLiuYue ?? true;
+  const includeLiuRi = options.includeLiuRi ?? true;
   const longitude = parseFloat(profile.longitude);
   const currentDateParts = getLocalDateParts(referenceDate, profile.timezone);
   const currentDateString = `${currentDateParts.year}-${pad2(currentDateParts.month)}-${pad2(currentDateParts.day)}`;
@@ -533,6 +725,39 @@ export function computeHourlyScoring(
     ? getDaYunModifier(
       natalChart.pillars.day.stemIdx,
       activeDaYunPillar,
+      usefulGod,
+      favoriteData.favorableElements,
+      favoriteData.unfavorableElements,
+      natalDmElement,
+      dmStrength,
+    )
+    : null;
+  const liuNian = includeLiuNian
+    ? getLiuNianModifier(
+      natalChart.pillars.day.stemIdx,
+      todayBazi.pillars.year,
+      usefulGod,
+      favoriteData.favorableElements,
+      favoriteData.unfavorableElements,
+      natalDmElement,
+      dmStrength,
+    )
+    : null;
+  const liuYue = includeLiuYue
+    ? getLiuYueModifier(
+      natalChart.pillars.day.stemIdx,
+      todayBazi.pillars.month,
+      usefulGod,
+      favoriteData.favorableElements,
+      favoriteData.unfavorableElements,
+      natalDmElement,
+      dmStrength,
+    )
+    : null;
+  const liuRi = includeLiuRi
+    ? getLiuRiModifier(
+      natalChart.pillars.day.stemIdx,
+      todayBazi.pillars.day,
       usefulGod,
       favoriteData.favorableElements,
       favoriteData.unfavorableElements,
@@ -562,12 +787,33 @@ export function computeHourlyScoring(
       dmStrength,
     );
     const daYunModifier = activeDaYun?.modifier ?? 0;
-    const finalScore = clamp(baseScore + daYunModifier, -4, 4);
+    const liuNianModifier = liuNian?.modifier ?? 0;
+    const liuYueModifier = liuYue?.modifier ?? 0;
+    const liuRiModifier = liuRi?.modifier ?? 0;
+
+    // The user-facing score intentionally stays on a symmetric six-point scale.
+    // Positive theoretical ceiling is +6 (base +2, plus four supportive layers at +1),
+    // and we mirror that on the negative side to keep comparisons legible.
+    // Composition order is explicit and stable: base hour trigger, then Da Yun,
+    // then Liu Nian, then Liu Yue, then Liu Ri, and finally clamp to [-6, 6].
+    const finalScore = clamp(
+      baseScore + daYunModifier + liuNianModifier + liuYueModifier + liuRiModifier,
+      -6,
+      6,
+    );
 
     const tenGodValue = tenGod(natalChart.pillars.day.stemIdx, slotHourStemIdx);
     const baseCategoryScores = getCategoryContributions(tenGodValue.en, baseScore);
     const daYunCategoryModifier = activeDaYun?.categoryModifier ?? emptyCategoryScores();
-    const categoryScores = sumCategoryScores(baseCategoryScores, daYunCategoryModifier);
+    const liuNianCategoryModifier = liuNian?.categoryModifier ?? emptyCategoryScores();
+    const liuYueCategoryModifier = liuYue?.categoryModifier ?? emptyCategoryScores();
+    const liuRiCategoryModifier = liuRi?.categoryModifier ?? emptyCategoryScores();
+    const categoryScores = [
+      daYunCategoryModifier,
+      liuNianCategoryModifier,
+      liuYueCategoryModifier,
+      liuRiCategoryModifier,
+    ].reduce(sumCategoryScores, baseCategoryScores);
     const localStartLabel = formatLocalDateTime(slotBazi.utcDate, profile.timezone);
     const localEndLabel = formatLocalDateTime(new Date(slotBazi.utcDate.getTime() + 120 * 60000), profile.timezone);
 
@@ -582,10 +828,16 @@ export function computeHourlyScoring(
       tenGod: tenGodValue,
       baseScore,
       daYunModifier,
+      liuNianModifier,
+      liuYueModifier,
+      liuRiModifier,
       finalScore,
       totalScore: finalScore,
       baseCategoryScores,
       daYunCategoryModifier,
+      liuNianCategoryModifier,
+      liuYueCategoryModifier,
+      liuRiCategoryModifier,
       categoryScores,
       explanation: null,
       debug: {
@@ -611,7 +863,7 @@ export function computeHourlyScoring(
   const enrichedSlots = slots.map((slot) => ({
     ...slot,
     explanation: extremeBranchIndexes.has(slot.branchIdx)
-      ? buildExtremeSlotExplanation(slot, usefulGod, activeDaYun)
+      ? buildExtremeSlotExplanation(slot, usefulGod, activeDaYun, liuNian, liuYue, liuRi)
       : null,
   }));
 
@@ -624,6 +876,9 @@ export function computeHourlyScoring(
     unfavorableElements: favoriteData.unfavorableElements,
     usefulGod,
     activeDaYun,
+    liuNian,
+    liuYue,
+    liuRi,
     strongestPositiveSlots: enrichedSlots.filter((slot) => strongestPositiveSlots.some((candidate) => candidate.branchIdx === slot.branchIdx)),
     strongestNegativeSlots: enrichedSlots.filter((slot) => strongestNegativeSlots.some((candidate) => candidate.branchIdx === slot.branchIdx)),
     slots: enrichedSlots,
