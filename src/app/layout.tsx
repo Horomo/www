@@ -125,6 +125,9 @@ export default function RootLayout({
                 <Link href="/calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Calculator
                 </Link>
+                <Link href="/calculator/hourly" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                  Hourly Score
+                </Link>
                 <Link href="/" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
                   Home
                 </Link>
