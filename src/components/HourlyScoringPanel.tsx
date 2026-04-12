@@ -56,6 +56,19 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return <div className="text-[11px] uppercase tracking-[0.28em] text-[#0d5d56]/62">{children}</div>;
 }
 
+function sanitizeCoordinateInput(value: string) {
+  let next = value.replace(/[^0-9.-]/g, '');
+  const minus = next.startsWith('-') ? '-' : '';
+  next = minus + next.slice(minus ? 1 : 0).replace(/-/g, '');
+
+  const dotIndex = next.indexOf('.');
+  if (dotIndex !== -1) {
+    next = `${next.slice(0, dotIndex + 1)}${next.slice(dotIndex + 1).replace(/\./g, '')}`;
+  }
+
+  return next;
+}
+
 function FormField({
   label,
   children,
@@ -82,6 +95,7 @@ export default function HourlyScoringPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [scoringResult, setScoringResult] = useState<HourlyScoringResult | null>(null);
+  const [isCoordinateOverrideEnabled, setIsCoordinateOverrideEnabled] = useState(false);
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
   async function loadHourlyScoring() {
@@ -99,10 +113,12 @@ export default function HourlyScoringPanel() {
       if (json.profile) {
         setSavedProfile(json.profile);
         setFormValues({ ...json.profile });
+        setIsCoordinateOverrideEnabled(!json.profile.birthPlace);
         setIsEditing(false);
         setScoringResult(json.scoring);
       } else {
         setSavedProfile(null);
+        setIsCoordinateOverrideEnabled(true);
         setIsEditing(true);
         setScoringResult(null);
       }
@@ -131,10 +147,12 @@ export default function HourlyScoringPanel() {
 
   const hasSavedProfile = Boolean(savedProfile);
   const canEditYinYang = formValues.genderIdentity !== 'male' && formValues.genderIdentity !== 'female';
+  const coordinatesLockedFromPlace = Boolean(formValues.birthPlace) && !isCoordinateOverrideEnabled;
 
   const startEditing = () => {
     if (savedProfile) {
       setFormValues({ ...savedProfile });
+      setIsCoordinateOverrideEnabled(!savedProfile.birthPlace);
     }
     setError(null);
     setIsEditing(true);
@@ -143,14 +161,17 @@ export default function HourlyScoringPanel() {
   const cancelEditing = () => {
     if (savedProfile) {
       setFormValues({ ...savedProfile });
+      setIsCoordinateOverrideEnabled(!savedProfile.birthPlace);
     } else {
       setFormValues(DEFAULT_FORM_VALUES);
+      setIsCoordinateOverrideEnabled(true);
     }
     setError(null);
     setIsEditing(false);
   };
 
   const handleBirthPlaceSelect = (place: PlaceSearchResult) => {
+    setIsCoordinateOverrideEnabled(false);
     setFormValues((current) => ({
       ...current,
       birthPlace: place,
@@ -370,7 +391,10 @@ export default function HourlyScoringPanel() {
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
               <BirthPlaceSearch
                 value={formValues.birthPlaceQuery}
-                onChange={(value) => setFormValues((current) => ({ ...current, birthPlaceQuery: value, birthPlace: null }))}
+                onChange={(value) => {
+                  setIsCoordinateOverrideEnabled(true);
+                  setFormValues((current) => ({ ...current, birthPlaceQuery: value, birthPlace: null }));
+                }}
                 onSelect={handleBirthPlaceSelect}
                 selectedPlace={formValues.birthPlace}
               />
@@ -389,28 +413,47 @@ export default function HourlyScoringPanel() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField label="Longitude">
                     <input
-                      type="number"
+                      type="text"
                       value={formValues.longitude}
-                      onChange={(event) => setFormValues((current) => ({ ...current, longitude: event.target.value }))}
+                      onChange={(event) => setFormValues((current) => ({ ...current, longitude: sanitizeCoordinateInput(event.target.value) }))}
                       className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
-                      step="0.01"
-                      min="-180"
-                      max="180"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="e.g. 100.5305"
+                      readOnly={coordinatesLockedFromPlace}
                     />
                   </FormField>
 
                   <FormField label="Latitude">
                     <input
-                      type="number"
+                      type="text"
                       value={formValues.latitude}
-                      onChange={(event) => setFormValues((current) => ({ ...current, latitude: event.target.value }))}
+                      onChange={(event) => setFormValues((current) => ({ ...current, latitude: sanitizeCoordinateInput(event.target.value) }))}
                       className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
-                      step="0.01"
-                      min="-90"
-                      max="90"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="e.g. 13.7563"
+                      readOnly={coordinatesLockedFromPlace}
                     />
                   </FormField>
                 </div>
+                {formValues.birthPlace ? (
+                  <div className="rounded-[1.5rem] bg-white/68 px-4 py-4 text-sm text-[#35514d] shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
+                    <p>
+                      Coordinates are locked to the selected place so accidental keyboard input does not corrupt the saved location.
+                    </p>
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="md"
+                        onClick={() => setIsCoordinateOverrideEnabled((current) => !current)}
+                      >
+                        {coordinatesLockedFromPlace ? 'Edit coordinates' : 'Lock to selected place'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>
