@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import BirthPlaceSearch from '@/components/BirthPlaceSearch';
 import {
@@ -82,6 +82,7 @@ export default function HourlyScoringPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [scoringResult, setScoringResult] = useState<HourlyScoringResult | null>(null);
+  const editFormRef = useRef<HTMLFormElement | null>(null);
 
   async function loadHourlyScoring() {
     setProfileLoading(true);
@@ -118,8 +119,36 @@ export default function HourlyScoringPanel() {
     loadHourlyScoring();
   }, []);
 
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isEditing]);
+
   const hasSavedProfile = Boolean(savedProfile);
   const canEditYinYang = formValues.genderIdentity !== 'male' && formValues.genderIdentity !== 'female';
+
+  const startEditing = () => {
+    if (savedProfile) {
+      setFormValues({ ...savedProfile });
+    }
+    setError(null);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (savedProfile) {
+      setFormValues({ ...savedProfile });
+    } else {
+      setFormValues(DEFAULT_FORM_VALUES);
+    }
+    setError(null);
+    setIsEditing(false);
+  };
 
   const handleBirthPlaceSelect = (place: PlaceSearchResult) => {
     setFormValues((current) => ({
@@ -204,7 +233,7 @@ export default function HourlyScoringPanel() {
               </div>
             </div>
             <div className="mt-6">
-              <Button variant="secondary" size="md" onClick={() => setIsEditing(true)}>
+              <Button type="button" variant="secondary" size="md" onClick={startEditing}>
                 {hasSavedProfile ? 'Edit saved profile' : 'Set up profile'}
               </Button>
             </div>
@@ -227,7 +256,7 @@ export default function HourlyScoringPanel() {
       ) : null}
 
       {(isEditing || !hasSavedProfile) ? (
-        <form onSubmit={handleSaveProfile} className="grid gap-6 rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(241,249,248,0.92))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.08)] md:p-8">
+        <form ref={editFormRef} onSubmit={handleSaveProfile} className="grid gap-6 rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(241,249,248,0.92))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.08)] md:p-8">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
             <div>
               <SectionEyebrow>Profile Editor</SectionEyebrow>
@@ -390,9 +419,16 @@ export default function HourlyScoringPanel() {
             <p className="max-w-2xl text-sm leading-7 text-[#35514d]">
               Saving updates refreshes the same hourly scoring endpoint and preserves the existing account-based profile flow.
             </p>
-            <Button type="submit" variant="primary" size="lg" disabled={profileSaving}>
-              {profileSaving ? SAVING_PROFILE_TEXT : hasSavedProfile ? 'Update profile' : 'Save profile'}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              {hasSavedProfile ? (
+                <Button type="button" variant="ghost" size="lg" onClick={cancelEditing} disabled={profileSaving}>
+                  Cancel
+                </Button>
+              ) : null}
+              <Button type="submit" variant="primary" size="lg" disabled={profileSaving}>
+                {profileSaving ? SAVING_PROFILE_TEXT : hasSavedProfile ? 'Update profile' : 'Save profile'}
+              </Button>
+            </div>
           </div>
         </form>
       ) : scoringResult ? (
