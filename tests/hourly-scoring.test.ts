@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { clockTimeToUtc, computeBazi, getDaYunCycleStartDate } from '../src/lib/bazi';
 import * as hourly from '../src/lib/hourly-scoring';
 import type { AnalysisFormPayload } from '../src/lib/analysis-payload';
 
@@ -134,6 +135,31 @@ test('active Da Yun is selected for the known profile and reference date', () =>
   assert.equal(result.activeDaYun?.yearEnd, 2026);
 });
 
+test('active Da Yun switches at the first cycle start date instead of the calendar year boundary', () => {
+  const natalChart = computeBazi(baseProfile.dob, baseProfile.tob, baseProfile.timezone, Number(baseProfile.longitude), baseProfile.calculationMode);
+  assert.ok(natalChart.daYun);
+
+  const firstCycleStart = getDaYunCycleStartDate(natalChart.tstDate, natalChart.daYun, 0);
+  const startInstantUtc = clockTimeToUtc(
+    firstCycleStart.getUTCFullYear(),
+    firstCycleStart.getUTCMonth() + 1,
+    firstCycleStart.getUTCDate(),
+    firstCycleStart.getUTCHours(),
+    firstCycleStart.getUTCMinutes(),
+    baseProfile.timezone,
+  );
+
+  const beforeCycleStart = hourly.computeHourlyScoring(baseProfile, new Date(startInstantUtc.getTime() - 60 * 60 * 1000));
+  const atCycleStart = hourly.computeHourlyScoring(baseProfile, new Date(startInstantUtc.getTime() + 60 * 60 * 1000));
+
+  assert.equal(beforeCycleStart.activeDaYun, null);
+  assert.ok(atCycleStart.activeDaYun);
+  assert.equal(atCycleStart.activeDaYun?.stem.element, 'water');
+  assert.equal(atCycleStart.activeDaYun?.branch.animal, 'Goat');
+  assert.equal(atCycleStart.activeDaYun?.ageStart, 7);
+  assert.equal(beforeCycleStart.currentDateLabel, atCycleStart.currentDateLabel);
+});
+
 test('baseScore remains unchanged when the Da Yun layer is disabled', () => {
   const withDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
   const withoutDaYun = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'), { includeDaYun: false });
@@ -215,6 +241,8 @@ test('explanations include Da Yun context only for extreme slots', () => {
   for (const slot of result.slots) {
     if (extremeBranchIndexes.has(slot.branchIdx)) {
       assert.match(slot.explanation ?? '', /Da Yun/);
+      assert.match(slot.explanation ?? '', /short-term trigger/);
+      assert.match(slot.explanation ?? '', /long-term background/);
     } else {
       assert.equal(slot.explanation, null);
     }
@@ -232,4 +260,16 @@ test('fresh calculation is performed from saved profile and current date referen
   const resultA = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-10T00:00:00Z'));
   const resultB = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
   assert.notEqual(resultA.currentDateLabel, resultB.currentDateLabel);
+});
+
+test('today follows the user timezone instead of UTC around midnight boundaries', () => {
+  const justBeforeLocalMidnight = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T16:30:00Z'), { includeDaYun: false });
+  const justAfterLocalMidnight = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T17:30:00Z'), { includeDaYun: false });
+
+  assert.equal(justBeforeLocalMidnight.currentDateLabel, '2026-04-11');
+  assert.equal(justAfterLocalMidnight.currentDateLabel, '2026-04-12');
+  assert.notDeepEqual(
+    justBeforeLocalMidnight.slots.map((slot) => slot.stemIdx),
+    justAfterLocalMidnight.slots.map((slot) => slot.stemIdx),
+  );
 });

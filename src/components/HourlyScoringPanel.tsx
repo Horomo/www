@@ -48,6 +48,28 @@ const DEFAULT_FORM_VALUES: AnalysisFormDraft = {
   unknownTime: false,
 };
 
+export const LOADING_SAVED_PROFILE_TEXT = 'Loading saved profile...';
+export const SAVING_PROFILE_TEXT = 'Saving your profile...';
+export const ACTIVE_DA_YUN_SEPARATOR = ' / ';
+export const SLOT_SEPARATOR = ' - ';
+export const SCORE_BREAKDOWN_SEPARATOR = ' | ';
+
+export function formatActiveDaYunHeadline(scoringResult: NonNullable<HourlyScoringResult['activeDaYun']>) {
+  return `${scoringResult.stem.zh}${scoringResult.branch.zh} ages ${scoringResult.ageStart}-${scoringResult.ageEnd}`;
+}
+
+export function formatActiveDaYunElements(scoringResult: NonNullable<HourlyScoringResult['activeDaYun']>) {
+  return `${scoringResult.elements.stem} stem${ACTIVE_DA_YUN_SEPARATOR}${scoringResult.elements.branch} branch`;
+}
+
+export function formatSlotHeading(slot: HourSlotScore) {
+  return `${slot.hourLabel}${SLOT_SEPARATOR}${slot.branch.zh}`;
+}
+
+export function formatSlotScoreBreakdown(slot: HourSlotScore) {
+  return `Base ${slot.baseScore >= 0 ? '+' : ''}${slot.baseScore}${SCORE_BREAKDOWN_SEPARATOR}Da Yun ${slot.daYunModifier >= 0 ? '+' : ''}${slot.daYunModifier}${SCORE_BREAKDOWN_SEPARATOR}Final ${slot.finalScore >= 0 ? '+' : ''}${slot.finalScore}`;
+}
+
 function ScoreChip({ score }: { score: number }) {
   const tone = score > 0 ? 'cyan' : score < 0 ? 'danger' : 'default';
   return (
@@ -234,7 +256,7 @@ export default function HourlyScoringPanel() {
       {(profileLoading || profileSaving) && (
         <div className="rounded-[2rem] bg-white/90 px-6 py-8 shadow-[0_18px_40px_rgba(0,106,98,0.08)]">
           <p className="text-sm text-[#151d22]/72">
-            {profileLoading ? 'Loading saved profile…' : 'Saving your profile…'}
+            {profileLoading ? LOADING_SAVED_PROFILE_TEXT : SAVING_PROFILE_TEXT}
           </p>
         </div>
       )}
@@ -385,7 +407,7 @@ export default function HourlyScoringPanel() {
               <div className="mt-2 text-sm text-[#151d22]/70">This birth profile is saved to your account and used for all future hourly scoring requests.</div>
             </div>
             <Button type="submit" variant="primary" size="lg" disabled={profileSaving}>
-              {profileSaving ? 'Saving profile…' : hasSavedProfile ? 'Update profile' : 'Save profile'}
+              {profileSaving ? SAVING_PROFILE_TEXT : hasSavedProfile ? 'Update profile' : 'Save profile'}
             </Button>
           </div>
         </form>
@@ -401,7 +423,7 @@ export default function HourlyScoringPanel() {
                 </p>
               </div>
               <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-                <div><span className="font-semibold text-[#151d22]">Day Master</span> {scoringResult.dmZh} · {scoringResult.dmElement}</div>
+                <div><span className="font-semibold text-[#151d22]">Day Master</span> {scoringResult.dmZh} / {scoringResult.dmElement}</div>
                 <div><span className="font-semibold text-[#151d22]">Strength</span> {scoringResult.dmStrength}</div>
                 <div><span className="font-semibold text-[#151d22]">Useful God</span> {scoringResult.usefulGod}</div>
               </div>
@@ -414,14 +436,14 @@ export default function HourlyScoringPanel() {
                 <div>
                   <Badge tone="violet">Active Da Yun</Badge>
                   <h3 className="mt-3 font-serif text-2xl text-[#151d22]">
-                    {scoringResult.activeDaYun.stem.zh}{scoringResult.activeDaYun.branch.zh} ยท ages {scoringResult.activeDaYun.ageStart}-{scoringResult.activeDaYun.ageEnd}
+                    {formatActiveDaYunHeadline(scoringResult.activeDaYun)}
                   </h3>
                   <p className="mt-2 max-w-2xl text-sm leading-7 text-[#151d22]/66">
                     This cycle covers {scoringResult.activeDaYun.yearStart}-{scoringResult.activeDaYun.yearEnd}. It does not replace the hourly score; it reweights each slot as the long-term climate around today&apos;s hour trigger.
                   </p>
                 </div>
                 <div className="grid gap-2 rounded-[1.4rem] bg-slate-50 p-4 text-sm text-[#151d22]/76">
-                  <div><span className="font-semibold text-[#151d22]">Elements</span> {scoringResult.activeDaYun.elements.stem} stem ยท {scoringResult.activeDaYun.elements.branch} branch</div>
+                  <div><span className="font-semibold text-[#151d22]">Elements</span> {formatActiveDaYunElements(scoringResult.activeDaYun)}</div>
                   <div><span className="font-semibold text-[#151d22]">Ten Gods</span> {scoringResult.activeDaYun.stemTenGod.en} / {scoringResult.activeDaYun.branchTenGod.en}</div>
                   <div><span className="font-semibold text-[#151d22]">Score modifier</span> {scoringResult.activeDaYun.modifier >= 0 ? '+' : ''}{scoringResult.activeDaYun.modifier}</div>
                 </div>
@@ -480,9 +502,9 @@ export default function HourlyScoringPanel() {
               <div className="mt-4 space-y-4">
                 {scoringResult.strongestPositiveSlots.map((slot) => (
                   <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.14)]">
-                    <div className="text-sm font-semibold text-[#151d22]">{slot.hourLabel} · {slot.branch.zh}</div>
+                    <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
                     <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                      Base {slot.baseScore >= 0 ? '+' : ''}{slot.baseScore} ยท Da Yun {slot.daYunModifier >= 0 ? '+' : ''}{slot.daYunModifier} ยท Final {slot.finalScore >= 0 ? '+' : ''}{slot.finalScore}
+                      {formatSlotScoreBreakdown(slot)}
                     </div>
                     <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
                   </div>
@@ -495,9 +517,9 @@ export default function HourlyScoringPanel() {
               <div className="mt-4 space-y-4">
                 {scoringResult.strongestNegativeSlots.map((slot) => (
                   <div key={slot.branchIdx} className="rounded-[1.5rem] bg-white/90 p-4 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.14)]">
-                    <div className="text-sm font-semibold text-[#151d22]">{slot.hourLabel} · {slot.branch.zh}</div>
+                    <div className="text-sm font-semibold text-[#151d22]">{formatSlotHeading(slot)}</div>
                     <div className="mt-2 text-xs uppercase tracking-[0.18em] text-[#151d22]/46">
-                      Base {slot.baseScore >= 0 ? '+' : ''}{slot.baseScore} ยท Da Yun {slot.daYunModifier >= 0 ? '+' : ''}{slot.daYunModifier} ยท Final {slot.finalScore >= 0 ? '+' : ''}{slot.finalScore}
+                      {formatSlotScoreBreakdown(slot)}
                     </div>
                     <p className="mt-2 text-sm text-[#151d22]/70">{slot.explanation}</p>
                   </div>
@@ -510,3 +532,4 @@ export default function HourlyScoringPanel() {
     </div>
   );
 }
+

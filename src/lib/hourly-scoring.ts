@@ -5,6 +5,7 @@ import {
   controls,
   controlledBy,
   generatedBy,
+  getActiveDaYunPillarForDate,
   getBranchMainStem,
   hourPillar,
   STEMS,
@@ -101,19 +102,19 @@ export interface ComputeHourlyScoringOptions {
 }
 
 const BRANCH_START_HOURS = [23, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21];
-const LABELS = [
-  '23:00–01:00',
-  '01:00–03:00',
-  '03:00–05:00',
-  '05:00–07:00',
-  '07:00–09:00',
-  '09:00–11:00',
-  '11:00–13:00',
-  '13:00–15:00',
-  '15:00–17:00',
-  '17:00–19:00',
-  '19:00–21:00',
-  '21:00–23:00',
+export const HOUR_SLOT_LABELS = [
+  '23:00-01:00',
+  '01:00-03:00',
+  '03:00-05:00',
+  '05:00-07:00',
+  '07:00-09:00',
+  '09:00-11:00',
+  '11:00-13:00',
+  '13:00-15:00',
+  '15:00-17:00',
+  '17:00-19:00',
+  '19:00-21:00',
+  '21:00-23:00',
 ];
 
 function pad2(value: number) {
@@ -358,11 +359,15 @@ function getDaYunElementModifier(relation: DaYunElementInfluence['relation']) {
   }
 }
 
-export function getActiveDaYunPillar(daYun: DaYun | null, referenceDate: Date, timezone: string): DaYunPillar | null {
+export function getActiveDaYunPillar(
+  daYun: DaYun | null,
+  birthDate: Date,
+  referenceDate: Date,
+  timezone: string,
+): DaYunPillar | null {
   if (!daYun) return null;
 
-  const { year } = getLocalDateParts(referenceDate, timezone);
-  return daYun.pillars.find((pillar) => year >= pillar.yearStart && year <= pillar.yearEnd) ?? null;
+  return getActiveDaYunPillarForDate(daYun, birthDate, referenceDate, timezone);
 }
 
 export function getDaYunCategoryModifier(dayMasterStemIdx: number, activeDaYun: DaYunPillar | null): HourlyScoreCategories {
@@ -521,7 +526,9 @@ export function computeHourlyScoring(
 
   const favoriteData = getFavorableUnfavorableElements(natalDmElement, dmStrength);
   const usefulGod = getUsefulGod(favoriteData.favorableElements);
-  const activeDaYunPillar = includeDaYun ? getActiveDaYunPillar(natalChart.daYun, referenceDate, profile.timezone) : null;
+  const activeDaYunPillar = includeDaYun
+    ? getActiveDaYunPillar(natalChart.daYun, natalChart.tstDate, referenceDate, profile.timezone)
+    : null;
   const activeDaYun = includeDaYun
     ? getDaYunModifier(
       natalChart.pillars.day.stemIdx,
@@ -569,7 +576,7 @@ export function computeHourlyScoring(
       branch: BRANCHES[branchIdx],
       stemIdx: slotHourStemIdx,
       stem: STEMS[slotHourStemIdx],
-      hourLabel: LABELS[branchIdx],
+      hourLabel: HOUR_SLOT_LABELS[branchIdx],
       localStartLabel,
       localEndLabel,
       tenGod: tenGodValue,
@@ -622,3 +629,4 @@ export function computeHourlyScoring(
     slots: enrichedSlots,
   };
 }
+
