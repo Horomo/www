@@ -66,7 +66,7 @@ export async function upsertUserProfile(userId: string, profile: AnalysisFormPay
         'Content-Type': 'application/json',
         apikey: serviceRoleKey,
         Authorization: `Bearer ${serviceRoleKey}`,
-        Prefer: 'return=representation',
+        Prefer: 'resolution=merge-duplicates,return=representation',
       },
       body: JSON.stringify({ user_id: userId, profile_data: profile }),
     },

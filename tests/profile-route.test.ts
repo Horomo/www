@@ -94,3 +94,23 @@ test('profile POST saves and returns the profile for authenticated members', asy
   assert.equal(body.profile.userId, 'user@example.com');
   assert.equal(body.profile.dob, validProfile.dob);
 });
+
+test('profile POST returns a useful error payload when storage is not configured', async () => {
+  const request = new Request('http://localhost/api/profile', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(validProfile),
+  });
+
+  const response = await handleProfilePost(request as unknown as NextRequest, {
+    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    fetchProfile: async () => null,
+    saveProfile: async (): Promise<SavedBaziProfile> => {
+      throw new Error('Supabase storage is not configured.');
+    },
+  });
+
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.error, 'Supabase storage is not configured.');
+});

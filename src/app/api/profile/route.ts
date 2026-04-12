@@ -12,6 +12,16 @@ export type ProfileRouteDependencies = {
   saveProfile: (userId: string, profile: AnalysisFormPayload) => Promise<SavedBaziProfile>;
 };
 
+function handleProfileStorageError(error: unknown) {
+  const message = error instanceof Error ? error.message : 'Unable to access saved profile storage.';
+  const status = message.includes('not configured') ? 503 : 500;
+
+  return NextResponse.json(
+    { error: message },
+    { status },
+  );
+}
+
 export async function handleProfileGet(
   req: NextRequest,
   dependencies: ProfileRouteDependencies,
@@ -21,8 +31,12 @@ export async function handleProfileGet(
     return NextResponse.json({ error: 'Unauthorized. Please sign in with Google to access your saved profile.' }, { status: 401 });
   }
 
-  const profile = await dependencies.fetchProfile(session.user.email);
-  return NextResponse.json({ profile });
+  try {
+    const profile = await dependencies.fetchProfile(session.user.email);
+    return NextResponse.json({ profile });
+  } catch (error: unknown) {
+    return handleProfileStorageError(error);
+  }
 }
 
 export async function handleProfilePost(
@@ -41,22 +55,34 @@ export async function handleProfilePost(
     return NextResponse.json({ error: 'Invalid profile payload.' }, { status: 400 });
   }
 
-  const savedProfile = await dependencies.saveProfile(session.user.email, profile);
-  return NextResponse.json({ profile: savedProfile });
+  try {
+    const savedProfile = await dependencies.saveProfile(session.user.email, profile);
+    return NextResponse.json({ profile: savedProfile });
+  } catch (error: unknown) {
+    return handleProfileStorageError(error);
+  }
 }
 
 export async function GET(req: NextRequest) {
-  return handleProfileGet(req, {
-    getSession: () => getServerSession(authOptions),
-    fetchProfile: fetchUserProfile,
-    saveProfile: upsertUserProfile,
-  });
+  try {
+    return await handleProfileGet(req, {
+      getSession: () => getServerSession(authOptions),
+      fetchProfile: fetchUserProfile,
+      saveProfile: upsertUserProfile,
+    });
+  } catch (error: unknown) {
+    return handleProfileStorageError(error);
+  }
 }
 
 export async function POST(req: NextRequest) {
-  return handleProfilePost(req, {
-    getSession: () => getServerSession(authOptions),
-    fetchProfile: fetchUserProfile,
-    saveProfile: upsertUserProfile,
-  });
+  try {
+    return await handleProfilePost(req, {
+      getSession: () => getServerSession(authOptions),
+      fetchProfile: fetchUserProfile,
+      saveProfile: upsertUserProfile,
+    });
+  } catch (error: unknown) {
+    return handleProfileStorageError(error);
+  }
 }
