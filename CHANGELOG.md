@@ -2,6 +2,36 @@
 
 ## 2026-04-12
 
+- `feat: extend hourly scoring with Liu Nian, Liu Yue, and Liu Ri timing layers`
+  Added additive current-year, current-month, and current-day influence layers on top of the existing natal base scoring and active Da Yun flow, while preserving the underlying hourly scoring architecture and member/profile behavior.
+
+- `feat: expose transparent layer breakdowns for hourly slot scoring`
+  Extended the hourly result shape with `liuNian`, `liuYue`, and `liuRi` summaries plus per-slot `liuNianModifier`, `liuYueModifier`, and `liuRiModifier`, keeping final scores explainable as base + Da Yun + year + month + day.
+
+- `feat: extend hourly category scoring with timing-layer modifiers`
+  Added deterministic category-level timing contributions for career, wealth, love, and health so real computed slots now carry both base Ten God effects and additive time-layer category backgrounds.
+
+- `feat: surface year/month/day timing layers in the hourly UI`
+  Updated the Hourly scoring interface to show summary cards for Active Da Yun, Liu Nian, Liu Yue, and Liu Ri, and expanded the slot breakdown to display Base, Da Yun, Year, Month, Day, and Final values.
+
+- `fix: correct Da Yun semantic tagging in shared timing-layer helpers`
+  Replaced the incorrect internal `liuNian` tag used by the shared Da Yun summary path with an explicit `daYun` semantic tag, without changing intended scoring output.
+
+- `test: strengthen exact pillar proofs for Liu Nian, Liu Yue, and Liu Ri`
+  Added structured exact-pillar assertions using stable stem and branch fields instead of fragile combined pillar strings, proving the current year/month/day layers match the engine output for a known local date.
+
+- `test: add end-to-end category composition proof for hourly scoring`
+  Added deterministic coverage proving that computed slot category totals equal base category scores plus Da Yun, Liu Nian, Liu Yue, and Liu Ri category modifiers.
+
+- `test: add rendered UI proof for hourly scoring layer cards and breakdown columns`
+  Added render-level coverage proving the Hourly results UI shows the timing-layer summary cards, Base/Da Yun/Year/Month/Day/Final columns, and strongest-slot insight cards only for extreme slots.
+
+- `fix: document and verify the symmetric [-6, 6] hourly score clamp`
+  Added explicit code rationale for the six-point symmetric user-facing score range and kept regression coverage that verifies computed final scores stay inside that bound.
+
+- `chore: remove unreachable legacy assertions from hourly scoring tests`
+  Removed dead assertions after an early return in `hourly-scoring.test.ts`, preserving the stronger structured proof paths and keeping behavior unchanged.
+
 - `feat: redesign hourly scoring into a more editorial reading experience`
   Rebuilt the Hourly interface around a calmer editorial hierarchy with serif-led headings, softer mint and teal tonal layering, more whitespace, and clearer separation between profile context, time layers, slot analysis, and strongest-slot insights.
 
