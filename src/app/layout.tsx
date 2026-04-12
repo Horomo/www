@@ -15,13 +15,13 @@ import Providers from './providers';
 import './globals.css';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 const spaceGrotesk = Space_Grotesk({
@@ -111,45 +111,61 @@ export default function RootLayout({
         <StructuredData data={[buildOrganizationSchema(), buildWebsiteSchema()]} />
         <Providers>
           <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-full bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(255,255,255,0.58)_48%,rgba(235,250,255,0.72))] px-4 py-3 shadow-[0_24px_60px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:px-6">
-              <Link href="/" className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-[1.4rem] bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.92),rgba(64,224,208,0.34)_48%,rgba(255,183,194,0.24)_76%,transparent_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_14px_34px_rgba(64,224,208,0.12)]">
-                  <span className="font-zh text-2xl font-bold text-[#006a62]">八字</span>
-                </span>
-                <span>
-                  <span className="block font-serif text-xl text-[#151d22]">Horomo</span>
-                  <span className="block text-[11px] uppercase tracking-[0.28em] text-[#006a62]/70">Celestial Day Atlas</span>
-                </span>
-              </Link>
-              <nav aria-label="Primary" className="hidden flex-wrap items-center gap-2 rounded-full bg-white/36 px-3 py-2 text-sm text-[#151d22]/72 backdrop-blur-[18px] md:flex">
-                <Link href="/calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                  Calculator
+            <div className="mx-auto max-w-7xl">
+              <div className="flex items-center justify-between gap-4 rounded-full bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(255,255,255,0.58)_48%,rgba(235,250,255,0.72))] px-4 py-3 shadow-[0_24px_60px_rgba(0,106,98,0.08)] backdrop-blur-[24px] sm:px-6">
+                <Link href="/" className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-[1.4rem] bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.92),rgba(64,224,208,0.34)_48%,rgba(255,183,194,0.24)_76%,transparent_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_14px_34px_rgba(64,224,208,0.12)]">
+                    <span className="text-2xl font-bold text-[#006a62]">H</span>
+                  </span>
+                  <span>
+                    <span className="block font-serif text-xl text-[#151d22]">Horomo</span>
+                    <span className="block text-[11px] uppercase tracking-[0.28em] text-[#006a62]/70">Celestial Day Atlas</span>
+                  </span>
                 </Link>
-                <Link href="/calculator/hourly" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                <nav aria-label="Primary" className="hidden flex-wrap items-center gap-2 rounded-full bg-white/36 px-3 py-2 text-sm text-[#151d22]/72 backdrop-blur-[18px] md:flex">
+                  <Link href="/calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Calculator
+                  </Link>
+                  <Link href="/calculator/hourly" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Hourly Score
+                  </Link>
+                  <Link href="/" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Home
+                  </Link>
+                  <Link href="/learn" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Learn
+                  </Link>
+                  <Link href="/learn/day-master" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Day Master
+                  </Link>
+                  <Link href="/learn/ten-gods" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Ten Gods
+                  </Link>
+                  <Link href="/learn/luck-pillars" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                    Luck Pillars
+                  </Link>
+                </nav>
+                <div className="flex items-center gap-3">
+                  <Badge tone="cyan" className="hidden sm:inline-flex">True Solar Time</Badge>
+                  <Link href="/calculator" className={buttonClassName('secondary', 'sm')}>
+                    Start Your Analysis
+                  </Link>
+                </div>
+              </div>
+              <nav aria-label="Primary mobile" className="mt-3 flex items-center gap-2 overflow-x-auto rounded-[1.6rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(244,251,250,0.84))] px-3 py-3 text-sm text-[#151d22]/78 shadow-[0_18px_40px_rgba(0,106,98,0.06)] backdrop-blur-[18px] md:hidden">
+                <Link href="/calculator/hourly" className="shrink-0 rounded-full bg-[#0d5d56] px-4 py-2.5 font-medium text-white shadow-[0_12px_28px_rgba(13,93,86,0.22)]">
                   Hourly Score
                 </Link>
-                <Link href="/" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                <Link href="/calculator" className="shrink-0 rounded-full bg-white/72 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
+                  Calculator
+                </Link>
+                <Link href="/" className="shrink-0 rounded-full bg-white/56 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
                   Home
                 </Link>
-                <Link href="/learn" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
+                <Link href="/learn" className="shrink-0 rounded-full bg-white/56 px-4 py-2.5 transition-all duration-300 hover:bg-white hover:text-[#006a62]">
                   Learn
                 </Link>
-                <Link href="/learn/day-master" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                  Day Master
-                </Link>
-                <Link href="/learn/ten-gods" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                  Ten Gods
-                </Link>
-                <Link href="/learn/luck-pillars" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                  Luck Pillars
-                </Link>
               </nav>
-              <div className="flex items-center gap-3">
-                <Badge tone="cyan" className="hidden sm:inline-flex">True Solar Time</Badge>
-                <Link href="/calculator" className={buttonClassName('secondary', 'sm')}>
-                  Start Your Analysis
-                </Link>
-              </div>
             </div>
           </header>
           <div className="flex-1">{children}</div>
