@@ -4,6 +4,7 @@ import Script from 'next/script';
 import Link from 'next/link';
 
 import StructuredData from '@/components/StructuredData';
+import DesktopPrimaryNav from '@/components/ui/DesktopPrimaryNav';
 import MobilePrimaryNav from '@/components/ui/MobilePrimaryNav';
 import Badge from '@/components/ui/Badge';
 import { buttonClassName } from '@/components/ui/Button';
@@ -123,29 +124,7 @@ export default function RootLayout({
                     <span className="block text-[11px] uppercase tracking-[0.28em] text-[#006a62]/70">Celestial Day Atlas</span>
                   </span>
                 </Link>
-                <nav aria-label="Primary" className="hidden flex-wrap items-center gap-2 rounded-full bg-white/36 px-3 py-2 text-sm text-[#151d22]/72 backdrop-blur-[18px] md:flex">
-                  <Link href="/calculator" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Calculator
-                  </Link>
-                  <Link href="/calculator/hourly" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Hourly Score
-                  </Link>
-                  <Link href="/" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Home
-                  </Link>
-                  <Link href="/learn" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Learn
-                  </Link>
-                  <Link href="/learn/day-master" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Day Master
-                  </Link>
-                  <Link href="/learn/ten-gods" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Ten Gods
-                  </Link>
-                  <Link href="/learn/luck-pillars" className="rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]">
-                    Luck Pillars
-                  </Link>
-                </nav>
+                <DesktopPrimaryNav />
                 <div className="flex items-center gap-3">
                   <Badge tone="cyan" className="hidden sm:inline-flex">True Solar Time</Badge>
                   <Link href="/calculator" className={buttonClassName('secondary', 'sm')}>
