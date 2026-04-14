@@ -620,39 +620,39 @@ export function getDaYunModifier(
 
 function describeBaseScore(slot: HourSlotScore, usefulGod: string) {
   if (slot.baseScore === 2) {
-    return `The hour element ${slot.stem.element} matches your useful god ${usefulGod}, so the short-term trigger is strongly supportive.`;
+    return `Base fit: this two-hour window is a strong match for your chart because the hour element ${slot.stem.element} matches your useful element ${usefulGod}.`;
   }
 
   if (slot.baseScore === 1) {
-    return `The hour element ${slot.stem.element} is favorable for your natal balance, giving this slot a supportive short-term push.`;
+    return `Base fit: this two-hour window is naturally supportive because the hour element ${slot.stem.element} is favorable for your birth chart.`;
   }
 
   if (slot.baseScore === -2) {
-    return `The hour element ${slot.stem.element} hits the chart's strongest clash rule, so the short-term trigger is unusually tense.`;
+    return `Base fit: this two-hour window is one of the more difficult matches because the hour element ${slot.stem.element} hits the chart's strongest clash rule.`;
   }
 
   if (slot.baseScore === -1) {
-    return `The hour element ${slot.stem.element} falls into your unfavorable set, so the short-term trigger leans draining rather than supportive.`;
+    return `Base fit: this two-hour window leans draining rather than supportive because the hour element ${slot.stem.element} falls into your unfavorable set.`;
   }
 
-  return `The hour element ${slot.stem.element} is neutral against your natal balance, so the short-term trigger is mixed.`;
+  return `Base fit: this two-hour window is mixed because the hour element ${slot.stem.element} is neutral for your birth chart.`;
 }
 
 function describeDaYun(activeDaYun: ActiveDaYunSummary | null, daYunModifier: number) {
   if (!activeDaYun) {
-    return 'No active Da Yun modifier was applied.';
+    return 'No 10-year cycle modifier was applied.';
   }
 
   const periodLabel = `${activeDaYun.stem.zh}${activeDaYun.branch.zh} (${activeDaYun.yearStart}-${activeDaYun.yearEnd})`;
   if (daYunModifier > 0) {
-    return `Your active Da Yun ${periodLabel} adds +${daYunModifier} as a long-term background because its ${activeDaYun.elements.stem}/${activeDaYun.elements.branch} elements support the useful or favorable side of the chart.`;
+    return `Your current 10-year cycle (Da Yun) ${periodLabel} adds ${formatSignedValue(daYunModifier)} as a long-term background because its ${activeDaYun.elements.stem}/${activeDaYun.elements.branch} elements support the chart.`;
   }
 
   if (daYunModifier < 0) {
-    return `Your active Da Yun ${periodLabel} adds ${daYunModifier} as a long-term background because its ${activeDaYun.elements.stem}/${activeDaYun.elements.branch} elements press against the natal balance.`;
+    return `Your current 10-year cycle (Da Yun) ${periodLabel} adds ${formatSignedValue(daYunModifier)} as a long-term background because its ${activeDaYun.elements.stem}/${activeDaYun.elements.branch} elements press against the chart.`;
   }
 
-  return `Your active Da Yun ${periodLabel} is neutral here, so the long-term background does not change the short-term score.`;
+  return `Your current 10-year cycle (Da Yun) ${periodLabel} is neutral here, so it does not change the slot on its own.`;
 }
 
 function describeTransitLayer(layer: TransitLayerSummary | null, layerModifier: number) {
@@ -661,16 +661,16 @@ function describeTransitLayer(layer: TransitLayerSummary | null, layerModifier: 
   }
 
   const kindLabel = layer.kind === 'liuNian'
-    ? 'Liu Nian'
+    ? 'The current year (Liu Nian)'
     : layer.kind === 'liuYue'
-      ? 'Liu Yue'
-      : 'Liu Ri';
+      ? 'The current month (Liu Yue)'
+      : 'The current day (Liu Ri)';
   const periodLabel = `${layer.stem.zh}${layer.branch.zh}`;
   if (layerModifier > 0) {
-    return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements support the chart's useful or favorable side.`;
+    return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements support the chart.`;
   }
 
-  return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements press against the natal balance.`;
+  return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements add pressure.`;
 }
 
 function buildExtremeSlotExplanation(
@@ -689,7 +689,7 @@ function buildExtremeSlotExplanation(
   ].filter(Boolean);
 
   if (layerSentences.length === 0) {
-    return `${describeBaseScore(slot, usefulGod)} The wider Da Yun, year, month, and day layers stay neutral here, so this slot mostly reflects the hour trigger.`;
+    return `${describeBaseScore(slot, usefulGod)} The wider 10-year, year, month, and day layers stay neutral here, so this result mostly reflects the hour itself.`;
   }
 
   return `${describeBaseScore(slot, usefulGod)} ${layerSentences.join(' ')}`;

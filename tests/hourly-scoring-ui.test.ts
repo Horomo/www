@@ -54,8 +54,8 @@ test('hourly scoring summary formatters render clean separators', () => {
 
   assert.equal(headline, `${result.activeDaYun.stem.zh}${result.activeDaYun.branch.zh} ages ${result.activeDaYun.ageStart}-${result.activeDaYun.ageEnd}`);
   assert.equal(elements, `${result.activeDaYun.elements.stem} stem / ${result.activeDaYun.elements.branch} branch`);
-  assert.equal(slotHeading, `${result.slots[0].hourLabel} - ${result.slots[0].branch.zh}`);
-  assert.match(slotBreakdown, /^Base [+-]\d+ \| Da Yun [+-]\d+ \| Year [+-]\d+ \| Month [+-]\d+ \| Day [+-]\d+ \| Final [+-]\d+$/);
+  assert.equal(slotHeading, `${result.slots[0].hourLabel} - ${result.slots[0].branch.animal} hour`);
+  assert.match(slotBreakdown, /^Base fit [+-]\d+ \| 10-year cycle [+-]\d+ \| Year [+-]\d+ \| Month [+-]\d+ \| Day [+-]\d+ \| Final [+-]\d+$/);
 
   assert.doesNotMatch(headline, MOJIBAKE_PATTERN);
   assert.doesNotMatch(elements, MOJIBAKE_PATTERN);
@@ -72,16 +72,18 @@ test('hourly scoring content renders timing-layer cards, expanded table columns,
   ]);
   const nonExtremeSlot = result.slots.find((slot) => !extremeBranchIndexes.has(slot.branchIdx));
 
-  assert.match(markup, /Active Da Yun/);
+  assert.match(markup, /10-year cycle/);
   assert.match(markup, /Liu Nian/);
   assert.match(markup, /Liu Yue/);
   assert.match(markup, /Liu Ri/);
-  assert.match(markup, />Base</);
-  assert.match(markup, />Da Yun</);
+  assert.match(markup, />Base fit</);
+  assert.match(markup, />10-year</);
   assert.match(markup, />Year</);
   assert.match(markup, />Month</);
   assert.match(markup, />Day</);
   assert.match(markup, />Final</);
+  assert.match(markup, /How to read this/i);
+  assert.match(markup, /Life areas always appear in this order: career \/ wealth \/ love \/ health/i);
   assert.match(markup, /Strongest positive slot/);
   assert.match(markup, /Strongest negative slot/);
 

@@ -377,18 +377,18 @@ test('explanations include Da Yun context only for extreme slots', () => {
   for (const slot of result.slots) {
     if (extremeBranchIndexes.has(slot.branchIdx)) {
       if (slot.daYunModifier !== 0) {
-        assert.match(slot.explanation ?? '', /Da Yun/);
+        assert.match(slot.explanation ?? '', /10-year cycle \(Da Yun\)/);
       }
       if (slot.liuNianModifier !== 0) {
-        assert.match(slot.explanation ?? '', /Liu Nian/);
+        assert.match(slot.explanation ?? '', /current year \(Liu Nian\)/i);
       }
       if (slot.liuYueModifier !== 0) {
-        assert.match(slot.explanation ?? '', /Liu Yue/);
+        assert.match(slot.explanation ?? '', /current month \(Liu Yue\)/i);
       }
       if (slot.liuRiModifier !== 0) {
-        assert.match(slot.explanation ?? '', /Liu Ri/);
+        assert.match(slot.explanation ?? '', /current day \(Liu Ri\)/i);
       }
-      assert.match(slot.explanation ?? '', /short-term trigger/);
+      assert.match(slot.explanation ?? '', /Base fit:/);
     } else {
       assert.equal(slot.explanation, null);
     }

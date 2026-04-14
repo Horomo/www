@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-04-14
+
+- `feat: rewrite hourly scoring explanations for normal users`
+  Reworked the hourly results copy on desktop and mobile so normal users can understand what they are looking at without needing implementation knowledge. Added a dedicated “How to read this” explanation block near the results that now explains what a two-hour slot is, what the hour pillar identity labels mean, how Base fit differs from the broader timing layers, how the Final score is built, how to read positive versus negative values, and how to use the strongest supportive and strongest challenging windows in practice. This changed user-facing interpretation copy only and did not change the scoring formula.
+
+- `fix: simplify extreme-slot explanation text to match the real score model`
+  Rewrote the generated strongest-slot explanations so they still describe the same engine behavior but in clearer product language. The strongest-window text now explains Base fit as the slot’s baseline match, describes Da Yun as the current 10-year cycle, clarifies Year/Month/Day as shorter background layers, and explicitly tells users that the score reflects timing support or friction rather than guaranteed outcomes or mystical certainty.
+
+- `feat: rename confusing hourly result labels into clearer user-facing wording`
+  Updated visible terminology across the hourly table, mobile cards, and score breakdown strings so the UI feels less like internal debug output. Examples include changing `Base` to `Base fit`, changing compact `Da Yun` score labels to `10-year cycle`, changing `Areas` to `Life areas`, reframing the Ten God column as a user-readable role label, and replacing vague mobile labels with direct wording such as “Most supportive” and “Most challenging.”
+
+- `docs: clarify life-area score order and interpretation in the hourly UI`
+  Added explicit explanation that life-area scores always appear in the order `career / wealth / love / health`, including a concrete numeric example so users can decode patterns such as `3 / 0 / 3 / 2` without guessing. The UI now also states that higher numbers indicate relatively more support, lower or negative numbers indicate more pressure, and that these area values are another view of the same timing model rather than a separate hidden prediction system.
+
 ## 2026-04-12
 
 - `audit: verify Da Yun hourly-scoring phase against the agreed implementation spec`
