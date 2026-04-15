@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Noto_Serif, Space_Grotesk } from 'next/font/google';
 import Script from 'next/script';
 import Link from 'next/link';
 
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 import StructuredData from '@/components/StructuredData';
 import DesktopPrimaryNav from '@/components/ui/DesktopPrimaryNav';
 import MobilePrimaryNav from '@/components/ui/MobilePrimaryNav';
@@ -111,6 +113,7 @@ export default function RootLayout({
           `}
         </Script>
         <StructuredData data={[buildOrganizationSchema(), buildWebsiteSchema()]} />
+        <SpeedInsights />
         <Providers>
           <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
             <div className="mx-auto max-w-7xl">

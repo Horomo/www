@@ -17,7 +17,8 @@
       "Bash(npx --prefix \"C:/src/Horomo/www\" tsc --noEmit --project \"C:/src/Horomo/www/tsconfig.json\")",
       "Bash(node --experimental-strip-types --no-warnings tests/hourly-scoring.test.ts)",
       "Bash(npm test:*)",
-      "Bash(grep -r \"horomo.com\\\\|canonical\" /c/src/Horomo/www --maxdepth 2 --include=\"*.ts\" --include=\"*.tsx\" -l)"
+      "Bash(grep -r \"horomo.com\\\\|canonical\" /c/src/Horomo/www --maxdepth 2 --include=\"*.ts\" --include=\"*.tsx\" -l)",
+      "Bash(npm list:*)"
     ]
   }
 }
