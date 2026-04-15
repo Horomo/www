@@ -16,7 +16,8 @@
       "Bash(npm install:*)",
       "Bash(npx --prefix \"C:/src/Horomo/www\" tsc --noEmit --project \"C:/src/Horomo/www/tsconfig.json\")",
       "Bash(node --experimental-strip-types --no-warnings tests/hourly-scoring.test.ts)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(git worktree:*)"
     ]
   }
 }
