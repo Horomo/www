@@ -4,24 +4,47 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 
-// Falls back to 'horomo.com' if the variable is not set so the redirect
-// still works on a cold deploy before the Vercel env var is configured.
-const CANONICAL_HOST = process.env.NEXT_PUBLIC_CANONICAL_HOST ?? 'horomo.com';
+// NOTE: NEXT_PUBLIC_* variables are inlined at build time by Next.js.
+// Do NOT set this in .env.local if that file is committed to the repo —
+// the local value would be baked into the production bundle.
+// Set it only in the Vercel dashboard for production builds.
+const DIRECT_FILE_PATHS = new Set(['/ads.txt', '/robots.txt', '/favicon.ico']);
+
+function normalizeHost(value: string | undefined): string {
+  if (!value) {
+    return 'horomo.com';
+  }
+
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return value.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  }
+}
 
 export function middleware(request: NextRequest) {
-  const { host, pathname, search } = request.nextUrl;
+  const canonicalHost = normalizeHost(
+    process.env.CANONICAL_HOST ?? process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  );
+  const hostname = request.nextUrl.hostname;
+  const pathname = request.nextUrl.pathname;
 
-  // Strip port for comparison so localhost and staging previews are unaffected.
-  const bareHost = host.split(':')[0];
+  if (
+    DIRECT_FILE_PATHS.has(pathname) ||
+    pathname.startsWith('/.well-known/') ||
+    /^\/sitemap(?:[^/]+)?\.xml$/i.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
 
-  // Only redirect in production — skip on localhost and Vercel preview URLs.
-  const isLocalhost = bareHost === 'localhost' || bareHost.endsWith('.local');
-  const isVercelPreview = bareHost.endsWith('.vercel.app');
+  // Skip dev environments and Vercel preview deployments.
+  const isLocalhost = hostname === 'localhost' || hostname.endsWith('.local');
+  const isVercelPreview = hostname.endsWith('.vercel.app');
 
-  if (!isLocalhost && !isVercelPreview && bareHost !== CANONICAL_HOST) {
+  if (!isLocalhost && !isVercelPreview && hostname !== canonicalHost) {
     const url = new URL(request.url);
-    url.host = CANONICAL_HOST;
-    url.port = '';
+    url.hostname = canonicalHost; // .hostname setter leaves protocol and port intact
+    url.port = ''; // drop any explicit port so the URL is clean
     return NextResponse.redirect(url, { status: 301 });
   }
 
@@ -30,7 +53,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static assets.
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Skip Next.js internals, static assets, and well-known root files that
+    // must be served directly without going through the middleware redirect.
+    '/((?!_next/static|_next/image|favicon\\.ico|ads\\.txt|robots\\.txt|sitemap[^/]*\\.xml|\\.well-known).*)',
   ],
 };
