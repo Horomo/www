@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/src/Horomo/www/**)",
+      "Bash(npx tsc:*)",
+      "Bash(npx --prefix \"C:\\\\src\\\\Horomo\\\\www\" tsc --noEmit --project \"C:\\\\src\\\\Horomo\\\\www\\\\tsconfig.json\")",
+      "Bash(dir \"C:/src/Horomo/www/.claude/worktrees/youthful-cohen/src/lib\")",
+      "Bash(dir \"C:/src/Horomo/www/.claude/worktrees/\")",
+      "Bash(dir \"C:/src/Horomo/www/.claude/worktrees/youthful-cohen/\")",
+      "Bash(git -C \"C:/src/Horomo/www\" worktree list)",
+      "Bash(dir \"C:/src/Horomo/www/src/lib/\")",
+      "Bash(git -C \"C:/src/Horomo/www\" branch --show-current)",
+      "Bash(git -C \"C:/src/Horomo/www\" diff main --name-only)",
+      "Bash(git -C \"C:/src/Horomo/www\" branch -a)",
+      "Bash(dir \"C:/src/Horomo/www/.claude/worktrees/youthful-cohen/src/\")",
+      "Bash(npm install:*)",
+      "Bash(npx --prefix \"C:/src/Horomo/www\" tsc --noEmit --project \"C:/src/Horomo/www/tsconfig.json\")",
+      "Bash(node --experimental-strip-types --no-warnings tests/hourly-scoring.test.ts)",
+      "Bash(npm test:*)"
+    ]
+  }
+}

@@ -31,7 +31,8 @@ test('timezone conversion round-trips the entered local clock time for a normal 
   assert.equal(formatInTimeZone(result.utcDate, 'Asia/Bangkok'), '1990-06-15 08:30');
   assert.equal(formatPseudoUtc(result.displayDate), '1990-06-15 08:30');
   assert.equal(result.displayTzLabel, 'UTC+7:00');
-  assert.equal(result.pillars.hour?.stem.zh + result.pillars.hour?.branch.zh, '壬辰');
+  assert.ok(result.pillars.hour, 'hour pillar should exist when birth time is provided');
+  assert.equal(result.pillars.hour.stem.zh + result.pillars.hour.branch.zh, '壬辰');
 });
 
 test('DST births keep display time separate from the internal standard-time surrogate', () => {

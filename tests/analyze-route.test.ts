@@ -36,7 +36,7 @@ test('analyze route accepts a genuine payload and uses the server-validated char
   });
 
   const response = await handleAnalyzeRequest(request, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     buildLogInsert: () => ({
       user_id: 'user@example.com',
       birth_info: formValues,
@@ -124,7 +124,7 @@ test('analyze route rejects forged computed charts before calling OpenAI', async
   });
 
   const response = await handleAnalyzeRequest(request, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     buildLogInsert: () => ({
       user_id: 'user@example.com',
       birth_info: formValues,

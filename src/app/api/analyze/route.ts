@@ -1,8 +1,7 @@
 import OpenAI from 'openai';
-import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { authOptions } from '@/lib/auth';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { buildAnalysisLogInsert, insertAnalysisLog } from '@/lib/analysis-log';
 import {
   analyzeRequestMatchesServerComputation,
@@ -21,7 +20,7 @@ function getOpenAiClient(): OpenAI {
 }
 
 type AnalyzeRouteDependencies = {
-  getSession: () => Promise<{ user?: { email?: string | null } } | null>;
+  getSession: () => Promise<{ id: string } | null>;
   insertLog: typeof insertAnalysisLog;
   buildLogInsert: typeof buildAnalysisLogInsert;
   createCompletion: (payload: {
@@ -33,7 +32,11 @@ type AnalyzeRouteDependencies = {
 };
 
 const defaultDependencies: AnalyzeRouteDependencies = {
-  getSession: () => getServerSession(authOptions),
+  getSession: async () => {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user ?? null;
+  },
   insertLog: insertAnalysisLog,
   buildLogInsert: buildAnalysisLogInsert,
   createCompletion: (payload) => getOpenAiClient().chat.completions.create(payload),
@@ -45,7 +48,7 @@ export async function handleAnalyzeRequest(
 ) {
   const session = await dependencies.getSession();
 
-  if (!session?.user?.email) {
+  if (!session?.id) {
     return NextResponse.json(
       { error: 'Unauthorized. Please sign in with Google to use AI analysis.' },
       { status: 401 },
@@ -303,7 +306,7 @@ Word budget:
       await dependencies.insertLog(
         dependencies.buildLogInsert({
           requestBody: parsedBody,
-          userId: session.user.email,
+          userId: session.id,
           userAgent: req.headers.get('user-agent'),
           requestId,
           aiModel: AI_MODEL,
@@ -311,7 +314,7 @@ Word budget:
       );
     } catch (logError: unknown) {
       const message = logError instanceof Error ? logError.message : 'Unknown logging error';
-      console.error('Analysis log insert failed', { requestId, userId: session.user.email, message });
+      console.error('Analysis log insert failed', { requestId, userId: session.id, message });
     }
 
     const response = await dependencies.createCompletion({

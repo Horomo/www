@@ -38,7 +38,7 @@ test('profile GET returns null when no saved profile exists', async () => {
   const request = new Request('http://localhost/api/profile');
 
   const response = await handleProfileGet(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     fetchProfile: async () => null,
     saveProfile: async (): Promise<SavedBaziProfile> => ({ userId: 'user@example.com', updatedAt: '2026-04-11T00:00:00Z', ...validProfile }),
   });
@@ -56,9 +56,9 @@ test('profile POST rejects invalid payloads', async () => {
   });
 
   const response = await handleProfilePost(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     fetchProfile: async () => null,
-    saveProfile: async () => validProfile,
+    saveProfile: async (): Promise<SavedBaziProfile> => ({ userId: 'test-user-id', updatedAt: '2026-04-11T00:00:00Z', ...validProfile }),
   });
 
   assert.equal(response.status, 400);
@@ -76,7 +76,7 @@ test('profile POST saves and returns the profile for authenticated members', asy
   });
 
   const response = await handleProfilePost(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     fetchProfile: async () => null,
     saveProfile: async (userId, profile) => {
       savedPayload = profile;
@@ -91,7 +91,7 @@ test('profile POST saves and returns the profile for authenticated members', asy
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(savedPayload, validProfile);
-  assert.equal(body.profile.userId, 'user@example.com');
+  assert.equal(body.profile.userId, 'test-user-id');
   assert.equal(body.profile.dob, validProfile.dob);
 });
 
@@ -103,7 +103,7 @@ test('profile POST returns a useful error payload when storage is not configured
   });
 
   const response = await handleProfilePost(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     fetchProfile: async () => null,
     saveProfile: async (): Promise<SavedBaziProfile> => {
       throw new Error('Supabase storage is not configured.');

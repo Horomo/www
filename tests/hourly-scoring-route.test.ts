@@ -38,7 +38,7 @@ test('hourly scoring API returns null scoring when no saved profile exists', asy
   const request = new Request('http://localhost/api/hourly-scoring');
 
   const response = await handleHourlyScoringGet(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'user@example.com' } }),
+    getSession: async () => ({ id: 'test-user-id' }),
     fetchProfile: async () => null,
     computeScoring: () => computeHourlyScoring(baseProfile),
   });
@@ -53,7 +53,7 @@ test('hourly scoring API computes fresh scoring from the saved profile', async (
   const request = new Request('http://localhost/api/hourly-scoring');
 
   const response = await handleHourlyScoringGet(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'member@example.com' } }),
+    getSession: async () => ({ id: 'test-member-id' }),
     fetchProfile: async () => baseProfile,
     computeScoring: (profile) => computeHourlyScoring(profile, new Date('2026-04-12T00:00:00Z')),
   });
@@ -71,7 +71,7 @@ test('hourly scoring API uses a requested local date when provided', async () =>
   let receivedReferenceDate: Date | undefined;
 
   const response = await handleHourlyScoringGet(request as unknown as NextRequest, {
-    getSession: async () => ({ user: { email: 'member@example.com' } }),
+    getSession: async () => ({ id: 'test-member-id' }),
     fetchProfile: async () => baseProfile,
     computeScoring: (profile, referenceDate) => {
       receivedReferenceDate = referenceDate;

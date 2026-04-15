@@ -120,6 +120,8 @@ export interface HourlyScoringResult {
   liuNian: TransitLayerSummary | null;
   liuYue: TransitLayerSummary | null;
   liuRi: TransitLayerSummary | null;
+  /** Shared timing-layer context shown once above all strongest slots (Da Yun / year / month / day sentences). */
+  extremeSlotContext: string | null;
   strongestPositiveSlots: HourSlotScore[];
   strongestNegativeSlots: HourSlotScore[];
   slots: HourSlotScore[];
@@ -673,26 +675,31 @@ function describeTransitLayer(layer: TransitLayerSummary | null, layerModifier: 
   return `${kindLabel} ${periodLabel} adds ${formatSignedValue(layerModifier)} because its ${layer.elements.stem}/${layer.elements.branch} elements add pressure.`;
 }
 
-function buildExtremeSlotExplanation(
-  slot: HourSlotScore,
-  usefulGod: string,
+/** Per-slot: only the base fit sentence (unique to each slot). */
+function buildSlotBaseExplanation(slot: HourSlotScore, usefulGod: string) {
+  return describeBaseScore(slot, usefulGod);
+}
+
+/** Shared across all extreme slots for a given day: Da Yun / year / month / day layer sentences. */
+function buildSharedLayerContext(
+  representativeSlot: HourSlotScore,
   activeDaYun: ActiveDaYunSummary | null,
   liuNian: TransitLayerSummary | null,
   liuYue: TransitLayerSummary | null,
   liuRi: TransitLayerSummary | null,
 ) {
   const layerSentences = [
-    slot.daYunModifier !== 0 ? describeDaYun(activeDaYun, slot.daYunModifier) : null,
-    describeTransitLayer(liuNian, slot.liuNianModifier),
-    describeTransitLayer(liuYue, slot.liuYueModifier),
-    describeTransitLayer(liuRi, slot.liuRiModifier),
+    representativeSlot.daYunModifier !== 0 ? describeDaYun(activeDaYun, representativeSlot.daYunModifier) : null,
+    describeTransitLayer(liuNian, representativeSlot.liuNianModifier),
+    describeTransitLayer(liuYue, representativeSlot.liuYueModifier),
+    describeTransitLayer(liuRi, representativeSlot.liuRiModifier),
   ].filter(Boolean);
 
   if (layerSentences.length === 0) {
-    return `${describeBaseScore(slot, usefulGod)} The wider 10-year, year, month, and day layers stay neutral here, so this result mostly reflects the hour itself.`;
+    return 'The wider 10-year, year, month, and day layers are all neutral today, so every slot score mostly reflects the hour itself.';
   }
 
-  return `${describeBaseScore(slot, usefulGod)} ${layerSentences.join(' ')}`;
+  return layerSentences.join(' ');
 }
 
 export function computeHourlyScoring(
@@ -863,9 +870,14 @@ export function computeHourlyScoring(
   const enrichedSlots = slots.map((slot) => ({
     ...slot,
     explanation: extremeBranchIndexes.has(slot.branchIdx)
-      ? buildExtremeSlotExplanation(slot, usefulGod, activeDaYun, liuNian, liuYue, liuRi)
+      ? buildSlotBaseExplanation(slot, usefulGod)
       : null,
   }));
+
+  const representativeExtremeSlot = enrichedSlots.find((slot) => extremeBranchIndexes.has(slot.branchIdx));
+  const extremeSlotContext = representativeExtremeSlot
+    ? buildSharedLayerContext(representativeExtremeSlot, activeDaYun, liuNian, liuYue, liuRi)
+    : null;
 
   return {
     currentDateLabel: formatLocalDate(referenceDate, profile.timezone),
@@ -879,6 +891,7 @@ export function computeHourlyScoring(
     liuNian,
     liuYue,
     liuRi,
+    extremeSlotContext,
     strongestPositiveSlots: enrichedSlots.filter((slot) => strongestPositiveSlots.some((candidate) => candidate.branchIdx === slot.branchIdx)),
     strongestNegativeSlots: enrichedSlots.filter((slot) => strongestNegativeSlots.some((candidate) => candidate.branchIdx === slot.branchIdx)),
     slots: enrichedSlots,
