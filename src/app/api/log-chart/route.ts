@@ -1,13 +1,13 @@
-import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { authOptions } from '@/lib/auth';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { buildAnalysisLogInsert, insertAnalysisLog } from '@/lib/analysis-log';
 import { parseAnalyzeRequestBody } from '@/lib/analysis-payload';
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.email ?? null;
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id ?? null;
 
   const body = await req.json().catch(() => null);
   const parsedBody = parseAnalyzeRequestBody(body);

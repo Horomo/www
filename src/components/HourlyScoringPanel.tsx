@@ -12,6 +12,7 @@ import { finalizeAnalysisFormPayload, type AnalysisFormDraft, type AnalysisFormP
 import { type HourlyScoringResult } from '@/lib/hourly-scoring';
 import { type CalculationGenderMode, type GenderIdentity } from '@/lib/gender';
 import type { PlaceSearchResult } from '@/lib/places';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const GENDER_IDENTITY_OPTIONS: Array<{
   value: GenderIdentity;
@@ -102,6 +103,7 @@ export default function HourlyScoringPanel() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthenticated, setIsUnauthenticated] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [scoringResult, setScoringResult] = useState<HourlyScoringResult | null>(null);
   const [isCoordinateOverrideEnabled, setIsCoordinateOverrideEnabled] = useState(false);
@@ -111,6 +113,7 @@ export default function HourlyScoringPanel() {
   const loadHourlyScoring = useCallback(async (dateOverride?: string) => {
     setProfileLoading(true);
     setError(null);
+    setIsUnauthenticated(false);
 
     try {
       const requestedDate = dateOverride ?? selectedDate;
@@ -121,6 +124,10 @@ export default function HourlyScoringPanel() {
 
       const response = await fetch(`/api/hourly-scoring${params.size ? `?${params.toString()}` : ''}`);
       if (!response.ok) {
+        if (response.status === 401) {
+          setIsUnauthenticated(true);
+          return;
+        }
         const body = await response.json().catch(() => null);
         throw new Error(body?.error ?? 'Unable to load hourly scoring.');
       }
@@ -253,70 +260,60 @@ export default function HourlyScoringPanel() {
   return (
     <div className="mx-auto mt-10 max-w-7xl space-y-8 md:mt-12 md:space-y-10">
       <section className="rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(240,248,247,0.78))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.06)] md:p-8">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-end">
-          <div className="pr-2 lg:pr-8">
-            <SectionEyebrow>Saved Profile</SectionEyebrow>
-            <h2 className="mt-3 max-w-[15ch] font-serif text-[2.2rem] leading-[0.99] tracking-[-0.035em] text-[#16302d] md:text-[3.1rem]">
-              Your private chart profile, prepared for daily scoring
-            </h2>
-            <p className="mt-5 max-w-2xl text-sm leading-8 text-[#35514d] md:text-[15px]">
-              The calculation model stays exactly as it is. This surface simply reframes your saved profile as the entry point to today&apos;s timing analysis.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="cyan">{hasSavedProfile ? 'Saved to account' : 'Profile needed'}</Badge>
+            {savedProfile ? <Badge tone="default">{savedProfile.birthPlaceQuery}</Badge> : null}
+            {savedProfile ? (
+              <>
+                <span className="text-sm text-[#35514d]">{savedProfile.dob}</span>
+                <span className="text-sm text-[#35514d]">{savedProfile.unknownTime ? 'Unknown time' : savedProfile.tob}</span>
+              </>
+            ) : null}
           </div>
-
-          <div className="rounded-[2.1rem] bg-[linear-gradient(160deg,rgba(232,248,244,0.88),rgba(255,255,255,0.84)_54%,rgba(247,252,252,0.92))] p-6 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-[#5b6f6d]">Profile status</div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Badge tone="cyan">{hasSavedProfile ? 'Saved to account' : 'Profile needed'}</Badge>
-              {savedProfile ? <Badge tone="default">{savedProfile.birthPlaceQuery}</Badge> : null}
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2.5">
-              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Birth date</div>
-                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.dob ?? formValues.dob}</div>
-              </div>
-              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Birth time</div>
-                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.unknownTime ? 'Unknown' : savedProfile?.tob ?? formValues.tob}</div>
-              </div>
-              <div className="rounded-full bg-white/75 px-4 py-2 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.08)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[#5b6f6d]">Timezone</div>
-                <div className="mt-1 text-sm font-medium text-[#16302d]">{savedProfile?.timezone ?? formValues.timezone}</div>
-              </div>
-            </div>
-            <div className="mt-6">
-              <Button type="button" variant="secondary" size="md" onClick={startEditing}>
-                {hasSavedProfile ? 'Edit saved profile' : 'Set up profile'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[2.1rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(242,249,248,0.84))] p-5 shadow-[0_18px_42px_rgba(13,93,86,0.05)]">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <SectionEyebrow>Viewing Date</SectionEyebrow>
-            <h3 className="mt-3 font-serif text-[1.75rem] leading-tight text-[#16302d]">Choose the day you want to read</h3>
-            <p className="mt-2 text-sm leading-7 text-[#35514d]">
-              Hourly scoring still uses the same birth profile and timing logic, but now you can inspect a specific day instead of only the current date.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
             <input
               type="date"
               value={selectedDate}
               onChange={(event) => void handleSelectedDateChange(event.target.value)}
-              className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm sm:w-auto"
+              className="glass-input rounded-[1.35rem] px-4 py-2.5 text-sm"
             />
             <Button type="button" variant="secondary" size="md" onClick={() => void handleResetToToday()}>
               Today
+            </Button>
+            <Button type="button" variant="secondary" size="md" onClick={startEditing}>
+              {hasSavedProfile ? 'Edit profile' : 'Set up profile'}
             </Button>
           </div>
         </div>
       </section>
 
-      {error ? (
+      {isUnauthenticated ? (
+        <div className="rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(241,249,248,0.92))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.08)] md:p-8">
+          <SectionEyebrow>Members only</SectionEyebrow>
+          <h3 className="mt-3 font-serif text-[2rem] leading-tight text-[#16302d]">Sign in to access hourly scoring</h3>
+          <p className="mt-3 max-w-xl text-sm leading-8 text-[#35514d]">
+            Hourly scoring is a member feature. Sign in with Google to save your birth profile and view today&apos;s slot-by-slot scoring.
+          </p>
+          <div className="mt-6">
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={() => {
+                void createSupabaseBrowserClient().auth.signInWithOAuth({
+                  provider: 'google',
+                  options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+                });
+              }}
+            >
+              Sign in with Google
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {!isUnauthenticated && error ? (
         <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(255,241,244,0.92),rgba(255,255,255,0.9))] px-6 py-5 text-sm text-[#8f4655] shadow-[inset_0_0_0_1px_rgba(143,70,85,0.12)]">
           {error}
         </div>
@@ -330,27 +327,13 @@ export default function HourlyScoringPanel() {
         </div>
       ) : null}
 
-      {(isEditing || !hasSavedProfile) ? (
+      {!isUnauthenticated && (isEditing || !hasSavedProfile) ? (
         <form ref={editFormRef} onSubmit={handleSaveProfile} className="grid gap-6 rounded-[2.6rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(241,249,248,0.92))] p-6 shadow-[0_24px_60px_rgba(13,93,86,0.08)] md:p-8">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-            <div>
-              <SectionEyebrow>Profile Editor</SectionEyebrow>
-              <h3 className="mt-3 font-serif text-[2rem] leading-tight text-[#16302d]">Save the profile used for every hourly request</h3>
-              <p className="mt-3 max-w-2xl text-sm leading-8 text-[#35514d]">
-                This keeps auth, saved-profile behavior, and scoring input exactly as before. The redesign only changes how the profile setup is presented.
-              </p>
-            </div>
-            <div className="rounded-[2rem] bg-white/70 p-5 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-[#5b6f6d]">Profile summary</div>
-              <p className="mt-3 text-sm leading-7 text-[#35514d]">
-                This saved birth profile will be reused for all future hourly scoring requests.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge tone="default">{formValues.birthPlaceQuery || 'Birth location pending'}</Badge>
-                <Badge tone="default">{formValues.timezone}</Badge>
-                <Badge tone="default">{formValues.unknownTime ? 'Unknown birth time' : formValues.tob}</Badge>
-              </div>
-            </div>
+          <div className="mb-2">
+            <SectionEyebrow>Birth Profile</SectionEyebrow>
+            <h3 className="mt-2 font-serif text-[1.75rem] leading-tight text-[#16302d]">
+              {hasSavedProfile ? 'Edit your profile' : 'Set up your birth profile'}
+            </h3>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">
@@ -512,10 +495,7 @@ export default function HourlyScoringPanel() {
             </div>
           </section>
 
-          <div className="flex flex-col gap-3 border-t border-white/50 pt-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="max-w-2xl text-sm leading-7 text-[#35514d]">
-              Saving updates refreshes the same hourly scoring endpoint and preserves the existing account-based profile flow.
-            </p>
+          <div className="flex flex-col gap-3 border-t border-white/50 pt-2 sm:flex-row sm:items-center sm:justify-end">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               {hasSavedProfile ? (
                 <Button type="button" variant="ghost" size="lg" onClick={cancelEditing} disabled={profileSaving}>

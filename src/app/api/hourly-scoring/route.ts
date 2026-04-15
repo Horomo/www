@@ -1,14 +1,13 @@
-import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { authOptions } from '@/lib/auth';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { clockTimeToUtc } from '@/lib/bazi';
 import { fetchUserProfile } from '@/lib/profile';
 import { computeHourlyScoring } from '@/lib/hourly-scoring';
 import type { AnalysisFormPayload } from '@/lib/analysis-payload';
 
 export type HourlyScoringRouteDependencies = {
-  getSession: () => Promise<{ user?: { email?: string | null } } | null>;
+  getSession: () => Promise<{ id: string } | null>;
   fetchProfile: (userId: string) => Promise<AnalysisFormPayload | null>;
   computeScoring: (profile: AnalysisFormPayload, referenceDate?: Date) => ReturnType<typeof computeHourlyScoring>;
 };
@@ -40,14 +39,14 @@ export async function handleHourlyScoringGet(
   dependencies: HourlyScoringRouteDependencies,
 ) {
   const session = await dependencies.getSession();
-  if (!session?.user?.email) {
+  if (!session?.id) {
     return NextResponse.json(
       { error: 'Unauthorized. Please sign in to access hourly scoring.' },
       { status: 401 },
     );
   }
 
-  const profile = await dependencies.fetchProfile(session.user.email);
+  const profile = await dependencies.fetchProfile(session.id);
   if (!profile) {
     return NextResponse.json({ profile: null, scoring: null });
   }
@@ -59,7 +58,11 @@ export async function handleHourlyScoringGet(
 
 export async function GET(req: NextRequest) {
   return handleHourlyScoringGet(req, {
-    getSession: () => getServerSession(authOptions),
+    getSession: async () => {
+      const supabase = await createSupabaseServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      return user ?? null;
+    },
     fetchProfile: fetchUserProfile,
     computeScoring: computeHourlyScoring,
   });

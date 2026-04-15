@@ -367,31 +367,36 @@ test('Liu Nian, Liu Yue, and Liu Ri category modifiers respond to Ten God themes
   assert.equal(liuRi?.categoryModifier.love, 1);
 });
 
-test('explanations include Da Yun context only for extreme slots', () => {
+test('slot explanations contain only base fit; shared layer context is on the result', () => {
   const result = hourly.computeHourlyScoring(baseProfile, new Date('2026-04-11T00:00:00Z'));
   const extremeBranchIndexes = new Set([
     ...result.strongestPositiveSlots.map((slot) => slot.branchIdx),
     ...result.strongestNegativeSlots.map((slot) => slot.branchIdx),
   ]);
+  const representativeSlot = result.slots.find((s) => extremeBranchIndexes.has(s.branchIdx));
 
+  // Each extreme slot explanation contains only the per-slot base fit sentence.
   for (const slot of result.slots) {
     if (extremeBranchIndexes.has(slot.branchIdx)) {
-      if (slot.daYunModifier !== 0) {
-        assert.match(slot.explanation ?? '', /10-year cycle \(Da Yun\)/);
-      }
-      if (slot.liuNianModifier !== 0) {
-        assert.match(slot.explanation ?? '', /current year \(Liu Nian\)/i);
-      }
-      if (slot.liuYueModifier !== 0) {
-        assert.match(slot.explanation ?? '', /current month \(Liu Yue\)/i);
-      }
-      if (slot.liuRiModifier !== 0) {
-        assert.match(slot.explanation ?? '', /current day \(Liu Ri\)/i);
-      }
       assert.match(slot.explanation ?? '', /Base fit:/);
+      // Layer context has moved to extremeSlotContext — should not appear per-slot.
+      assert.doesNotMatch(slot.explanation ?? '', /10-year cycle \(Da Yun\)/);
+      assert.doesNotMatch(slot.explanation ?? '', /current year \(Liu Nian\)/i);
+      assert.doesNotMatch(slot.explanation ?? '', /current month \(Liu Yue\)/i);
+      assert.doesNotMatch(slot.explanation ?? '', /current day \(Liu Ri\)/i);
     } else {
       assert.equal(slot.explanation, null);
     }
+  }
+
+  // Shared layer context is set when any transit layer is non-zero for an extreme slot.
+  if (representativeSlot && (
+    representativeSlot.daYunModifier !== 0 ||
+    representativeSlot.liuNianModifier !== 0 ||
+    representativeSlot.liuYueModifier !== 0 ||
+    representativeSlot.liuRiModifier !== 0
+  )) {
+    assert.ok(result.extremeSlotContext, 'extremeSlotContext should be set when transit layers are non-zero');
   }
 });
 
@@ -418,8 +423,10 @@ test('today follows the user timezone instead of UTC around midnight boundaries'
     justBeforeLocalMidnight.slots.map((slot) => slot.stemIdx),
     justAfterLocalMidnight.slots.map((slot) => slot.stemIdx),
   );
+  assert.ok(justBeforeLocalMidnight.liuRi, 'liuRi should be present before midnight');
+  assert.ok(justAfterLocalMidnight.liuRi, 'liuRi should be present after midnight');
   assert.notEqual(
-    justBeforeLocalMidnight.liuRi?.stem.zh + justBeforeLocalMidnight.liuRi?.branch.zh,
-    justAfterLocalMidnight.liuRi?.stem.zh + justAfterLocalMidnight.liuRi?.branch.zh,
+    justBeforeLocalMidnight.liuRi.stem.zh + justBeforeLocalMidnight.liuRi.branch.zh,
+    justAfterLocalMidnight.liuRi.stem.zh + justAfterLocalMidnight.liuRi.branch.zh,
   );
 });

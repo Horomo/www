@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 import Badge from '@/components/ui/Badge';
 import {
   type ActiveDaYunSummary,
@@ -15,6 +19,28 @@ type SlotTone = 'positive' | 'neutral' | 'negative';
 
 const AREA_ORDER = ['career', 'wealth', 'love', 'health'] as const;
 const AREA_EXAMPLE = '3 / 0 / 3 / 2';
+
+const TEN_GOD_DESCRIPTIONS: Record<string, string> = {
+  '比肩': 'Companion — reinforces self-reliance, peer support, and direct initiative.',
+  '劫财': 'Rob Wealth — brings rivalry, assertiveness, and competition for shared resources.',
+  '食神': 'Eating God — favors creativity, talent expression, and self-sustaining output.',
+  '伤官': 'Hurting Officer — drives innovation, boldness, and unconventional approaches.',
+  '正财': 'Direct Wealth — supports disciplined effort, stable returns, and practical reward.',
+  '偏财': 'Indirect Wealth — opens windfall, opportunity, and fluid exchange.',
+  '正官': 'Direct Officer — aligns with structure, responsibility, and lawful achievement.',
+  '七杀': '7 Killings — brings pressure, sharp challenge, and competitive drive.',
+  '偏官': 'Indirect Officer — channels bold pressure and testing circumstances.',
+  '正印': 'Direct Resource — offers nurturing support, learning, and steady backing.',
+  '偏印': 'Indirect Resource — activates unconventional knowledge and hidden ability.',
+};
+
+const LAYER_ROWS = [
+  { key: 'base' as const, label: 'Base fit', sublabel: 'hour on its own' },
+  { key: 'daYun' as const, label: '10-year', sublabel: 'Da Yun layer' },
+  { key: 'year' as const, label: 'Year', sublabel: 'Liu Nian layer' },
+  { key: 'month' as const, label: 'Month', sublabel: 'Liu Yue layer' },
+  { key: 'day' as const, label: 'Day', sublabel: 'Liu Ri layer' },
+];
 
 export function formatActiveDaYunHeadline(scoringResult: ActiveDaYunSummary) {
   return `${scoringResult.stem.zh}${scoringResult.branch.zh} ages ${scoringResult.ageStart}-${scoringResult.ageEnd}`;
@@ -181,31 +207,123 @@ function BreakdownValue({ value }: { value: number }) {
   );
 }
 
-function TableRow({ slot }: { slot: HourSlotScore }) {
+function ExpandedRowDetail({ slot }: { slot: HourSlotScore }) {
+  const layerValues = {
+    base: slot.baseScore,
+    daYun: slot.daYunModifier,
+    year: slot.liuNianModifier,
+    month: slot.liuYueModifier,
+    day: slot.liuRiModifier,
+  };
+
+  return (
+    <div className="grid gap-4 rounded-[1.4rem] bg-white/72 p-4 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)] sm:grid-cols-[1fr_auto]">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.22em] text-[#5b6f6d]">Layer breakdown</div>
+        <div className="mt-3 space-y-2">
+          {LAYER_ROWS.map((layer) => (
+            <div key={layer.key} className="flex items-center gap-3 text-sm">
+              <div className="w-28 shrink-0">
+                <span className="font-medium text-[#16302d]">{layer.label}</span>
+                <span className="ml-1.5 text-[10px] text-[#5b6f6d]">{layer.sublabel}</span>
+              </div>
+              <BreakdownValue value={layerValues[layer.key]} />
+              {/* TODO: per-layer explanation (data not currently available per-slot) */}
+            </div>
+          ))}
+          <div className="flex items-center gap-3 border-t border-[#d9e9e5] pt-2 text-sm">
+            <div className="w-28 shrink-0 font-medium text-[#16302d]">Final</div>
+            <ScorePill score={slot.finalScore} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 sm:min-w-[196px]">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-[#5b6f6d]">Life areas</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {AREA_ORDER.map((area) => (
+              <div key={area} className="rounded-[1rem] bg-[#f8fbfb] px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#5b6f6d]">{area}</div>
+                <div className="mt-0.5 text-sm font-semibold">
+                  <BreakdownValue value={slot.categoryScores[area]} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-[#5b6f6d]">Role</div>
+          <div className="mt-1.5 text-sm font-medium text-[#16302d]">{slot.tenGod.zh} {slot.tenGod.en}</div>
+          <div className="mt-0.5 text-xs leading-5 text-[#5b6f6d]">
+            {TEN_GOD_DESCRIPTIONS[slot.tenGod.zh] ?? 'Ten God role for this hour relative to your Day Master.'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableRow({
+  slot,
+  isExpanded,
+  onToggle,
+}: {
+  slot: HourSlotScore;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   const tone = getScoreTone(slot.finalScore);
 
   return (
-    <tr className={tone === 'positive' ? 'bg-[rgba(234,252,248,0.42)]' : tone === 'negative' ? 'bg-[rgba(255,243,245,0.56)]' : 'bg-white/38'}>
-      <td className="rounded-l-[1.4rem] py-4 pl-5 pr-3">
-        <div className="font-medium text-[#16302d]">{slot.hourLabel}</div>
-        <div className="mt-1 text-xs text-[#5b6f6d]">{slot.localStartLabel} to {slot.localEndLabel}</div>
-        <div className="mt-1 text-xs text-[#5b6f6d]">Hour pillar {slot.stem.zh}{slot.branch.zh} | {slot.branch.animal}</div>
-      </td>
-      <td className="px-3 py-4 text-sm text-[#16302d]">{slot.branch.animal}</td>
-      <td className="px-3 py-4 text-sm text-[#16302d]">
-        <div>{slot.tenGod.en}</div>
-        <div className="mt-1 text-xs text-[#5b6f6d]">{slot.tenGod.zh}</div>
-      </td>
-      <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.baseScore} /></td>
-      <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.daYunModifier} /></td>
-      <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuNianModifier} /></td>
-      <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuYueModifier} /></td>
-      <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuRiModifier} /></td>
-      <td className="px-3 py-4 text-sm"><ScorePill score={slot.finalScore} /></td>
-      <td className="rounded-r-[1.4rem] px-4 py-4 text-sm text-[#35514d]">
-        {formatAreaScores(slot.categoryScores)}
-      </td>
-    </tr>
+    <>
+      <tr
+        onClick={onToggle}
+        className={`cursor-pointer ${
+          tone === 'positive'
+            ? 'bg-[rgba(234,252,248,0.42)]'
+            : tone === 'negative'
+              ? 'bg-[rgba(255,243,245,0.56)]'
+              : 'bg-white/38'
+        }`}
+      >
+        <td className="rounded-l-[1.4rem] py-4 pl-5 pr-3">
+          <div className="font-medium text-[#16302d]">{slot.hourLabel}</div>
+          <div className="mt-1 text-xs text-[#5b6f6d]">{slot.localStartLabel} to {slot.localEndLabel}</div>
+          <div className="mt-1 text-xs text-[#5b6f6d]">Hour pillar {slot.stem.zh}{slot.branch.zh} | {slot.branch.animal}</div>
+        </td>
+        <td className="px-3 py-4 text-sm text-[#16302d]">{slot.branch.animal}</td>
+        <td className="px-3 py-4 text-sm text-[#16302d]">
+          <div>{slot.tenGod.en}</div>
+          <div className="mt-1 text-xs text-[#5b6f6d]">{slot.tenGod.zh}</div>
+        </td>
+        <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.baseScore} /></td>
+        <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.daYunModifier} /></td>
+        <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuNianModifier} /></td>
+        <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuYueModifier} /></td>
+        <td className="px-3 py-4 text-sm"><BreakdownValue value={slot.liuRiModifier} /></td>
+        <td className="px-3 py-4 text-sm"><ScorePill score={slot.finalScore} /></td>
+        <td className="rounded-r-[1.4rem] px-4 py-4 text-sm text-[#35514d]">
+          {formatAreaScores(slot.categoryScores)}
+        </td>
+      </tr>
+      <tr>
+        <td colSpan={10} className="p-0">
+          {/* Animate max-height so the panel slides in/out. The <tr> itself is always rendered
+              to avoid table reflow; border-spacing-y-1 on the parent table compensates for
+              the extra rows so the visual gap between main rows stays equivalent. */}
+          <div
+            className="overflow-hidden transition-all duration-200"
+            style={{ maxHeight: isExpanded ? '600px' : '0' }}
+          >
+            <div className="px-2 pb-3 pt-1">
+              <ExpandedRowDetail slot={slot} />
+            </div>
+          </div>
+        </td>
+      </tr>
+    </>
   );
 }
 
@@ -276,12 +394,14 @@ function InsightPanel({
   title,
   eyebrow,
   description,
+  sharedContext,
   slots,
   tone,
 }: {
   title: string;
   eyebrow: string;
   description: string;
+  sharedContext: string | null;
   slots: HourSlotScore[];
   tone: 'positive' | 'negative';
 }) {
@@ -290,6 +410,9 @@ function InsightPanel({
       {sectionEyebrow(eyebrow)}
       <h3 className="mt-3 font-serif text-[1.95rem] leading-[1.02] tracking-[-0.03em] text-[#16302d]">{title}</h3>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-[#35514d]">{description}</p>
+      {sharedContext ? (
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[#5b6f6d]">{sharedContext}</p>
+      ) : null}
       <div className="mt-6 space-y-4">
         {slots.map((slot) => (
           <article key={slot.branchIdx} className={`rounded-[1.7rem] px-4 py-5 ${tone === 'positive' ? 'bg-[linear-gradient(180deg,rgba(236,252,247,0.8),rgba(255,255,255,0.72))]' : 'bg-[linear-gradient(180deg,rgba(255,244,246,0.82),rgba(255,255,255,0.74))]'} shadow-[inset_0_0_0_1px_rgba(13,93,86,0.04)]`}>
@@ -307,6 +430,68 @@ function InsightPanel({
         ))}
       </div>
     </section>
+  );
+}
+
+function SlotTable({ slots }: { slots: HourSlotScore[] }) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  function handleToggle(branchIdx: number) {
+    setExpandedIdx((current) => (current === branchIdx ? null : branchIdx));
+  }
+
+  return (
+    <div className="cosmic-scrollbar mt-7 overflow-x-auto pb-1">
+      {/* border-spacing-y-1 (4px): each expansion <tr> adds 4px above + 4px below = 8px gap,
+          matching the visual row gap of the original border-spacing-y-2 (8px). */}
+      <table className="min-w-full border-separate border-spacing-y-1 text-left">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-[0.22em] text-[#5b6f6d]">
+            <th className="px-4 py-2 font-medium">Slot</th>
+            <th className="px-3 py-2 font-medium">Animal</th>
+            <th className="px-3 py-2 font-medium">Role</th>
+            <th className="px-3 py-2 font-medium">
+              <div>Base fit</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">hour on its own</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>10-year</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">Da Yun layer</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>Year</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">Liu Nian layer</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>Month</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">Liu Yue layer</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>Day</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">Liu Ri layer</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>Final</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">all layers combined</div>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <div>Life areas</div>
+              <div className="mt-0.5 text-[10px] normal-case tracking-normal text-[#5b6f6d]/60">career / wealth / love / health</div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((slot) => (
+            <TableRow
+              key={slot.branchIdx}
+              slot={slot}
+              isExpanded={expandedIdx === slot.branchIdx}
+              onToggle={() => handleToggle(slot.branchIdx)}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -465,29 +650,7 @@ export function HourlyScoringResultContent({ scoringResult }: { scoringResult: H
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#35514d]">
               Read left to right: start with the slot itself, then follow how the time layers raise or lower the final result.
             </p>
-            <div className="cosmic-scrollbar mt-7 overflow-x-auto pb-1">
-              <table className="min-w-full border-separate border-spacing-y-2 text-left">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-[0.22em] text-[#5b6f6d]">
-                    <th className="px-4 py-2 font-medium">Slot</th>
-                    <th className="px-3 py-2 font-medium">Animal</th>
-                    <th className="px-3 py-2 font-medium">Role</th>
-                    <th className="px-3 py-2 font-medium">Base fit</th>
-                    <th className="px-3 py-2 font-medium">10-year</th>
-                    <th className="px-3 py-2 font-medium">Year</th>
-                    <th className="px-3 py-2 font-medium">Month</th>
-                    <th className="px-3 py-2 font-medium">Day</th>
-                    <th className="px-3 py-2 font-medium">Final</th>
-                    <th className="px-3 py-2 font-medium">Life areas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scoringResult.slots.map((slot) => (
-                    <TableRow key={slot.branchIdx} slot={slot} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SlotTable slots={scoringResult.slots} />
           </div>
 
           <aside className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(236,250,247,0.76),rgba(255,255,255,0.74))] p-6 shadow-[inset_0_0_0_1px_rgba(13,93,86,0.05)]">
@@ -539,6 +702,7 @@ export function HourlyScoringResultContent({ scoringResult }: { scoringResult: H
           title={`Strongest positive slot${scoringResult.strongestPositiveSlots.length === 1 ? '' : 's'}`}
           eyebrow="Most Supportive Windows"
           description="Use these times for actions that benefit from more support, easier momentum, or a cleaner background. They are your better-timed windows today, not guarantees."
+          sharedContext={scoringResult.extremeSlotContext}
           slots={scoringResult.strongestPositiveSlots}
           tone="positive"
         />
@@ -546,6 +710,7 @@ export function HourlyScoringResultContent({ scoringResult }: { scoringResult: H
           title={`Strongest negative slot${scoringResult.strongestNegativeSlots.length === 1 ? '' : 's'}`}
           eyebrow="Most Challenging Windows"
           description="Use these times with more caution, lower stakes, or slower pacing. They point to greater resistance today, not fixed bad outcomes."
+          sharedContext={scoringResult.extremeSlotContext}
           slots={scoringResult.strongestNegativeSlots}
           tone="negative"
         />
