@@ -4,6 +4,7 @@ import Script from 'next/script';
 import Link from 'next/link';
 
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 
 import StructuredData from '@/components/StructuredData';
 import DesktopPrimaryNav from '@/components/ui/DesktopPrimaryNav';
@@ -114,6 +115,7 @@ export default function RootLayout({
         </Script>
         <StructuredData data={[buildOrganizationSchema(), buildWebsiteSchema()]} />
         <SpeedInsights />
+        <Analytics />
         <Providers>
           <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
             <div className="mx-auto max-w-7xl">
