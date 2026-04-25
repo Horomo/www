@@ -1,34 +1,36 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+
+import { Link, usePathname } from '@/i18n/navigation';
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: 'hourly' | 'calculator' | 'learn';
   isActive: (pathname: string) => boolean;
 };
 
 const MOBILE_NAV_ITEMS: NavItem[] = [
   {
     href: '/hourly',
-    label: 'Hourly Score',
+    labelKey: 'hourly',
     isActive: (pathname) => pathname === '/hourly',
   },
   {
     href: '/calculator',
-    label: 'Calculator',
+    labelKey: 'calculator',
     isActive: (pathname) => pathname === '/calculator' || pathname === '/calculator/result',
   },
   {
     href: '/learn',
-    label: 'Learn',
+    labelKey: 'learn',
     isActive: (pathname) => pathname === '/learn' || pathname.startsWith('/learn/'),
   },
 ];
 
 export default function MobilePrimaryNav() {
   const pathname = usePathname();
+  const t = useTranslations('nav');
 
   return (
     <nav
@@ -49,7 +51,7 @@ export default function MobilePrimaryNav() {
                 : 'min-w-0 rounded-full bg-white/62 px-3 py-2.5 text-center text-[13px] text-[#415654] transition-all duration-300 hover:bg-white hover:text-[#006a62]'
             }
           >
-            <span className="block truncate">{item.label}</span>
+            <span className="block truncate">{t(item.labelKey)}</span>
           </Link>
         );
       })}

@@ -1,4 +1,6 @@
-import Link from 'next/link';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+
+import { Link } from '@/i18n/navigation';
 
 import GuideArtwork from '@/components/GuideArtwork';
 import LearnGuideCard from '@/components/LearnGuideCard';
@@ -9,19 +11,27 @@ import { buttonClassName } from '@/components/ui/Button';
 import { learnGuides } from '@/lib/learn';
 import { buildFaqSchema, buildMetadata } from '@/lib/seo';
 
-export const metadata = buildMetadata({
-  title: 'BaZi Calculator & Four Pillars Chart',
-  description:
-    'Use Horomo to calculate a BaZi chart with true solar time, Day Master analysis, Ten Gods, hidden stems, element distribution, and Da Yun luck pillars.',
-  path: '/',
-  keywords: [
-    'bazi calculator',
-    'bazi chart',
-    'four pillars calculator',
-    'chinese astrology calculator',
-    'bazi reading',
-  ],
-});
+type HomePageProps = {
+  params: Promise<{ locale: string }>;
+};
+
+export async function generateMetadata({ params }: HomePageProps) {
+  const { locale } = await params;
+  return buildMetadata({
+    title: 'BaZi Calculator & Four Pillars Chart',
+    description:
+      'Use Horomo to calculate a BaZi chart with true solar time, Day Master analysis, Ten Gods, hidden stems, element distribution, and Da Yun luck pillars.',
+    path: '/',
+    locale,
+    keywords: [
+      'bazi calculator',
+      'bazi chart',
+      'four pillars calculator',
+      'chinese astrology calculator',
+      'bazi reading',
+    ],
+  });
+}
 
 const homeFaqs = [
   {
@@ -46,7 +56,12 @@ const homeFaqs = [
   },
 ];
 
-export default function Home() {
+export default async function Home({ params }: HomePageProps) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const tHome = await getTranslations('home');
+  const tCommon = await getTranslations('common');
+
   return (
     <main>
       <StructuredData data={buildFaqSchema(homeFaqs)} />
@@ -58,7 +73,7 @@ export default function Home() {
           <div>
             <Badge tone="cyan">Four Pillars of Destiny</Badge>
             <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[0.95] tracking-[-0.03em] text-[#151d22] sm:text-6xl lg:text-[5.2rem]">
-              BaZi calculator for Day Master, Ten Gods, hidden stems, and Da Yun cycles
+              {tHome('h1')}
             </h1>
             <p className="mt-8 max-w-3xl text-lg leading-8 text-[#151d22]/72">
               Horomo is built for people who want more than a basic BaZi chart. It calculates the
@@ -72,7 +87,7 @@ export default function Home() {
             </div>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link href="/calculator" className={buttonClassName('primary', 'lg')}>
-                Start Your Analysis
+                {tCommon('startAnalysis')}
               </Link>
               <Link href="/learn" className={buttonClassName('secondary', 'lg')}>
                 Learn the core concepts
@@ -150,7 +165,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex justify-center">
               <Link href="/calculator" className={buttonClassName('primary', 'lg')}>
-                Start Your Analysis
+                {tCommon('startAnalysis')}
               </Link>
             </div>
           </div>

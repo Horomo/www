@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { routing, type Locale } from '@/i18n/routing';
+
 const DEFAULT_SITE_URL = 'http://localhost:3000';
 
 export const siteConfig = {
@@ -8,6 +10,12 @@ export const siteConfig = {
   locale: 'en_US',
   description:
     'Horomo is a BaZi calculator for Four Pillars charts, Day Master analysis, Ten Gods, hidden stems, element distribution, and Da Yun luck pillars.',
+};
+
+const OG_LOCALE_MAP: Record<Locale, string> = {
+  th: 'th_TH',
+  en: 'en_US',
+  zh: 'zh_CN',
 };
 
 function normalizeSiteUrl(rawUrl: string): URL {
@@ -31,10 +39,30 @@ export function absoluteUrl(path = '/'): string {
   return new URL(path, getSiteUrl()).toString();
 }
 
+function localizedPath(path: string, locale: Locale): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  if (locale === routing.defaultLocale) {
+    return normalized;
+  }
+  if (normalized === '/') {
+    return `/${locale}`;
+  }
+  return `/${locale}${normalized}`;
+}
+
+function buildLanguageAlternates(path: string): Record<string, string> {
+  const alternates: Record<string, string> = {};
+  for (const locale of routing.locales) {
+    alternates[locale] = absoluteUrl(localizedPath(path, locale));
+  }
+  return alternates;
+}
+
 type MetadataOptions = {
   title: string;
   description: string;
   path?: string;
+  locale?: string;
   keywords?: string[];
   noIndex?: boolean;
   type?: 'website' | 'article';
@@ -44,11 +72,18 @@ export function buildMetadata({
   title,
   description,
   path = '/',
+  locale,
   keywords,
   noIndex = false,
   type = 'website',
 }: MetadataOptions): Metadata {
-  const canonical = absoluteUrl(path);
+  const resolvedLocale: Locale = (
+    locale && (routing.locales as readonly string[]).includes(locale)
+      ? (locale as Locale)
+      : routing.defaultLocale
+  );
+  const canonical = absoluteUrl(localizedPath(path, resolvedLocale));
+  const ogLocale = OG_LOCALE_MAP[resolvedLocale];
 
   return {
     metadataBase: getSiteUrl(),
@@ -57,6 +92,7 @@ export function buildMetadata({
     keywords,
     alternates: {
       canonical,
+      languages: buildLanguageAlternates(path),
     },
     openGraph: {
       type,
@@ -64,7 +100,7 @@ export function buildMetadata({
       title,
       description,
       siteName: siteConfig.name,
-      locale: siteConfig.locale,
+      locale: ogLocale,
       images: [
         {
           url: absoluteUrl('/opengraph-image'),

@@ -1,13 +1,14 @@
 // MANUAL STEP — Vercel environment variables:
-// Add NEXT_PUBLIC_CANONICAL_HOST=horomo.com in the Vercel project dashboard
+// Add CANONICAL_HOST=horomo.com in the Vercel project dashboard
 // (Settings → Environment Variables) for Production, Preview, and Development.
 
 import { type NextRequest, NextResponse } from 'next/server';
+import createMiddleware from 'next-intl/middleware';
 
-// NOTE: NEXT_PUBLIC_* variables are inlined at build time by Next.js.
-// Do NOT set this in .env.local if that file is committed to the repo —
-// the local value would be baked into the production bundle.
-// Set it only in the Vercel dashboard for production builds.
+import { routing } from './i18n/routing';
+
+const intlMiddleware = createMiddleware(routing);
+
 const DIRECT_FILE_PATHS = new Set(['/ads.txt', '/robots.txt', '/favicon.ico']);
 
 function normalizeHost(value: string | undefined): string {
@@ -41,6 +42,7 @@ export function middleware(request: NextRequest) {
   const isLocalhost = hostname === 'localhost' || hostname.endsWith('.local');
   const isVercelPreview = hostname.endsWith('.vercel.app');
 
+  // Canonical-host redirect runs first (production only).
   if (!isLocalhost && !isVercelPreview && hostname !== canonicalHost) {
     const url = new URL(request.url);
     url.hostname = canonicalHost; // .hostname setter leaves protocol and port intact
@@ -48,13 +50,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, { status: 301 });
   }
 
-  return NextResponse.next();
+  // Then locale detection / negotiation.
+  return intlMiddleware(request);
 }
 
 export const config = {
+  // Match all paths except Next.js internals, API routes, and files (anything
+  // with a dot in the final segment: favicon.ico, robots.txt, sitemap.xml,
+  // images, fonts, etc.). Root `/` is matched so next-intl can serve Thai
+  // without a prefix.
   matcher: [
-    // Skip Next.js internals, static assets, and well-known root files that
-    // must be served directly without going through the middleware redirect.
-    '/((?!_next/static|_next/image|favicon\\.ico|ads\\.txt|robots\\.txt|sitemap[^/]*\\.xml|\\.well-known).*)',
+    '/',
+    '/((?!api|_next|_vercel|.*\\..*).*)',
   ],
 };
