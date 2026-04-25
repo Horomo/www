@@ -1,54 +1,56 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+
+import { Link, usePathname } from '@/i18n/navigation';
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: 'calculator' | 'hourly' | 'home' | 'learn' | 'dayMaster' | 'tenGods' | 'luckPillars';
   isActive: (pathname: string) => boolean;
 };
 
 const DESKTOP_NAV_ITEMS: NavItem[] = [
   {
     href: '/calculator',
-    label: 'Calculator',
+    labelKey: 'calculator',
     isActive: (pathname) => pathname === '/calculator' || pathname === '/calculator/result',
   },
   {
     href: '/hourly',
-    label: 'Hourly Score',
+    labelKey: 'hourly',
     isActive: (pathname) => pathname === '/hourly',
   },
   {
     href: '/',
-    label: 'Home',
+    labelKey: 'home',
     isActive: (pathname) => pathname === '/',
   },
   {
     href: '/learn',
-    label: 'Learn',
+    labelKey: 'learn',
     isActive: (pathname) => pathname === '/learn',
   },
   {
     href: '/learn/day-master',
-    label: 'Day Master',
+    labelKey: 'dayMaster',
     isActive: (pathname) => pathname === '/learn/day-master',
   },
   {
     href: '/learn/ten-gods',
-    label: 'Ten Gods',
+    labelKey: 'tenGods',
     isActive: (pathname) => pathname === '/learn/ten-gods',
   },
   {
     href: '/learn/luck-pillars',
-    label: 'Luck Pillars',
+    labelKey: 'luckPillars',
     isActive: (pathname) => pathname === '/learn/luck-pillars',
   },
 ];
 
 export default function DesktopPrimaryNav() {
   const pathname = usePathname();
+  const t = useTranslations('nav');
 
   return (
     <nav
@@ -69,7 +71,7 @@ export default function DesktopPrimaryNav() {
                 : 'rounded-full px-3 py-2 transition-all duration-300 hover:bg-white/58 hover:text-[#006a62]'
             }
           >
-            {item.label}
+            {t(item.labelKey)}
           </Link>
         );
       })}

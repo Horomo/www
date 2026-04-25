@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "calculator": "Calculator",
+    "hourly": "Hourly Score",
+    "home": "Home",
+    "learn": "Learn",
+    "dayMaster": "Day Master",
+    "tenGods": "Ten Gods",
+    "luckPillars": "Luck Pillars"
+  },
+  "common": {
+    "startAnalysis": "Start Your Analysis",
+    "newCalculation": "New Calculation",
+    "backToCalculator": "Back to Calculator"
+  },
+  "home": {
+    "h1": "BaZi calculator for Day Master, Ten Gods, hidden stems, and Da Yun cycles"
+  },
+  "calculator": {
+    "h1": "Enter Your Birth Information",
+    "cta": "Calculate Chart · 起命盤",
+    "result": {
+      "h1": "Your BaZi Result"
+    },
+    "wizard": {
+      "stepIdentity": "Identity",
+      "stepBirth": "Birth",
+      "stepLocation": "Location",
+      "stepConfirm": "Confirm",
+      "headingIdentity": "Gender and polarity",
+      "headingBirth": "Birth date and time",
+      "headingLocation": "Birthplace and timezone",
+      "headingConfirm": "Review and calculate"
+    },
+    "pillars": {
+      "year": "Year",
+      "month": "Month",
+      "day": "Day",
+      "hour": "Hour"
+    }
+  },
+  "hourly": {
+    "h1": "BaZi Hourly Scoring"
+  },
+  "learn": {
+    "h1": "BaZi guides and glossary"
+  }
+}

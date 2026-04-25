@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { setRequestLocale } from 'next-intl/server';
+
+import { Link } from '@/i18n/navigation';
 
 import Breadcrumbs from '@/components/Breadcrumbs';
 import LearnGuideCard from '@/components/LearnGuideCard';
@@ -8,6 +10,7 @@ import StructuredData from '@/components/StructuredData';
 import Badge from '@/components/ui/Badge';
 import GlowCard from '@/components/ui/GlowCard';
 import { buttonClassName } from '@/components/ui/Button';
+import { routing } from '@/i18n/routing';
 import { getLearnGuide, learnGuides } from '@/lib/learn';
 import {
   buildArticleSchema,
@@ -16,15 +19,18 @@ import {
 } from '@/lib/seo';
 
 type LearnGuidePageProps = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 };
 
 export async function generateStaticParams() {
-  return learnGuides.map((guide) => ({ slug: guide.slug }));
+  const slugs = learnGuides.map((guide) => guide.slug);
+  return routing.locales.flatMap((locale) =>
+    slugs.map((slug) => ({ locale, slug })),
+  );
 }
 
 export async function generateMetadata({ params }: LearnGuidePageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
   const guide = getLearnGuide(slug);
 
   if (!guide) {
@@ -32,6 +38,7 @@ export async function generateMetadata({ params }: LearnGuidePageProps): Promise
       title: 'Guide not found',
       description: 'The requested guide could not be found.',
       path: '/learn',
+      locale,
       noIndex: true,
     });
   }
@@ -40,13 +47,15 @@ export async function generateMetadata({ params }: LearnGuidePageProps): Promise
     title: guide.title,
     description: guide.description,
     path: guide.href,
+    locale,
     keywords: guide.keywords,
     type: 'article',
   });
 }
 
 export default async function LearnGuidePage({ params }: LearnGuidePageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  setRequestLocale(locale);
   const guide = getLearnGuide(slug);
 
   if (!guide) {

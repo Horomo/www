@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useSyncExternalStore } from 'react';
+import { useTranslations } from 'next-intl';
 
+import { Link, useRouter } from '@/i18n/navigation';
 import BaziResultView from '@/components/BaziResultView';
 import Button, { buttonClassName } from '@/components/ui/Button';
 import GlowCard from '@/components/ui/GlowCard';
@@ -17,6 +17,8 @@ const subscribeToCalculationSession = () => () => {};
 
 export default function CalculatorResultPage() {
   const router = useRouter();
+  const tCommon = useTranslations('common');
+  const tResult = useTranslations('calculator.result');
   const session = useSyncExternalStore<CalculationSession | null>(
     subscribeToCalculationSession,
     loadCalculationResult,
@@ -34,7 +36,7 @@ export default function CalculatorResultPage() {
         <div className="mx-auto max-w-5xl">
           <div className="flex justify-start">
             <Link href="/calculator" className={buttonClassName('ghost', 'sm')}>
-              Back to Calculator
+              {tCommon('backToCalculator')}
             </Link>
           </div>
           <GlowCard accent="violet" className="mt-6 p-8 text-center sm:p-10">
@@ -46,7 +48,7 @@ export default function CalculatorResultPage() {
             </p>
             <div className="mt-6 flex justify-center">
               <Button variant="primary" size="lg" onClick={handleNewCalculation}>
-                New Calculation
+                {tCommon('newCalculation')}
               </Button>
             </div>
           </GlowCard>
@@ -60,16 +62,16 @@ export default function CalculatorResultPage() {
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/calculator" className={buttonClassName('ghost', 'sm')}>
-            Back to Calculator
+            {tCommon('backToCalculator')}
           </Link>
           <Button variant="primary" size="sm" onClick={handleNewCalculation}>
-            New Calculation
+            {tCommon('newCalculation')}
           </Button>
         </div>
 
         <div className="mt-6 text-center">
           <h1 className="font-serif text-4xl tracking-[-0.03em] text-[#151d22] sm:text-[3.1rem]">
-            Your BaZi Result
+            {tResult('h1')}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-[#151d22]/64 sm:text-base">
             Review the full chart, supporting visualizations, luck cycles, and optional AI insights

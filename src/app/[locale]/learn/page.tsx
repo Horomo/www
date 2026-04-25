@@ -1,4 +1,6 @@
-import Link from 'next/link';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+
+import { Link } from '@/i18n/navigation';
 
 import Breadcrumbs from '@/components/Breadcrumbs';
 import LearnGuideCard from '@/components/LearnGuideCard';
@@ -9,15 +11,26 @@ import GlowCard from '@/components/ui/GlowCard';
 import { learnGuides } from '@/lib/learn';
 import { buildBreadcrumbSchema, buildMetadata } from '@/lib/seo';
 
-export const metadata = buildMetadata({
-  title: 'BaZi Guides and Glossary',
-  description:
-    'Explore Horomo guides on BaZi charts, Day Master, Ten Gods, hidden stems, element distribution, and Da Yun luck pillars.',
-  path: '/learn',
-  keywords: ['bazi guides', 'bazi glossary', 'day master', 'ten gods', 'luck pillars'],
-});
+type LearnHubPageProps = {
+  params: Promise<{ locale: string }>;
+};
 
-export default function LearnHubPage() {
+export async function generateMetadata({ params }: LearnHubPageProps) {
+  const { locale } = await params;
+  return buildMetadata({
+    title: 'BaZi Guides and Glossary',
+    description:
+      'Explore Horomo guides on BaZi charts, Day Master, Ten Gods, hidden stems, element distribution, and Da Yun luck pillars.',
+    path: '/learn',
+    locale,
+    keywords: ['bazi guides', 'bazi glossary', 'day master', 'ten gods', 'luck pillars'],
+  });
+}
+
+export default async function LearnHubPage({ params }: LearnHubPageProps) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations('learn');
   const breadcrumbItems = [
     { name: 'Home', href: '/' },
     { name: 'Learn' },
@@ -36,7 +49,7 @@ export default function LearnHubPage() {
           <Breadcrumbs items={breadcrumbItems} />
           <Badge tone="violet" className="mt-6">Learning vault</Badge>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">
-            BaZi guides and glossary
+            {t('h1')}
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
             This hub supports the calculator with practical explanations of the core concepts people

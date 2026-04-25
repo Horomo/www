@@ -9,7 +9,9 @@
   --color-horomo-gold-soft: #fcd400;
   --color-horomo-rose: #874e58;
   --color-horomo-rose-soft: #ffb7c2;
-  --font-sans: var(--font-space-grotesk), var(--font-geist-sans), system-ui, sans-serif;
+  --font-sans: var(--font-kanit), system-ui, sans-serif;
+  --font-serif: var(--font-kanit), system-ui, sans-serif;
+  --font-mono: var(--font-kanit), ui-monospace, monospace;
 }
 
 :root {
@@ -25,7 +27,7 @@ html {
 }
 
 body {
-  font-family: var(--font-space-grotesk), var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-kanit), system-ui, sans-serif;
   color: #151d22;
   background:
     radial-gradient(circle at top, rgba(64, 224, 208, 0.15), transparent 28%),
@@ -36,7 +38,9 @@ body {
 }
 
 .font-zh {
-  font-family: var(--font-noto-serif), serif;
+  /* Kanit doesn't include CJK glyphs, so we let the system serif CJK font
+     take over for Chinese characters while keeping Latin/Thai on Kanit. */
+  font-family: var(--font-kanit), "Noto Serif CJK SC", "Microsoft YaHei", "PingFang SC", serif;
 }
 
 a,

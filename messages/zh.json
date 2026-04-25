@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "calculator": "排盘",
+    "hourly": "时辰评分",
+    "home": "首页",
+    "learn": "学习",
+    "dayMaster": "日主",
+    "tenGods": "十神",
+    "luckPillars": "大运"
+  },
+  "common": {
+    "startAnalysis": "开始分析",
+    "newCalculation": "重新计算",
+    "backToCalculator": "返回排盘"
+  },
+  "home": {
+    "h1": "八字命盘计算器，涵盖日主、十神、藏干与大运周期"
+  },
+  "calculator": {
+    "h1": "请输入您的出生信息",
+    "cta": "起命盘 · 起命盤",
+    "result": {
+      "h1": "您的八字命盘结果"
+    },
+    "wizard": {
+      "stepIdentity": "身份",
+      "stepBirth": "出生",
+      "stepLocation": "地点",
+      "stepConfirm": "确认",
+      "headingIdentity": "性别与阴阳",
+      "headingBirth": "出生日期与时间",
+      "headingLocation": "出生地与时区",
+      "headingConfirm": "核对并起盘"
+    },
+    "pillars": {
+      "year": "年柱",
+      "month": "月柱",
+      "day": "日柱",
+      "hour": "时柱"
+    }
+  },
+  "hourly": {
+    "h1": "八字时辰评分"
+  },
+  "learn": {
+    "h1": "八字指南与术语"
+  }
+}

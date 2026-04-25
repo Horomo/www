@@ -1,8 +1,9 @@
 'use client';
 
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
+import { useRouter } from '@/i18n/navigation';
 import BirthPlaceSearch from '@/components/BirthPlaceSearch';
 import Button from '@/components/ui/Button';
 import GlowCard from '@/components/ui/GlowCard';
@@ -46,12 +47,13 @@ const YIN_YANG_OPTIONS: Array<{
   { value: 'female', yinYang: '陰', pinyinLabel: 'Yīn', label: 'Yin', tagline: 'Receptive energy · Da Yun follows Yin rule' },
 ];
 
-const WIZARD_STEPS = [
-  { id: 'identity', label: 'Identity', detail: 'Choose gender identity and Yin/Yang polarity.' },
-  { id: 'birth', label: 'Birth', detail: 'Set date, time, and known-time status.' },
-  { id: 'location', label: 'Location', detail: 'Confirm place, timezone, and coordinates.' },
-  { id: 'confirm', label: 'Confirm', detail: 'Review the reading ritual before reveal.' },
+const WIZARD_STEP_DEFS = [
+  { id: 'identity', labelKey: 'stepIdentity', detail: 'Choose gender identity and Yin/Yang polarity.' },
+  { id: 'birth', labelKey: 'stepBirth', detail: 'Set date, time, and known-time status.' },
+  { id: 'location', labelKey: 'stepLocation', detail: 'Confirm place, timezone, and coordinates.' },
+  { id: 'confirm', labelKey: 'stepConfirm', detail: 'Review the reading ritual before reveal.' },
 ] as const;
+const WIZARD_STEP_COUNT = WIZARD_STEP_DEFS.length;
 
 type FormValues = AnalysisFormDraft;
 type StepFieldErrors = Partial<Record<'genderIdentity' | 'calculationMode' | 'dob' | 'tob' | 'timezone' | 'longitude' | 'latitude', string>>;
@@ -69,6 +71,8 @@ function StatTile({ label, value, hint, className }: { label: string; value: str
 
 export default function BaziCalculator() {
   const router = useRouter();
+  const tWizard = useTranslations('calculator.wizard');
+  const tCalculator = useTranslations('calculator');
   const [dob, setDob] = useState('1990-06-15');
   const [tob, setTob] = useState('08:30');
   const [birthPlaceQuery, setBirthPlaceQuery] = useState('Bangkok, Thailand');
@@ -174,7 +178,7 @@ export default function BaziCalculator() {
     }
     setShowStepValidation(false);
     setCalcError(null);
-    moveToStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1));
+    moveToStep(Math.min(currentStep + 1, WIZARD_STEP_COUNT - 1));
   }
   function goBack() { setShowStepValidation(false); setCalcError(null); moveToStep(Math.max(currentStep - 1, 0)); }
 
@@ -201,7 +205,7 @@ export default function BaziCalculator() {
           <div className="rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.86),rgba(255,255,255,0.72))] p-4 shadow-[0_20px_56px_rgba(0,106,98,0.08)] backdrop-blur-[20px] sm:p-6">
             <h2 id="calculator-heading" className="sr-only">BaZi calculator form</h2>
             <Stepper
-              steps={WIZARD_STEPS.map((step) => ({ ...step }))}
+              steps={WIZARD_STEP_DEFS.map((step) => ({ id: step.id, label: tWizard(step.labelKey), detail: step.detail }))}
               currentStep={currentStep}
               onStepClick={(index) => {
                 if (index <= currentStep) {
@@ -218,7 +222,7 @@ export default function BaziCalculator() {
                   <>
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 1</div>
-                      <h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Gender and polarity</h3>
+                      <h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingIdentity')}</h3>
                       <p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Choose your gender identity. Male and Female automatically set Yin/Yang. All other options let you choose polarity explicitly.</p>
                     </div>
                     <div className="space-y-3">
@@ -284,7 +288,7 @@ export default function BaziCalculator() {
 
                 {currentStep === 1 ? (
                   <>
-                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 2</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Birth date and time</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Use the recorded local birth time if known.</p></div>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 2</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingBirth')}</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Use the recorded local birth time if known.</p></div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Date of Birth</label><input type="date" value={dob} onChange={(event) => { setShowStepValidation(false); setDob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.dob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.dob}</p> : null}</div>
                       <div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Time of Birth (clock time on certificate)</label><input type="time" value={tob} disabled={unknownTime} onChange={(event) => { setShowStepValidation(false); setTob(event.target.value); }} className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.tob ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.tob}</p> : null}<p className="mt-2 text-xs leading-6 text-[#151d22]/52">Use the recorded local clock time at the birthplace. DST is handled automatically from the timezone.</p></div>
@@ -295,7 +299,7 @@ export default function BaziCalculator() {
 
                 {currentStep === 2 ? (
                   <>
-                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Birthplace and timezone</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Search your birthplace, then adjust the technical details only if needed.</p></div>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingLocation')}</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Search your birthplace, then adjust the technical details only if needed.</p></div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
                       <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div>{showStepValidation && currentStepErrors.timezone ? <p className="mt-3 text-xs leading-6 text-[#874e58]">{currentStepErrors.timezone}</p> : null}<p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
@@ -306,7 +310,7 @@ export default function BaziCalculator() {
 
                 {currentStep === 3 ? (
                   <>
-                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 4</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">Review and calculate</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Check your inputs, then generate the chart.</p></div>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 4</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingConfirm')}</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Check your inputs, then generate the chart.</p></div>
                     <div className="grid gap-3 sm:grid-cols-2">{confirmationSummary.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}</div>
                     <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(64,224,208,0.14),rgba(255,255,255,0.72))] px-4 py-4 text-sm leading-7 text-[#151d22]/72 shadow-[inset_0_0_0_1px_rgba(64,224,208,0.16)]">Your chart is calculated locally first. Optional AI analysis only runs after the chart exists.</div>
                   </>
@@ -316,9 +320,9 @@ export default function BaziCalculator() {
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex gap-3">
                   {currentStep > 0 ? <Button variant="ghost" size="md" onClick={goBack}>Back</Button> : null}
-                  {currentStep < WIZARD_STEPS.length - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Next</Button> : <Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>Calculate Chart · 起命盤</Button>}
+                  {currentStep < WIZARD_STEP_COUNT - 1 ? <Button variant="secondary" size="md" onClick={goNext}>Next</Button> : <Button variant="primary" size="lg" onClick={() => { if (calculationMode) trackEvent('calculation_mode_confirmed', { energy_type: calculationMode }); calculate(formValues); }}>{tCalculator('cta')}</Button>}
                 </div>
-                <p className="text-xs leading-6 text-[#151d22]/48">{currentStep < WIZARD_STEPS.length - 1 ? `${currentStep + 1} of ${WIZARD_STEPS.length}` : 'Review complete'}</p>
+                <p className="text-xs leading-6 text-[#151d22]/48">{currentStep < WIZARD_STEP_COUNT - 1 ? `${currentStep + 1} of ${WIZARD_STEP_COUNT}` : 'Review complete'}</p>
               </div>
             </GlowCard>
           </div>
