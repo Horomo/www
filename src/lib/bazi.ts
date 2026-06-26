@@ -319,6 +319,10 @@ export function getMonthTermDates(year: number): JieTerm[] {
 
 /**
  * Determine the Month Branch index for a given date.
+ *
+ * `date` must be the true UTC instant of birth — 節氣 boundaries are absolute
+ * UTC instants, so comparing them against a solar-shifted time would bias the
+ * boundary by the solar correction.
  */
 export function getMonthBranchIndex(date: Date): number {
   const year = date.getUTCFullYear();
@@ -335,6 +339,9 @@ export function getMonthBranchIndex(date: Date): number {
 
 /**
  * Determine Bazi Year, considering Li Chun (立春) cutoff.
+ *
+ * `date` must be the true UTC instant of birth (the 立春 cutoff is an absolute
+ * UTC instant; do not pass solar-shifted time).
  */
 export function getBaziYear(date: Date): number {
   const year = date.getUTCFullYear();
@@ -427,6 +434,7 @@ export function getAllJie(year: number): { lon: number; name: string; date: Date
   return terms.map(t => ({ ...t, date: solarTermDate(year, t.lon) }));
 }
 
+// `date` must be the true UTC instant of birth — 節氣 are absolute UTC instants.
 export function findNearestJie(date: Date, forward: boolean): { lon: number; name: string; date: Date } | null {
   const y = date.getUTCFullYear();
   const all: { lon: number; name: string; date: Date }[] = [];
@@ -447,7 +455,8 @@ export function ganzhi2cycle(stemIdx: number, branchIdx: number): number {
 }
 
 export function computeDaYun(
-  localDate: Date,
+  utcDate: Date,
+  civilDate: Date,
   mp: { stemIdx: number; branchIdx: number },
   yearStemIdx: number,
   calculationMode: CalculationGenderMode,
@@ -458,18 +467,24 @@ export function computeDaYun(
   const treatedAsMale = calculationMode === 'male';
   const forward = treatedAsMale !== yearStemYin;
 
-  const jie = findNearestJie(localDate, forward);
+  // 起運 is measured to the nearest 節氣, which are absolute UTC instants. Both
+  // the selection (findNearestJie) and the distance (daysDiff) must therefore
+  // compare against the true birth instant (utcDate), NOT true solar time.
+  // Longitude/EoT corrections are wall-clock adjustments and must not bias this.
+  const jie = findNearestJie(utcDate, forward);
   if (!jie) return null;
 
   const MS_PER_DAY = 86400000;
-  const daysDiff = Math.abs(jie.date.getTime() - localDate.getTime()) / MS_PER_DAY;
+  const daysDiff = Math.abs(jie.date.getTime() - utcDate.getTime()) / MS_PER_DAY;
 
   const startYears  = Math.floor(daysDiff / 3);
   const remainDays  = daysDiff % 3;
   const startMonths = Math.min(11, Math.round(remainDays * 4));
 
   const monthCycleIdx = ganzhi2cycle(mp.stemIdx, mp.branchIdx);
-  const birthYear = localDate.getUTCFullYear();
+  // birthYear labels the Gregorian year of birth at the birthplace; it stays on
+  // civil (clock) time and is not a 節氣 comparison.
+  const birthYear = civilDate.getUTCFullYear();
 
   const pillars: DaYunPillar[] = [];
   for (let i = 1; i <= 10; i++) {
@@ -731,13 +746,20 @@ export function computeBazi(
     tstDate = new Date(utcDate.getTime() + stdOffsetMin * 60 * 1000);
   }
 
-  // All pillars use True Solar Time date
-  const yp = yearPillar(tstDate);
-  const mp = monthPillar(tstDate, yp.stemIdx);
+  // Frame split:
+  //  - Day & Hour pillars are wall-clock concepts → True Solar Time (tstDate).
+  //  - Year & Month pillars and Da Yun 起運 are decided by 節氣 boundaries,
+  //    which are absolute UTC instants → compare against the true birth instant
+  //    (utcDate). Feeding tstDate here would bias every 節氣 boundary by the
+  //    total solar correction (~hours), flipping Month/Year/生肖 and shifting
+  //    Da Yun start age for births near a 節氣.
+  const yp = yearPillar(utcDate);
+  const mp = monthPillar(utcDate, yp.stemIdx);
   const dp = dayPillar(tstDate);
   const hp = timeStr ? hourPillar(tstDate, dp.stemIdx) : null;
 
   const daYun = computeDaYun(
+    utcDate,
     tstDate,
     { stemIdx: mp.stemIdx, branchIdx: mp.branchIdx },
     yp.stemIdx,
