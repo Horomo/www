@@ -101,13 +101,13 @@ test('derived chart values use the corrected 子 hidden stem', () => {
   assert.equal(chartData.tenGodsCount['偏印'] ?? 0, 0);
 });
 
-test('year pillar flips at the Li Chun boundary after true-solar-time correction', () => {
-  // Li Chun 2024 oracle: 2024-02-04T08:27:00Z (HKO).
-  // EoT at that date ≈ −13.85 min → UTC crossover (TST = oracle) ≈ 08:40:51Z.
-  // 08:40 UTC → TST ≈ 08:26:09Z (before Li Chun) → 癸卯
-  // 08:41 UTC → TST ≈ 08:27:09Z (after  Li Chun) → 甲辰
-  const before = bazi.computeBazi('2024-02-04', '08:40', 'UTC', 0, 'male');
-  const after = bazi.computeBazi('2024-02-04', '08:41', 'UTC', 0, 'male');
+test('year pillar flips at the Li Chun UTC instant', () => {
+  // Li Chun 2024 = 2024-02-04T08:27:00Z (HKO exact). 節氣 boundaries are absolute
+  // UTC instants, so the flip is at the true birth instant. Longitude/EoT are
+  // wall-clock corrections that move only the solar-time Day/Hour pillars — they
+  // do NOT shift this boundary (Fix A). Here tz=UTC, lon=0 so utcDate == clock.
+  const before = bazi.computeBazi('2024-02-04', '08:26', 'UTC', 0, 'male');
+  const after = bazi.computeBazi('2024-02-04', '08:28', 'UTC', 0, 'male');
 
   assert.equal(before.pillars.year.stem.zh + before.pillars.year.branch.zh, '癸卯');
   assert.equal(before.pillars.month.stem.zh + before.pillars.month.branch.zh, '乙丑');
@@ -115,13 +115,11 @@ test('year pillar flips at the Li Chun boundary after true-solar-time correction
   assert.equal(after.pillars.month.stem.zh + after.pillars.month.branch.zh, '丙寅');
 });
 
-test('month pillar flips at the Jing Zhe boundary after true-solar-time correction', () => {
-  // Jing Zhe 2024 oracle: 2024-03-05T02:23:00Z (HKO).
-  // EoT at that date ≈ −11.44 min → UTC crossover (TST = oracle) ≈ 02:34:26Z.
-  // 02:34 UTC → TST ≈ 02:22:33Z (before Jing Zhe) → 丙寅
-  // 02:35 UTC → TST ≈ 02:23:33Z (after  Jing Zhe) → 丁卯
-  const before = bazi.computeBazi('2024-03-05', '02:34', 'UTC', 0, 'male');
-  const after = bazi.computeBazi('2024-03-05', '02:35', 'UTC', 0, 'male');
+test('month pillar flips at the Jing Zhe UTC instant', () => {
+  // Jing Zhe 2024 = 2024-03-05T02:23:00Z (HKO exact). Flip is at the true UTC
+  // instant; EoT/longitude do not shift it (Fix A). tz=UTC, lon=0 → utcDate == clock.
+  const before = bazi.computeBazi('2024-03-05', '02:22', 'UTC', 0, 'male');
+  const after = bazi.computeBazi('2024-03-05', '02:24', 'UTC', 0, 'male');
 
   assert.equal(before.pillars.month.stem.zh + before.pillars.month.branch.zh, '丙寅');
   assert.equal(after.pillars.month.stem.zh + after.pillars.month.branch.zh, '丁卯');
