@@ -6,6 +6,9 @@
 - `fix: compare 節氣 (solar-term) boundaries in the true UTC-instant frame`
   Year/Month pillars, 生肖, and Da Yun 起運 were decided by feeding True Solar Time (clock + longitude correction + Equation of Time + DST revert) into the solar-term comparison, but 節氣 are absolute UTC instants. Mixing the two frames biased every boundary by the total solar correction (~7–8 h in UTC+7/UTC+8), so a birth within roughly half a day of a 節氣 could land in the wrong Month/Year pillar and 生肖, and the Da Yun start age could be off by months or years. The birth instant (`utcDate`) is now compared directly against the term's UTC instant. Day and Hour pillars are unchanged — they correctly continue to use True Solar Time. Ordinary mid-month charts are unaffected.
 
+- `fix: derive standard offset from the real non-DST offset around the birth instant`
+  `getStdOffsetMinutes` used a min(January, July) heuristic that assumed the smaller of the two was the year-round standard. That broke for zones that changed their base offset *permanently* mid-year (a non-DST step) — e.g. Asia/Bangkok's +6:42 → +7:00 switch on 1920-04-01 — making the standard meridian (and therefore every longitude correction in that zone-year) wrong, and spuriously flagging the post-change period as DST. The standard offset is now read per instant from tzdata: the offset at the birth moment, demoted to its lower neighbour only when it is a DST bump (greater than both adjacent offsets). DST is no longer assumed to be 60 minutes, so half-hour DST zones (e.g. Lord Howe Island, +10:30/+11:00) resolve correctly. Zones without DST are byte-identical, so ordinary modern charts are unaffected.
+
 ## 2026-04-14
 
 - `feat: rewrite hourly scoring explanations for normal users`
