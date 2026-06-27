@@ -57,19 +57,6 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return <div className="text-[11px] uppercase tracking-[0.28em] text-[#0d5d56]/62">{children}</div>;
 }
 
-function sanitizeCoordinateInput(value: string) {
-  let next = value.replace(/[^0-9.-]/g, '');
-  const minus = next.startsWith('-') ? '-' : '';
-  next = minus + next.slice(minus ? 1 : 0).replace(/-/g, '');
-
-  const dotIndex = next.indexOf('.');
-  if (dotIndex !== -1) {
-    next = `${next.slice(0, dotIndex + 1)}${next.slice(dotIndex + 1).replace(/\./g, '')}`;
-  }
-
-  return next;
-}
-
 function formatDateInputValue(date: Date, timezone: string) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -106,7 +93,6 @@ export default function HourlyScoringPanel() {
   const [isUnauthenticated, setIsUnauthenticated] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [scoringResult, setScoringResult] = useState<HourlyScoringResult | null>(null);
-  const [isCoordinateOverrideEnabled, setIsCoordinateOverrideEnabled] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -136,13 +122,11 @@ export default function HourlyScoringPanel() {
       if (json.profile) {
         setSavedProfile(json.profile);
         setFormValues({ ...json.profile });
-        setIsCoordinateOverrideEnabled(!json.profile.birthPlace);
         setSelectedDate(requestedDate || json.scoring?.currentDateLabel || formatDateInputValue(new Date(), json.profile.timezone));
         setIsEditing(false);
         setScoringResult(json.scoring);
       } else {
         setSavedProfile(null);
-        setIsCoordinateOverrideEnabled(true);
         setSelectedDate(requestedDate || formatDateInputValue(new Date(), formValues.timezone));
         setIsEditing(true);
         setScoringResult(null);
@@ -172,13 +156,11 @@ export default function HourlyScoringPanel() {
 
   const hasSavedProfile = Boolean(savedProfile);
   const canEditYinYang = formValues.genderIdentity !== 'male' && formValues.genderIdentity !== 'female';
-  const coordinatesLockedFromPlace = Boolean(formValues.birthPlace) && !isCoordinateOverrideEnabled;
   const activeTimezone = savedProfile?.timezone ?? formValues.timezone;
 
   const startEditing = () => {
     if (savedProfile) {
       setFormValues({ ...savedProfile });
-      setIsCoordinateOverrideEnabled(!savedProfile.birthPlace);
     }
     setError(null);
     setIsEditing(true);
@@ -187,17 +169,14 @@ export default function HourlyScoringPanel() {
   const cancelEditing = () => {
     if (savedProfile) {
       setFormValues({ ...savedProfile });
-      setIsCoordinateOverrideEnabled(!savedProfile.birthPlace);
     } else {
       setFormValues(DEFAULT_FORM_VALUES);
-      setIsCoordinateOverrideEnabled(true);
     }
     setError(null);
     setIsEditing(false);
   };
 
   const handleBirthPlaceSelect = (place: PlaceSearchResult) => {
-    setIsCoordinateOverrideEnabled(false);
     setFormValues((current) => ({
       ...current,
       birthPlace: place,
@@ -429,7 +408,6 @@ export default function HourlyScoringPanel() {
               <BirthPlaceSearch
                 value={formValues.birthPlaceQuery}
                 onChange={(value) => {
-                  setIsCoordinateOverrideEnabled(true);
                   setFormValues((current) => ({ ...current, birthPlaceQuery: value, birthPlace: null }));
                 }}
                 onSelect={handleBirthPlaceSelect}
@@ -437,60 +415,15 @@ export default function HourlyScoringPanel() {
               />
 
               <div className="grid gap-4">
-                <FormField label="Timezone">
-                  <input
-                    type="text"
-                    value={formValues.timezone}
-                    onChange={(event) => setFormValues((current) => ({ ...current, timezone: event.target.value }))}
-                    className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
-                    placeholder="e.g. Asia/Bangkok"
-                  />
-                </FormField>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Longitude">
-                    <input
-                      type="text"
-                      value={formValues.longitude}
-                      onChange={(event) => setFormValues((current) => ({ ...current, longitude: sanitizeCoordinateInput(event.target.value) }))}
-                      className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      placeholder="e.g. 100.5305"
-                      readOnly={coordinatesLockedFromPlace}
-                    />
-                  </FormField>
-
-                  <FormField label="Latitude">
-                    <input
-                      type="text"
-                      value={formValues.latitude}
-                      onChange={(event) => setFormValues((current) => ({ ...current, latitude: sanitizeCoordinateInput(event.target.value) }))}
-                      className="glass-input w-full rounded-[1.35rem] px-4 py-3 text-sm"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      placeholder="e.g. 13.7563"
-                      readOnly={coordinatesLockedFromPlace}
-                    />
-                  </FormField>
-                </div>
-                {formValues.birthPlace ? (
-                  <div className="rounded-[1.5rem] bg-white/68 px-4 py-4 text-sm text-[#35514d] shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
-                    <p>
-                      Coordinates are locked to the selected place so accidental keyboard input does not corrupt the saved location.
-                    </p>
-                    <div className="mt-3">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="md"
-                        onClick={() => setIsCoordinateOverrideEnabled((current) => !current)}
-                      >
-                        {coordinatesLockedFromPlace ? 'Edit coordinates' : 'Lock to selected place'}
-                      </Button>
-                    </div>
+                <div className="rounded-[1.5rem] bg-white/68 px-4 py-4 text-sm text-[#35514d] shadow-[inset_0_0_0_1px_rgba(13,93,86,0.06)]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0d5d56]/62">Location details</div>
+                  <div className="mt-3 space-y-1.5">
+                    <div>Timezone: <span className="font-semibold text-[#1f2f2c]">{formValues.timezone || '—'}</span></div>
+                    <div>Longitude: <span className="font-semibold text-[#1f2f2c]">{formValues.longitude || '—'}</span></div>
+                    <div>Latitude: <span className="font-semibold text-[#1f2f2c]">{formValues.latitude || '—'}</span></div>
                   </div>
-                ) : null}
+                  <p className="mt-3 text-xs text-[#35514d]/70">Filled automatically from the selected birthplace. Search again to change it.</p>
+                </div>
               </div>
             </div>
           </section>
