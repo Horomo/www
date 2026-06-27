@@ -1,5 +1,12 @@
 # BaZi Verification Report
 
+> **Note (superseded in part):** The "Solar Term" sections below describe the
+> original lookup-table + iterative `sunApparentLongitude()` solver. As of Fix B,
+> solar terms are computed from the astronomy-engine ephemeris via
+> `solarTermDate()` (apparent ecliptic longitude of date); the table, the solver,
+> and `sunApparentLongitude()`/`jdeToDate()` no longer exist. The day-pillar
+> sections remain accurate.
+
 ## Current Day Pillar Assumptions
 
 - `dayPillar()` anchors the 60-day cycle to `REF_JD = 2451545` and `REF_INDEX = 55`, which means the reference instant is Julian Day 2451545 with cycle index 55 (`己未`).

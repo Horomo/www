@@ -2,6 +2,8 @@
 //  BAZI CALCULATION ENGINE — TypeScript port
 // ═══════════════════════════════════════════════════════════
 
+import * as Astronomy from 'astronomy-engine';
+
 import type { CalculationGenderMode } from '@/lib/gender';
 
 // ── Types ──────────────────────────────────────────────────
@@ -185,56 +187,12 @@ export function tenGod(dmStem: number, otherStem: number): TenGod {
 
 // ── Solar Term Calculations ────────────────────────────────
 
-/**
- * Verified solar term timestamps from the Hong Kong Observatory (HKO).
- *
- * Source: Hong Kong Observatory, Solar Terms calendar, published using data
- * from HM Nautical Almanac Office and US Naval Observatory.
- * Reference: https://www.hko.gov.hk/en/gts/astronomy/Solar_Term.htm
- *
- * Keyed as SOLAR_TERM_LOOKUP[calendarYear][solarLongitude] = UTC ISO string.
- * "calendarYear" is the year argument passed to solarTermDate(), which matches
- * the civil year in which the term falls (e.g. Li Chun at 315° in early
- * February is stored under the year of that February, not refYear).
- *
- * Terms not present in this table fall back to the iterative approximation
- * (±~6 min accuracy), which is sufficient for day-level pillar resolution
- * but not for minute-level boundary tests.
- */
-const SOLAR_TERM_LOOKUP: Record<number, Partial<Record<number, string>>> = {
-  2024: {
-    315: '2024-02-04T08:27:00.000Z', // 立春 Li Chun  — HKO: 2024-02-04 16:27 HKT
-    345: '2024-03-05T02:23:00.000Z', // 驚蟄 Jing Zhe — HKO: 2024-03-05 10:23 HKT
-     15: '2024-04-04T07:02:00.000Z', // 清明 Qing Ming — HKO: 2024-04-04 15:02 HKT
-     45: '2024-05-05T00:10:00.000Z', // 立夏 Li Xia   — HKO: 2024-05-05 08:10 HKT
-  },
-};
-
-/**
- * Approximate Sun apparent longitude (degrees) for a given JDE.
- */
-export function sunApparentLongitude(jde: number): number {
-  const T = (jde - 2451545.0) / 36525;
-  let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
-  L0 = L0 % 360; if (L0 < 0) L0 += 360;
-  let M = 357.52911 + 35999.05029 * T - 0.0001537 * T * T;
-  M = M % 360; if (M < 0) M += 360;
-  const Mrad = M * Math.PI / 180;
-  const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(Mrad)
-          + (0.019993 - 0.000101 * T) * Math.sin(2 * Mrad)
-          + 0.000289 * Math.sin(3 * Mrad);
-  let sunLon = L0 + C;
-  const omega = 125.04 - 1934.136 * T;
-  sunLon = sunLon - 0.00569 - 0.00478 * Math.sin(omega * Math.PI / 180);
-  sunLon = sunLon % 360; if (sunLon < 0) sunLon += 360;
-  return sunLon;
-}
-
-/** Convert Julian Day Number to JavaScript Date (UTC). */
-export function jdeToDate(jde: number): Date {
-  const ms = (jde - 2440587.5) * 86400000;
-  return new Date(ms);
-}
+// Solar-term instants are fixed for a given (year, longitude), so memoizing
+// avoids recomputing the same term across the ~50 lookups a single chart makes
+// (12 month terms + Li Chun + three years of Da Yun jie). We cache the epoch
+// milliseconds (a primitive) and hand out a fresh Date per call, so a caller
+// mutating the returned Date can never corrupt the cache.
+const solarTermCache = new Map<string, number>();
 
 /** Convert a JavaScript Date to Julian Day Number (JD). */
 export function dateToJD(date: Date): number {
@@ -248,35 +206,36 @@ export function dateToJD(date: Date): number {
 }
 
 /**
- * Return the UTC Date when the sun reaches solarLon (degrees) in the given
- * calendar year.
+ * UTC instant when the Sun's apparent ecliptic longitude (of date) reaches
+ * `solarLon` degrees during civil year `year`.
  *
- * Lookup order:
- *   1. SOLAR_TERM_LOOKUP — exact timestamps verified against HKO publications.
- *   2. Iterative solar-longitude solver — accurate to ±~6 min, sufficient for
- *      day-level pillar resolution but not for minute-level boundary tests.
+ * Each ecliptic longitude occurs exactly once per tropical year, so searching
+ * forward from 00:00 UTC on 1 January of `year` returns the single occurrence
+ * that falls within that civil year. This reproduces the calendar placement the
+ * pillar engine relies on: e.g. Li Chun (315°) in early February of `year`, and
+ * 大雪 (255°) in December of `year`.
+ *
+ * Backed by astronomy-engine's SearchSunLongitude, which works from the apparent
+ * ecliptic longitude OF DATE (precession + nutation) — the definition the Chinese
+ * 節氣 use. This single ephemeris source (accurate to well under an arcminute,
+ * for every year) replaces a sparse HKO lookup table plus a ±~6 min iterative
+ * approximation, so all charts use one consistent standard.
  */
 export function solarTermDate(year: number, solarLon: number): Date {
-  const tableEntry = SOLAR_TERM_LOOKUP[year]?.[solarLon];
-  if (tableEntry !== undefined) {
-    return new Date(tableEntry);
+  const key = `${year}:${solarLon}`;
+  const cachedMs = solarTermCache.get(key);
+  if (cachedMs !== undefined) return new Date(cachedMs);
+
+  // Searching forward from Jan 1 spans a full tropical year, so the single
+  // in-year occurrence of `solarLon` is the first (and, for the 24 term
+  // longitudes, only) crossing in the window.
+  const start = new Date(Date.UTC(year, 0, 1));
+  const found = Astronomy.SearchSunLongitude(solarLon, start, 366);
+  if (!found) {
+    throw new Error(`solarTermDate: no Sun-longitude crossing for ${solarLon}° in ${year}`);
   }
-
-  const refYear = (solarLon >= 280) ? year - 1 : year;
-  const JDE_VE = 2451623.80984 + 365.242189623 * (refYear - 2000);
-  const daysPerDeg = 365.242189623 / 360;
-  const lon = ((solarLon - 0) + 360) % 360;
-  let jde = JDE_VE + lon * daysPerDeg;
-
-  for (let i = 0; i < 3; i++) {
-    const sunLon = sunApparentLongitude(jde);
-    let diff = solarLon - sunLon;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    jde += diff * daysPerDeg;
-  }
-
-  return jdeToDate(jde);
+  solarTermCache.set(key, found.date.getTime());
+  return new Date(found.date.getTime());
 }
 
 interface JieTerm {
@@ -676,6 +635,10 @@ export function getStdOffsetMinutes(date: Date, ianaTimezone: string): number {
   return std;
 }
 
+export function getStandardMeridianDegrees(stdOffsetMin: number): number {
+  return stdOffsetMin / 60 * 15;
+}
+
 /**
  * Returns true if DST is in effect for the given date and timezone.
  */
@@ -784,7 +747,7 @@ export function computeBazi(
     const dstCorrectionMin = stdOffsetMin - displayOffsetMin;
 
     // Step 2: Longitude correction
-    const stdMeridian    = stdOffsetMin / 60 * 15; // degrees
+    const stdMeridian    = getStandardMeridianDegrees(stdOffsetMin); // degrees
     const lonCorrectionMin = (longitude - stdMeridian) * 4;
 
     // Step 3: Equation of Time
