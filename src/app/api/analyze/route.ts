@@ -8,6 +8,7 @@ import {
   parseAnalyzeRequestBody,
   recomputeAnalysisChartPayload,
 } from '@/lib/analysis-payload';
+import { validateBirthLocationForWrite } from '@/lib/location-write-validation';
 import { getActiveDaYunPillarForDate } from '@/lib/bazi';
 import { formatCalculationGenderMode, formatGenderIdentity } from '@/lib/gender';
 
@@ -61,6 +62,14 @@ export async function handleAnalyzeRequest(
   if (!parsedBody) {
     return NextResponse.json(
       { error: 'Invalid analysis payload.' },
+      { status: 400 },
+    );
+  }
+
+  const locationValidation = validateBirthLocationForWrite(parsedBody.birthInfo);
+  if (!locationValidation.valid) {
+    return NextResponse.json(
+      { error: locationValidation.error },
       { status: 400 },
     );
   }

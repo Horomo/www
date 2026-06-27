@@ -157,3 +157,49 @@ test('analyze route rejects forged computed charts before calling OpenAI', async
   assert.match(json.error, /does not match/i);
   assert.equal(openAiCalls.length, 0);
 });
+
+test('analyze route rejects gross longitude/timezone mismatch before logging or OpenAI', async () => {
+  const openAiCalls: Array<unknown> = [];
+  let logCalls = 0;
+  const formValues = {
+    dob: '1990-06-15',
+    tob: '08:30',
+    timezone: 'America/New_York',
+    longitude: '100.52',
+    latitude: '13.75',
+    genderIdentity: 'male' as const,
+    genderOtherText: '',
+    calculationMode: 'male' as const,
+    unknownTime: false,
+    birthPlaceQuery: 'Mismatched direct API payload',
+    birthPlace: null,
+  };
+  const result = bazi.computeBazi(formValues.dob, formValues.tob, formValues.timezone, Number(formValues.longitude), formValues.calculationMode);
+  const chartData = bazi.computeChartData(result.pillars, result.pillars.day.stemIdx, result.unknownTime);
+  const body = buildAnalyzeRequestBody({ formValues, result, chartData });
+  const request = new Request('http://localhost/api/analyze', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'user-agent': 'node-test' },
+    body: JSON.stringify(body),
+  });
+
+  const response = await handleAnalyzeRequest(request, {
+    getSession: async () => ({ id: 'test-user-id' }),
+    buildLogInsert: () => {
+      throw new Error('buildLogInsert should not be called');
+    },
+    insertLog: async () => {
+      logCalls += 1;
+    },
+    createCompletion: async (payload) => {
+      openAiCalls.push(payload);
+      return { choices: [{ message: { content: 'should-not-run' } }] };
+    },
+  });
+
+  assert.equal(response.status, 400);
+  const json = await response.json();
+  assert.match(json.error, /does not match timezone America\/New_York/);
+  assert.equal(logCalls, 0);
+  assert.equal(openAiCalls.length, 0);
+});
