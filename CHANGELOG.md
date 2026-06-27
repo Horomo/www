@@ -12,6 +12,10 @@
 - `fix: revert DST by the real instant amount, not a hardcoded 60 minutes`
   True solar time was computed as `utc + stdOffset + dstCorrection + longitude + EoT` with `dstCorrection = −60` whenever DST was active. But `utc + stdOffset` already reverts DST (it builds the standard wall clock), so the extra term double-counted: every DST-active birth's `tstDate` was an hour early, which could flip the Hour pillar (and the Day pillar near midnight). True solar time is now `standard wall clock + longitude + EoT`, with no second DST subtraction; the displayed DST step is derived from the real offsets at the instant (`stdOffset − birthOffset`), so it is −60 for normal DST, −30 for sub-hour DST (Lord Howe), −120 for double summer time, and 0 when DST is not in effect. Births with DST not in effect (incl. all DST-free zones) are unchanged; DST-active charts move by the previously double-counted amount, which corrects them.
 
+### Documentation
+- `docs: document the midnight (子正) day-boundary convention`
+  Recorded that the day pillar changes at local solar midnight (00:00). The contested period is 子時's first half, 23:00–00:00 (子初 / 夜子時): here it stays on the current day (the midnight-rollover rule, 子正換日, commonly called the 早子時 method), so a 23:00–23:59 birth keeps the current day's pillar and Day Master while its hour branch is 子. The alternative school rolls the day at 23:00 (子初換日 / 晚子時 method), giving those births the next day's pillar and a different Day Master; it is a recognised school choice (not a bug) and is intentionally not implemented yet. Added explanatory comments at the convention sites in `src/lib/bazi.ts` (`dayPillar`, `hourBranchIndex`) so the 00:00 boundary is not mistaken for a defect, plus a "Calculation Conventions" note in the README. No calculation logic changed — chart output is byte-identical. A future opt-in day-boundary toggle (default = midnight rollover) is planned as a separate enhancement.
+
 ## 2026-04-14
 
 - `feat: rewrite hourly scoring explanations for normal users`
