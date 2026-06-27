@@ -9,6 +9,9 @@
 - `fix: derive standard offset from the real non-DST offset around the birth instant`
   `getStdOffsetMinutes` used a min(January, July) heuristic that assumed the smaller of the two was the year-round standard. That broke for zones that changed their base offset *permanently* mid-year (a non-DST step) — e.g. Asia/Bangkok's +6:42 → +7:00 switch on 1920-04-01 — making the standard meridian (and therefore every longitude correction in that zone-year) wrong, and spuriously flagging the post-change period as DST. The standard offset is now read per instant from tzdata: the offset at the birth moment, demoted to its lower neighbour only when it is a DST bump (greater than both adjacent offsets). DST is no longer assumed to be 60 minutes, so half-hour DST zones (e.g. Lord Howe Island, +10:30/+11:00) resolve correctly. Zones without DST are byte-identical, so ordinary modern charts are unaffected.
 
+- `fix: revert DST by the real instant amount, not a hardcoded 60 minutes`
+  True solar time was computed as `utc + stdOffset + dstCorrection + longitude + EoT` with `dstCorrection = −60` whenever DST was active. But `utc + stdOffset` already reverts DST (it builds the standard wall clock), so the extra term double-counted: every DST-active birth's `tstDate` was an hour early, which could flip the Hour pillar (and the Day pillar near midnight). True solar time is now `standard wall clock + longitude + EoT`, with no second DST subtraction; the displayed DST step is derived from the real offsets at the instant (`stdOffset − birthOffset`), so it is −60 for normal DST, −30 for sub-hour DST (Lord Howe), −120 for double summer time, and 0 when DST is not in effect. Births with DST not in effect (incl. all DST-free zones) are unchanged; DST-active charts move by the previously double-counted amount, which corrects them.
+
 ## 2026-04-14
 
 - `feat: rewrite hourly scoring explanations for normal users`
