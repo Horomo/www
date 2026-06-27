@@ -378,6 +378,18 @@ export function dayPillar(date: Date): { stemIdx: number; branchIdx: number; cyc
   // verified against civil dates that roll over at local midnight. Converting
   // JD -> civil day via floor(jd + 0.5) realigns the count to midnight-based
   // day boundaries before we compare against the reference anchor.
+  //
+  // Day-boundary convention: the day pillar changes at local solar midnight
+  // (00:00), which the floor(jd + 0.5) civil-day conversion encodes. The
+  // contested period is 子時's first half, 23:00–00:00 (子初 / 夜子時, the
+  // "late-zi" sub-hour): here it stays on the CURRENT day — the midnight-rollover
+  // rule (子正換日), commonly called the 早子時 method. The alternative school
+  // rolls the day at 23:00 (子初換日 / 晚子時 method), giving a 23:00–23:59 birth
+  // the NEXT day's pillar and a different Day Master. Both are used in practice;
+  // neither is "wrong". Supporting the 23:00 rule is a deliberate non-goal for
+  // now, tracked as a future opt-in toggle (default would remain midnight). Do
+  // NOT change this 00:00 boundary to 23:00 without that toggle — it is a school
+  // choice, not a bug.
   const civilDay = Math.floor(jd + 0.5);
   const refCivilDay = Math.floor(REF_JD + 0.5);
   const diff = civilDay - refCivilDay;
@@ -390,6 +402,10 @@ export function dayPillar(date: Date): { stemIdx: number; branchIdx: number; cyc
 // ── Hour Pillar (時柱) ─────────────────────────────────────
 export function hourBranchIndex(solarHour: number, solarMinute: number): number {
   const h = solarHour + solarMinute / 60;
+  // 子時 spans 23:00–01:00, so 23:00–23:59 (子初 / 夜子時) maps to branch 子 (0)
+  // while the day pillar still changes at 00:00 (midnight-rollover; see
+  // dayPillar). The alternative school rolls the day at 23:00 — intentionally
+  // not implemented here (see dayPillar's note).
   if (h >= 23 || h < 1)  return 0;
   if (h < 3)  return 1;
   if (h < 5)  return 2;
