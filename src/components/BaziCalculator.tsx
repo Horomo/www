@@ -129,7 +129,7 @@ export default function BaziCalculator() {
     }
     if (step === 2) {
       const lng = parseFloat(values.longitude); const lat = parseFloat(values.latitude);
-      if (!values.timezone) errors.timezone = 'Choose a birth place or enter a timezone manually.';
+      if (!values.timezone) errors.timezone = 'Search and select a birth place to continue.';
       if (Number.isNaN(lng) || lng < -180 || lng > 180) errors.longitude = 'Longitude must be between -180 and 180.';
       if (Number.isNaN(lat) || lat < -90 || lat > 90) errors.latitude = 'Latitude must be between -90 and 90.';
     }
@@ -299,12 +299,11 @@ export default function BaziCalculator() {
 
                 {currentStep === 2 ? (
                   <>
-                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingLocation')}</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Search your birthplace, then adjust the technical details only if needed.</p></div>
+                    <div><div className="text-[11px] uppercase tracking-[0.24em] text-[#006a62]/62">Step 3</div><h3 className="mt-2 font-serif text-[1.8rem] text-[#151d22]">{tWizard('headingLocation')}</h3><p className="mt-2 max-w-lg text-sm leading-7 text-[#151d22]/62">Search your birthplace; we fill in the timezone and coordinates automatically.</p></div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <BirthPlaceSearch value={birthPlaceQuery} onChange={handleBirthPlaceQueryChange} onSelect={handleBirthPlaceSelect} selectedPlace={birthPlace} />
                       <div className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#151d22]/46">Location summary</div><div className="mt-3 space-y-2 text-sm leading-7 text-[#151d22]/66"><div>Timezone: <span className="font-semibold text-[#151d22]">{timezone || '—'}</span></div><div>Longitude: <span className="font-semibold text-[#151d22]">{longitude || '—'}</span></div><div>Latitude: <span className="font-semibold text-[#151d22]">{latitude || '—'}</span></div></div>{showStepValidation && currentStepErrors.timezone ? <p className="mt-3 text-xs leading-6 text-[#874e58]">{currentStepErrors.timezone}</p> : null}<p className="mt-3 text-xs leading-6 text-[#151d22]/52">Longitude affects true solar time directly. Latitude is preserved for reference and logging.</p></div>
                     </div>
-                    <details className="rounded-[24px] bg-[linear-gradient(135deg,rgba(255,255,255,0.8),rgba(255,255,255,0.56))] px-5 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.22em] text-[#151d22]/56">Advanced Location Details</summary><div className="mt-4 grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Timezone (DST detected automatically)</label><input type="text" value={timezone} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setTimezone(event.target.value); }} placeholder="e.g. Asia/Bangkok" className={cn(TEXT_INPUT_CLASS, 'mt-2')} /></div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Longitude (°E positive, °W negative)</label><input type="number" value={longitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLongitude(event.target.value); }} min="-180" max="180" step="0.01" placeholder="e.g. 100.52" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.longitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.longitude}</p> : null}</div><div><label className="text-xs font-medium uppercase tracking-[0.18em] text-[#151d22]/54">Latitude (°N positive, °S negative)</label><input type="number" value={latitude} onChange={(event) => { setShowStepValidation(false); setBirthPlace(null); setLatitude(event.target.value); }} min="-90" max="90" step="0.01" placeholder="e.g. 13.75" className={cn(TEXT_INPUT_CLASS, 'mt-2')} />{showStepValidation && currentStepErrors.latitude ? <p className="mt-2 text-xs leading-6 text-[#874e58]">{currentStepErrors.latitude}</p> : null}</div></div></details>
                   </>
                 ) : null}
 
