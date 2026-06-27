@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { fetchUserProfile, parseSavedProfile, upsertUserProfile } from '@/lib/profile';
 import type { AnalysisFormPayload } from '@/lib/analysis-payload';
+import { validateBirthLocationForWrite } from '@/lib/location-write-validation';
 import type { SavedBaziProfile } from '@/lib/profile';
 
 export type ProfileRouteDependencies = {
@@ -52,6 +53,11 @@ export async function handleProfilePost(
 
   if (!profile) {
     return NextResponse.json({ error: 'Invalid profile payload.' }, { status: 400 });
+  }
+
+  const locationValidation = validateBirthLocationForWrite(profile);
+  if (!locationValidation.valid) {
+    return NextResponse.json({ error: locationValidation.error }, { status: 400 });
   }
 
   try {

@@ -6,6 +6,9 @@
 - `dep: add astronomy-engine (2.1.19, MIT, zero-dependency) for solar-term computation`
   Pure-JavaScript astronomical ephemeris (no native binaries, runs on client and server) used to compute the 24 solar terms (節氣) from the Sun's apparent ecliptic longitude of date.
 
+- `fix: validate birth longitude/timezone consistency on write-path APIs`
+  Added server-side defense-in-depth validation for newly written chart/profile payloads. Profile saves, chart logging, and AI-analysis requests now reject gross longitude/timezone mismatches using the shared standard-meridian calculation with a global 60-degree tolerance, while legacy profile reads and stored-chart recomputation remain tolerated for backward compatibility.
+
 ### Fixed
 - `fix: compare 節氣 (solar-term) boundaries in the true UTC-instant frame`
   Year/Month pillars, 生肖, and Da Yun 起運 were decided by feeding True Solar Time (clock + longitude correction + Equation of Time + DST revert) into the solar-term comparison, but 節氣 are absolute UTC instants. Mixing the two frames biased every boundary by the total solar correction (~7–8 h in UTC+7/UTC+8), so a birth within roughly half a day of a 節氣 could land in the wrong Month/Year pillar and 生肖, and the Da Yun start age could be off by months or years. The birth instant (`utcDate`) is now compared directly against the term's UTC instant. Day and Hour pillars are unchanged — they correctly continue to use True Solar Time. Ordinary mid-month charts are unaffected.
