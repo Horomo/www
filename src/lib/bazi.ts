@@ -598,22 +598,73 @@ export function getUtcOffsetMinutes(date: Date, ianaTimezone: string): number {
 }
 
 /**
- * Get the standard (non-DST) UTC offset in minutes for a timezone in a given year.
- * Uses January and July offsets; standard time = the smaller of the two.
+ * Distinct UTC offsets (minutes) observed at monthly probes from `date`,
+ * scanning `direction` (-1 = past, +1 = future) for ~14 months (excluding
+ * `date` itself).
+ *
+ * Monthly steps always land clear of the spring-forward gap / fall-back
+ * ambiguous window (those are ~1 hour wide), so getUtcOffsetMinutes returns an
+ * unambiguous offset at each probe. ~14 months guarantees at least one full
+ * annual cycle is seen, so any seasonal (DST) offset is observed in each
+ * direction.
  */
-export function getStdOffsetMinutes(year: number, ianaTimezone: string): number {
-  const jan = new Date(Date.UTC(year, 0, 15));
-  const jul = new Date(Date.UTC(year, 6, 15));
-  const janOff = getUtcOffsetMinutes(jan, ianaTimezone);
-  const julOff = getUtcOffsetMinutes(jul, ianaTimezone);
-  return Math.min(janOff, julOff);
+function offsetsInDirection(date: Date, ianaTimezone: string, direction: 1 | -1): Set<number> {
+  const offsets = new Set<number>();
+  for (let month = 1; month <= 14; month++) {
+    offsets.add(getUtcOffsetMinutes(addUtcYearsMonths(date, 0, direction * month), ianaTimezone));
+  }
+  return offsets;
+}
+
+/**
+ * Standard (non-DST) UTC offset in minutes for the timezone at the instant
+ * `date`, derived from the actual tzdata around that instant.
+ *
+ * Standard time = the offset the zone uses when DST is NOT in effect at that
+ * era. Rule: the standard offset is the LOWEST offset that recurs on BOTH sides
+ * of the birth within ~14 months. DST (any tier) shifts the clock forward
+ * seasonally, so the base offset reappears every winter on both the past and
+ * future side and is the minimum of those recurring values. A permanent base
+ * change is one-directional — the pre-change offset does not recur on the future
+ * side (nor the post-change offset on the past side) — so it is excluded
+ * automatically. The birth offset itself always recurs (it holds at `date`),
+ * guaranteeing a non-empty result; for a year-round / permanent-DST era with no
+ * winter reversion (e.g. UK 1968–71 British Standard Time) that single offset is
+ * correctly returned as the standard.
+ *
+ * This handles, with no special-casing:
+ *  - normal single DST (both hemispheres) and multi-tier double-summer-time;
+ *  - sub-60-minute DST (e.g. Lord Howe +10:30/+11:00) — DST is read from tzdata,
+ *    never assumed to be 60 minutes;
+ *  - permanent mid-year base changes, the failure of the previous
+ *    min(January, July) heuristic. Example: Asia/Bangkok switched +6:42 → +7:00
+ *    on 1920-04-01, so a birth after April 1920 has standard +7:00 (meridian
+ *    105°E), not the +6:42 the old heuristic returned for the whole year.
+ *
+ * Ceiling: negative-DST zones (e.g. Europe/Dublin winter, Ramadan rollbacks)
+ * model their raw offset as the HIGHER value; this rule returns the lower
+ * (winter) offset for them — matching the previous heuristic's behaviour, not a
+ * regression. Revisit if such a zone needs its tzdata raw offset specifically.
+ */
+export function getStdOffsetMinutes(date: Date, ianaTimezone: string): number {
+  const birthOffset = getUtcOffsetMinutes(date, ianaTimezone);
+  const past = offsetsInDirection(date, ianaTimezone, -1);
+  const future = offsetsInDirection(date, ianaTimezone, 1);
+  past.add(birthOffset);
+  future.add(birthOffset);
+
+  let std = birthOffset;
+  for (const offset of past) {
+    if (future.has(offset) && offset < std) std = offset;
+  }
+  return std;
 }
 
 /**
  * Returns true if DST is in effect for the given date and timezone.
  */
 export function isDST(date: Date, ianaTimezone: string): boolean {
-  const stdOff = getStdOffsetMinutes(date.getUTCFullYear(), ianaTimezone);
+  const stdOff = getStdOffsetMinutes(date, ianaTimezone);
   const curOff = getUtcOffsetMinutes(date, ianaTimezone);
   return curOff > stdOff;
 }
@@ -698,7 +749,7 @@ export function computeBazi(
     ? clockTimeToUtc(y, mo, d, hr, mn, ianaTimezone)
     : clockTimeToUtc(y, mo, d, 12, 0, ianaTimezone);
 
-  const stdOffsetMin = getStdOffsetMinutes(y, ianaTimezone);
+  const stdOffsetMin = getStdOffsetMinutes(utcDate, ianaTimezone);
   const displayOffsetMin = getUtcOffsetMinutes(utcDate, ianaTimezone);
 
   // ── True Solar Time calculation ──────────────────────────
