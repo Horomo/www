@@ -2,6 +2,10 @@
 
 ## 2026-06-27
 
+### Added
+- `dep: add astronomy-engine (2.1.19, MIT, zero-dependency) for solar-term computation`
+  Pure-JavaScript astronomical ephemeris (no native binaries, runs on client and server) used to compute the 24 solar terms (節氣) from the Sun's apparent ecliptic longitude of date.
+
 ### Fixed
 - `fix: compare 節氣 (solar-term) boundaries in the true UTC-instant frame`
   Year/Month pillars, 生肖, and Da Yun 起運 were decided by feeding True Solar Time (clock + longitude correction + Equation of Time + DST revert) into the solar-term comparison, but 節氣 are absolute UTC instants. Mixing the two frames biased every boundary by the total solar correction (~7–8 h in UTC+7/UTC+8), so a birth within roughly half a day of a 節氣 could land in the wrong Month/Year pillar and 生肖, and the Da Yun start age could be off by months or years. The birth instant (`utcDate`) is now compared directly against the term's UTC instant. Day and Hour pillars are unchanged — they correctly continue to use True Solar Time. Ordinary mid-month charts are unaffected.
@@ -13,6 +17,9 @@
   True solar time was computed as `utc + stdOffset + dstCorrection + longitude + EoT` with `dstCorrection = −60` whenever DST was active. But `utc + stdOffset` already reverts DST (it builds the standard wall clock), so the extra term double-counted: every DST-active birth's `tstDate` was an hour early, which could flip the Hour pillar (and the Day pillar near midnight). True solar time is now `standard wall clock + longitude + EoT`, with no second DST subtraction; the displayed DST step is derived from the real offsets at the instant (`stdOffset − birthOffset`), so it is −60 for normal DST, −30 for sub-hour DST (Lord Howe), −120 for double summer time, and 0 when DST is not in effect. Births with DST not in effect (incl. all DST-free zones) are unchanged; DST-active charts move by the previously double-counted amount, which corrects them.
 
 ### Changed
+- `change: compute solar terms (節氣) from an ephemeris instead of a lookup table + approximation`
+  Solar-term instants previously came from a sparse Hong Kong Observatory lookup table (only a handful of 2024 terms) that fell back to an in-repo ±~6 minute iterative `sunApparentLongitude` solver for every other date — two different standards, and minute-level inaccuracy that could flip the Month/Year pillar (and 生肖) for births within a few minutes of a 節氣. `solarTermDate` now computes each term from the astronomy-engine ephemeris (apparent ecliptic longitude of date) via `SearchSunLongitude`, accurate to well under an arcminute for every year, with results cached per (year, longitude). The lookup table, the iterative solver, and the now-unused `sunApparentLongitude`/`jdeToDate` helpers are removed (single source of truth). The UTC-instant comparison frame is unchanged, so only charts for births very close to a 節氣 boundary move — to the more accurate value; ordinary mid-month charts are unaffected.
+
 - `change: birthplace is chosen via search only (removes longitude/timezone mismatch)`
   Birth location is now set exclusively by selecting a result from the place search, which fills timezone, longitude, and latitude together as a consistent set. The manual timezone/longitude/latitude inputs are removed from both the calculator wizard (the "Advanced Location Details" panel) and the member hourly-scoring form (along with its coordinate-override toggle); the derived values are shown read-only for transparency. This makes a longitude/timezone mismatch — e.g. a Thai longitude paired with `America/New_York`, which skewed the longitude correction by hundreds of minutes — unrepresentable at the source. Calculation, the persisted payload shape, and AI-analysis recompute are unchanged, so previously saved charts (including any with a legacy mismatch) still recompute from their stored values.
 
