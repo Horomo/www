@@ -757,9 +757,15 @@ export function computeBazi(
   let tst: TSTInfo | null = null;
 
   if (timeStr) {
-    // Step 1: DST correction (revert to Standard Time)
+    // Step 1: DST reversion. The standard offset (stdOffsetMin) already encodes
+    // the non-DST offset, so building the standard wall clock from utcDate via
+    // stdOffsetMin performs the reversion. dstCorrectionMin is the equivalent
+    // clock→standard amount for the displayed breakdown, derived from the real
+    // offsets at this instant (std − birthOffset) — NOT a hardcoded −60, so
+    // sub-60-minute DST (e.g. Lord Howe = 30 min) and multi-tier double summer
+    // time are reverted by their true amount. It is 0 when DST is not in effect.
     const dstApplied = isDST(utcDate, ianaTimezone);
-    const dstCorrectionMin = dstApplied ? -60 : 0;
+    const dstCorrectionMin = stdOffsetMin - displayOffsetMin;
 
     // Step 2: Longitude correction
     const stdMeridian    = stdOffsetMin / 60 * 15; // degrees
@@ -769,10 +775,10 @@ export function computeBazi(
     const jd     = dateToJD(utcDate);
     const eotMin = equationOfTime(jd);
 
-    // TST = stdLocalTime + lonCorrection + EOT
-    // In UTC terms: tstMs = utcMs + stdOffset + lonCorrection + EOT
-    const totalCorrectionMin = stdOffsetMin + dstCorrectionMin + lonCorrectionMin + eotMin;
-    const tstMs = utcDate.getTime() + totalCorrectionMin * 60 * 1000;
+    // TST (apparent solar) = standard wall clock + longitude + EoT.
+    // Standard wall clock = utcDate + stdOffsetMin (DST already removed by using
+    // the standard offset), so DST is NOT subtracted a second time here.
+    const tstMs = utcDate.getTime() + (stdOffsetMin + lonCorrectionMin + eotMin) * 60 * 1000;
     tstDate = new Date(tstMs);
 
     // Clock's local date (standard time, without DST)
@@ -782,6 +788,10 @@ export function computeBazi(
       tstDate.getUTCFullYear() !== clockStdDate.getUTCFullYear() ||
       tstDate.getUTCMonth()    !== clockStdDate.getUTCMonth()    ||
       tstDate.getUTCDate()     !== clockStdDate.getUTCDate();
+
+    // Total correction is measured from the entered wall clock (which includes
+    // DST): clock → solar = DST reversion + longitude + EoT.
+    const totalCorrectionMin = dstCorrectionMin + lonCorrectionMin + eotMin;
 
     tst = {
       dstApplied,
