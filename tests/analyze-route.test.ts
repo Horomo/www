@@ -81,9 +81,14 @@ test('analyze route accepts a genuine payload and uses the server-validated char
   assert.match(userMsg, /Element Distribution/);
   assert.match(userMsg, /appear most often/);
 
-  // Model limitation note is in the system prompt
+  // Model limitation note + deterministic-用神 instructions in the system prompt
   assert.match(sysMsg, /flat, unweighted occurrences/);
-  assert.match(sysMsg, /not qi-strength scores/);
+  assert.match(sysMsg, /computed separately and deterministically/);
+  assert.match(sysMsg, /Do NOT recompute, override, or invent/);
+
+  // The deterministic 用神 engine result is injected into the chart summary
+  assert.match(userMsg, /Day Master Strength & Useful Element \(用神\)/);
+  assert.match(userMsg, /Classification:/);
 
   // Misleading phrases have been removed
   assert.doesNotMatch(userMsg, /Dominant Ten Gods/);

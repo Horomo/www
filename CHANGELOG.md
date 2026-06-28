@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-28
+
+### Added
+- `feat: deterministic Day Master strength + Useful Element (用神) engine`
+  Added `computeUsefulElement` to the BaZi engine: it weighs 身強/身弱 by summing supporting (印 resource / 比劫 companion) vs draining (官杀 / 財 / 食伤) forces across the chart — the month branch (月令) weighted highest, then other branches, then stems, with rooted hidden stems counted by depth (本气 > 中气 > 余气) — then selects the Useful Element by the 病藥 principle (a weak Day Master gets a supporting element, a strong one a draining element, chosen to counter the dominant cause). The 扶抑 direction and 月令 precedence are fixed (school-agreed); the numeric weights and thresholds live in a single `DEFAULT_STRENGTH_CONFIG` that can be calibrated without touching the logic, and are explicitly Horomo's tunable stance, not a universal standard. Charts that are too balanced (borderline) or too extreme (從格-suspect) are flagged and the engine refuses to assert a 用神 rather than forcing a possibly-inverted call. Every result carries a full per-component breakdown (position, Ten God, support/drain side, weight) so the conclusion is explainable rather than a black box. The AI analysis route now injects this deterministic result and instructs the model to EXPLAIN it — not recompute, override, or guess a Useful Element (and to defer to an expert when not asserted). Time/pillar calculation is unchanged.
+
 ## 2026-06-27
 
 ### Added
