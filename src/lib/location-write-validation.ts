@@ -7,6 +7,11 @@ import {
 
 export const LOCATION_TIMEZONE_LONGITUDE_MAX_DIFF_DEGREES = 60;
 
+// The minimal set of fields the longitude/timezone check needs. Both the
+// write-path API guard (full AnalysisFormPayload) and the MCP tools (which have
+// no form payload) validate through the same core, so the 60° rule lives once.
+export type BirthLocationFields = Pick<AnalysisFormPayload, 'dob' | 'tob' | 'unknownTime' | 'timezone' | 'longitude'>;
+
 export type LocationWriteValidationResult =
   | {
     valid: true;
@@ -55,7 +60,7 @@ function parseTimeParts(time: string): [number, number] | null {
   return [Number.parseInt(hour, 10), Number.parseInt(minute, 10)];
 }
 
-function birthInstantForValidation(profile: AnalysisFormPayload): Date {
+function birthInstantForValidation(profile: BirthLocationFields): Date {
   const dateParts = parseDateParts(profile.dob);
   if (!dateParts) {
     throw new Error('Date of birth must use YYYY-MM-DD format.');
@@ -71,8 +76,8 @@ function birthInstantForValidation(profile: AnalysisFormPayload): Date {
   return clockTimeToUtc(year, month, day, hour, minute, profile.timezone);
 }
 
-export function validateBirthLocationForWrite(
-  profile: AnalysisFormPayload,
+export function validateBirthLocation(
+  profile: BirthLocationFields,
   thresholdDegrees = LOCATION_TIMEZONE_LONGITUDE_MAX_DIFF_DEGREES,
 ): LocationWriteValidationResult {
   const timezone = profile.timezone;
@@ -125,4 +130,12 @@ export function validateBirthLocationForWrite(
       thresholdDegrees,
     };
   }
+}
+
+// Write-path API guard: same rule, accepting the full form payload.
+export function validateBirthLocationForWrite(
+  profile: AnalysisFormPayload,
+  thresholdDegrees = LOCATION_TIMEZONE_LONGITUDE_MAX_DIFF_DEGREES,
+): LocationWriteValidationResult {
+  return validateBirthLocation(profile, thresholdDegrees);
 }
