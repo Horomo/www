@@ -1060,3 +1060,233 @@ export function getDayMasterNote(stem: Stem): string {
   };
   return notes[stem.zh] || '—';
 }
+
+// ── Day Master Strength & Useful Element (用神) ─────────────
+//
+// IMPORTANT: this is Horomo's stance, NOT a universal standard. Weighing 身強/
+// 身弱 is a qualitative judgment in the classics. Two things ARE agreed across
+// schools and are encoded as fixed logic:
+//   - the direction of 扶抑: a weak Day Master wants support (印 resource / 比劫
+//     companion), a strong one wants draining (官杀 / 財 / 食伤);
+//   - 月令 (the month branch) carries the most weight, then other branches, then
+//     stems; rooted hidden stems count by depth 本气 > 中气 > 余气.
+// The numeric weights and thresholds below have NO canonical values — they are
+// tunable defaults a human can calibrate WITHOUT touching the logic. Charts that
+// are too balanced (borderline) or too extreme (從格-suspect) are flagged and the
+// engine refuses to assert a 用神 rather than forcing a (possibly inverted) call.
+
+export interface StrengthConfig {
+  monthCommandWeight: number;                                        // 月令 — highest
+  rootWeight: { primary: number; middle: number; residual: number }; // 本/中/余气
+  stemWeight: number;                                                // a stem on the table
+  branchWeight: number;                                              // a non-month branch
+  strongThreshold: number;   // support ratio ≥ this → 身強
+  weakThreshold: number;     // support ratio ≤ this → 身弱; strictly between → borderline
+  extremeThreshold: number;  // ratio ≥ this (or ≤ 1−this) → suspect 從格 → special_structure
+}
+
+// Default stance — calibrate these, do not bury new numbers in the logic.
+export const DEFAULT_STRENGTH_CONFIG: StrengthConfig = {
+  monthCommandWeight: 3,
+  rootWeight: { primary: 2, middle: 1, residual: 0.5 },
+  stemWeight: 1,
+  branchWeight: 1.5,
+  strongThreshold: 0.55,
+  weakThreshold: 0.45,
+  extremeThreshold: 0.80,
+};
+
+// Fixed (not configurable): which structures support vs drain the Day Master.
+//   support 扶 = companion (比劫, 同我) + resource (印, 生我)
+//   drain   抑 = output (食伤, 我生) + wealth (財, 我剋) + influence (官杀, 剋我)
+const SUPPORT_STRUCTURES = new Set(['companion', 'resource']);
+
+export type DayMasterClassification = 'strong' | 'weak' | 'borderline' | 'special_structure';
+
+export interface StrengthComponent {
+  position: string;       // e.g. 'month branch 本气'
+  stem: string;           // 天干 zh
+  element: string;
+  tenGod: string;         // 十神 zh
+  structure: string;      // companion/resource/output/wealth/influence
+  side: 'support' | 'drain';
+  weight: number;
+  monthCommand: boolean;  // true if from the month branch (月令)
+}
+
+export interface UsefulElementResult {
+  dayMaster: { stem: string; element: string };
+  supportScore: number;
+  drainScore: number;
+  strengthRatio: number;                  // support / (support + drain)
+  classification: DayMasterClassification;
+  usefulElement: string | null;          // element key (e.g. 'water'), or null when not asserted
+  favorableElements: string[];           // element keys; empty when not asserted
+  unfavorableElements: string[];
+  flags: string[];                        // 'borderline' | 'special_structure'
+  reasoning: string;                      // human-readable why
+  structureScores: Record<string, number>;
+  breakdown: StrengthComponent[];         // full per-component transparency
+  config: StrengthConfig;                 // echo of the weights used
+}
+
+const HIDDEN_DEPTH_NAMES = ['本气', '中气', '余气'];
+
+/**
+ * Deterministic Day Master strength + Useful Element (用神) engine.
+ *
+ * Sums weighted support vs drain forces across the chart (month branch weighted
+ * highest), classifies the Day Master, and — for clearly strong/weak charts —
+ * selects a 用神 by the 病藥 principle (counter the dominant cause). Borderline
+ * and 從格-suspect charts are flagged with no asserted 用神. Returns a full
+ * breakdown so the result is explainable, never a black box.
+ */
+export function computeUsefulElement(
+  pillars: BaziResult['pillars'],
+  dmStemIdx: number,
+  unknownTime: boolean,
+  config: StrengthConfig = DEFAULT_STRENGTH_CONFIG,
+): UsefulElementResult {
+  const dmEl = STEMS[dmStemIdx].element;
+  const breakdown: StrengthComponent[] = [];
+  const structureScores: Record<string, number> = { companion: 0, resource: 0, output: 0, wealth: 0, influence: 0 };
+  const depthWeights = [config.rootWeight.primary, config.rootWeight.middle, config.rootWeight.residual];
+
+  const add = (stemIdx: number, position: string, weight: number, monthCommand: boolean) => {
+    const el = STEMS[stemIdx].element;
+    const structure = elementToStructure(el, dmEl);
+    structureScores[structure] += weight;
+    breakdown.push({
+      position,
+      stem: STEMS[stemIdx].zh,
+      element: el,
+      tenGod: tenGod(dmStemIdx, stemIdx).zh,
+      structure,
+      side: SUPPORT_STRUCTURES.has(structure) ? 'support' : 'drain',
+      weight,
+      monthCommand,
+    });
+  };
+
+  const order = (unknownTime ? ['year', 'month', 'day'] : ['year', 'month', 'day', 'hour']) as Array<keyof typeof pillars>;
+  order.forEach((k) => {
+    const p = pillars[k];
+    if (!p) return;
+    // Visible stem — skip the Day Master's own stem (the subject is not a force on itself).
+    if (k !== 'day') add(p.stemIdx, `${k} stem`, config.stemWeight, false);
+    // Branch hidden stems (通根): weighted by depth; the month branch (月令) carries the most.
+    const isMonth = k === 'month';
+    const branchBase = isMonth ? config.monthCommandWeight : config.branchWeight;
+    BRANCH_HIDDEN_STEMS[p.branchIdx].forEach((hsIdx, depth) => {
+      const depthW = depthWeights[depth] ?? config.rootWeight.residual;
+      add(hsIdx, `${k} branch ${HIDDEN_DEPTH_NAMES[depth] ?? '余气'}`, branchBase * depthW, isMonth);
+    });
+  });
+
+  const supportScore = structureScores.companion + structureScores.resource;
+  const drainScore = structureScores.output + structureScores.wealth + structureScores.influence;
+  const total = supportScore + drainScore;
+  const strengthRatio = total === 0 ? 0.5 : supportScore / total;
+
+  const elMap: Record<string, string> = {
+    companion: dmEl,
+    resource: generatedBy(dmEl),
+    output: generates(dmEl),
+    wealth: controls(dmEl),
+    influence: controlledBy(dmEl),
+  };
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const elLabel = (key: string) => `${EL_LABEL[key].en} (${EL_LABEL[key].zh})`;
+
+  let classification: DayMasterClassification;
+  const flags: string[] = [];
+  if (strengthRatio >= config.extremeThreshold || strengthRatio <= 1 - config.extremeThreshold) {
+    classification = 'special_structure';
+    flags.push('special_structure');
+  } else if (strengthRatio >= config.strongThreshold) {
+    classification = 'strong';
+  } else if (strengthRatio <= config.weakThreshold) {
+    classification = 'weak';
+  } else {
+    classification = 'borderline';
+    flags.push('borderline');
+  }
+
+  const base = {
+    dayMaster: { stem: STEMS[dmStemIdx].zh, element: dmEl },
+    supportScore: round(supportScore),
+    drainScore: round(drainScore),
+    strengthRatio: round(strengthRatio),
+    classification,
+    structureScores: Object.fromEntries(Object.entries(structureScores).map(([k, v]) => [k, round(v)])),
+    breakdown,
+    config,
+    flags,
+  };
+
+  if (classification === 'borderline') {
+    return {
+      ...base,
+      usefulElement: null,
+      favorableElements: [],
+      unfavorableElements: [],
+      reasoning: `Support ratio ${round(strengthRatio)} falls between the weak (${config.weakThreshold}) and strong (${config.strongThreshold}) thresholds — the Day Master is too balanced to call confidently. Horomo does not assert a single useful element here; this chart needs case-by-case judgment.`,
+    };
+  }
+
+  if (classification === 'special_structure') {
+    const dir = strengthRatio >= 0.5 ? 'overwhelmingly strong' : 'overwhelmingly weak';
+    return {
+      ...base,
+      usefulElement: null,
+      favorableElements: [],
+      unfavorableElements: [],
+      reasoning: `Support ratio ${round(strengthRatio)} is ${dir} (beyond ${config.extremeThreshold}/${round(1 - config.extremeThreshold)}), which suggests a special structure (從格) where ordinary 扶抑 does not apply and could invert the polarity. Horomo does not assert a useful element here; this chart warrants expert review.`,
+    };
+  }
+
+  const supportEls = [elMap.resource, elMap.companion];
+  const drainEls = [elMap.influence, elMap.wealth, elMap.output];
+
+  if (classification === 'weak') {
+    const dominant = (['influence', 'wealth', 'output'] as const).reduce((a, b) => (structureScores[b] > structureScores[a] ? b : a));
+    let usefulElement: string;
+    let why: string;
+    if (dominant === 'wealth') {
+      usefulElement = elMap.companion; // 比劫 shares the load against 財
+      why = `the heaviest drain is Wealth (財), so companions (比劫) of ${elLabel(elMap.companion)} help the Day Master hold its wealth`;
+    } else if (dominant === 'influence') {
+      usefulElement = elMap.resource; // 印 channels 官杀 into the DM (化杀生身)
+      why = `Authority (官杀) presses hardest, so Resource (印) of ${elLabel(elMap.resource)} channels that pressure into support (化杀生身)`;
+    } else {
+      usefulElement = elMap.resource; // 印 restrains 食伤 and feeds DM
+      why = `Output (食伤) leaks the Day Master most, so Resource (印) of ${elLabel(elMap.resource)} both restrains the output and feeds the Day Master`;
+    }
+    return {
+      ...base,
+      usefulElement,
+      favorableElements: supportEls,
+      unfavorableElements: drainEls,
+      reasoning: `Day Master is weak (support ratio ${round(strengthRatio)}); ${why}. Useful element: ${elLabel(usefulElement)}.`,
+    };
+  }
+
+  // strong
+  const strongFrom = structureScores.resource >= structureScores.companion ? 'resource' : 'companion';
+  let usefulElement: string;
+  let why: string;
+  if (strongFrom === 'resource') {
+    usefulElement = elMap.wealth; // 財剋印
+    why = `it is over-fed by Resource (印), so Wealth (財) of ${elLabel(elMap.wealth)} curbs the excess (財剋印) and gives the Day Master something to act on`;
+  } else {
+    usefulElement = elMap.influence; // 官杀 disciplines 比劫
+    why = `it is crowded by Companions (比劫), so Authority (官杀) of ${elLabel(elMap.influence)} disciplines them (Output 食伤 is a secondary outlet)`;
+  }
+  return {
+    ...base,
+    usefulElement,
+    favorableElements: drainEls,
+    unfavorableElements: supportEls,
+    reasoning: `Day Master is strong (support ratio ${round(strengthRatio)}); ${why}. Useful element: ${elLabel(usefulElement)}.`,
+  };
+}

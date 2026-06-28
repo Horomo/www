@@ -9,7 +9,7 @@ import {
   recomputeAnalysisChartPayload,
 } from '@/lib/analysis-payload';
 import { validateBirthLocationForWrite } from '@/lib/location-write-validation';
-import { getActiveDaYunPillarForDate } from '@/lib/bazi';
+import { getActiveDaYunPillarForDate, computeUsefulElement, EL_LABEL } from '@/lib/bazi';
 import { formatCalculationGenderMode, formatGenderIdentity } from '@/lib/gender';
 
 const AI_MODEL = 'gpt-4o-mini';
@@ -93,6 +93,8 @@ export async function handleAnalyzeRequest(
 
   const { birthInfo } = parsedBody;
   const { pillars, chartData, daYun: rawDaYun } = computedChart;
+  const useful = computeUsefulElement(pillars, pillars.day.stemIdx, birthInfo.unknownTime);
+  const elName = (key: string) => `${EL_LABEL[key].en} (${EL_LABEL[key].zh})`;
   const now = new Date();
   const resolvedDaYun = rawDaYun
     ? {
@@ -115,9 +117,19 @@ export async function handleAnalyzeRequest(
 
   const systemPrompt = `You are a classical Bazi (Four Pillars of Destiny) master with deep knowledge of Chinese metaphysics. Analyze the chart in a clear, modern, practical style — not mystical or overly formal. Use English with Chinese terms in parentheses where appropriate. Be specific and insightful. Structure your response with clear sections.
 
-Note on data model: element and Ten God counts in this chart are flat, unweighted occurrences from visible stems and hidden stems. They are not qi-strength scores. Avoid asserting that the Day Master is "strong" or "weak", or that elements are "favorable" or "unfavorable", based solely on these counts.
+Note on data model: the "5 Structures count" and Ten God counts are flat, unweighted occurrences — do NOT derive Day Master strength from them. Day Master strength and the Useful Element (用神) are computed separately and deterministically by Horomo's engine and are provided to you below. Your job is to EXPLAIN the provided strength classification and 用神/喜忌 — why those elements help or hinder this person, and how to apply them in real life. Do NOT recompute, override, or invent a different Useful Element. If the engine reports the Useful Element as NOT ASSERTED (borderline or special 從格 structure), do not guess one: explain qualitatively why the chart is balanced/extreme and suggest consulting an expert.
 
 When analyzing, treat absent elements and minority Ten Gods as meaningful signals — what is missing from a chart is as diagnostic as what is present. Always surface shadow traits and challenges alongside strengths; a one-sided reading is not insightful.`;
+
+  const usefulAsserted = useful.usefulElement !== null;
+  const usefulSummary = [
+    `Classification: ${useful.classification}${useful.flags.length ? ` [${useful.flags.join(', ')}]` : ''} — support ratio ${useful.strengthRatio} (support ${useful.supportScore} vs drain ${useful.drainScore}).`,
+    `Weighted forces — 比劫: ${useful.structureScores.companion}, 印: ${useful.structureScores.resource}, 食伤: ${useful.structureScores.output}, 財: ${useful.structureScores.wealth}, 官杀: ${useful.structureScores.influence} (月令/month branch weighted highest).`,
+    usefulAsserted
+      ? `Useful Element (用神): ${elName(useful.usefulElement as string)}. Favorable (喜用): ${useful.favorableElements.map(elName).join(', ')}. Unfavorable (忌): ${useful.unfavorableElements.map(elName).join(', ')}.`
+      : `Useful Element (用神): NOT ASSERTED — do not guess one.`,
+    `Engine reasoning: ${useful.reasoning}`,
+  ].join('\n');
 
   const chartSummary = `
 Birth: ${birthInfo.dob}${birthInfo.unknownTime ? ' (unknown time)' : ` ${birthInfo.tob}`}
@@ -134,6 +146,9 @@ ${pillars.hour ? `- Hour 時柱: ${pillars.hour.stem.zh}${pillars.hour.branch.zh
 ${Object.entries(chartData.structureCounts).map(([k,v]) => `- ${k}: ${v}`).join('\n')}
 
 Most Frequent Ten Gods (flat count, unweighted): ${Object.entries(chartData.tenGodsCount).sort((a: [string, unknown], b: [string, unknown]) => (b[1] as number) - (a[1] as number)).slice(0,3).map(([k,v])=>`${k}(${v})`).join(', ')}
+
+Day Master Strength & Useful Element (用神) — deterministic, Horomo weighting (a tunable stance, NOT a universal standard). Explain this; do not recompute it:
+${usefulSummary}
 
 Current Da Yun (luck cycle pillar):
 - Stem: ${daYun?.stem?.zh ?? '?'} (${daYun?.stem?.pinyin ?? '?'}) — ${daYun?.stem?.element ?? '?'}
