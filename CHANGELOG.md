@@ -6,6 +6,10 @@
 - `feat: Horomo MCP server (Phase 1.5) — structured JSON output + 12-hour + batch tools (calculation only)`
   Every MCP tool now returns `structuredContent` (machine-readable JSON) **alongside** its Phase 1 text — the text is byte-identical to Phase 1 (golden-tested) and both views are built from the same single engine call, so they can never disagree. `compute_useful_element`'s JSON keeps `usefulElement: null` for borderline/從格 charts (mirrored, never guessed). Two new deterministic tools: `compute_bazi_day_hours` (all 12 hour pillars of a date, one per 時辰, with the shared Year/Month/Day pillars and each hour stem's Ten God vs the Day Master; true-solar-time ranges, consistent with the engine's 早子時 midnight-rollover convention) and `compute_bazi_batch` (full charts for up to 31 dates in one call, each entry exactly equal to `compute_bazi_chart`'s structured output; over the cap → clear error). Both new tools run through the same validation as Phase 1 (Zod range + IANA + 60° longitude/timezone guard, per date), and both are wrappers over the existing `computeBazi` — the engine, the Phase 1 text, and the 用神 weights are untouched. Deliberately excluded: any scoring/ranking of hours or dates (love/luck timing etc.) — those weights need expert calibration first and are a separate phase. See `docs/mcp-server.md` for the JSON shapes.
 
+### Deferred
+- MCP `outputSchema` declarations for the structured JSON (clients would then validate the shape themselves). The shapes are currently locked by unit tests and documented in `docs/mcp-server.md`; declaring them as Zod output schemas is a follow-up if client-side validation becomes needed. (Codex review advisory.)
+- Scoring/ranking of hours/dates (love/luck timing) — requires a BaZi expert to calibrate weights first, same as the 用神 config. Not started by design.
+
 ## 2026-06-28
 
 ### Added
