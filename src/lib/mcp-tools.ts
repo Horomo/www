@@ -8,11 +8,15 @@
 
 import {
   BRANCHES,
+  BRANCH_HIDDEN_STEMS,
   EL_LABEL,
   STEMS,
   computeBazi,
   computeChartData,
   computeUsefulElement,
+  controlledBy,
+  controls,
+  generates,
   hourPillar,
   tenGod,
   type BaziResult,
@@ -409,4 +413,364 @@ export function computeBatchTool(input: BatchInput): ToolOutput {
   ].join('\n');
 
   return { text, structured: { timezone: input.timezone, longitude: input.longitude, time: input.time ?? null, count: charts.length, charts } };
+}
+
+// ── compute_compatibility (合婚) — deterministic relational analysis ──────────
+//
+// Two charts are resolved through the SAME single-chart pipeline (validation,
+// 60° guard, engine) and a relational layer is computed on top. No pillar or
+// 用神 logic is re-derived here; only standard cross-chart relation tables and
+// explicit, documented scoring rules. No randomness anywhere.
+
+export type CompatibilityPerson = {
+  date: string;        // YYYY-MM-DD
+  time?: string;       // HH:mm at the birthplace; omit when unknown
+  timezone: string;    // IANA
+  longitude: number;
+};
+
+export type CompatibilityInput = {
+  personA: CompatibilityPerson;
+  personB: CompatibilityPerson;
+  // Optional — only unlocks the spouse-star (配偶星) axis. Never guessed.
+  genderA?: 'male' | 'female';
+  genderB?: 'male' | 'female';
+};
+
+// Standard Earthly-Branch relation tables, by branch index
+// (子0 丑1 寅2 卯3 辰4 巳5 午6 未7 申8 酉9 戌10 亥11).
+const SIX_HARMONY_PAIRS: Array<[number, number]> = [[0, 1], [2, 11], [3, 10], [4, 9], [5, 8], [6, 7]];
+const CLASH_PAIRS: Array<[number, number]> = [[0, 6], [1, 7], [2, 8], [3, 9], [4, 10], [5, 11]];
+const HARM_PAIRS: Array<[number, number]> = [[0, 7], [1, 6], [2, 5], [3, 4], [8, 11], [9, 10]];
+const BREAK_PAIRS: Array<[number, number]> = [[0, 9], [1, 4], [2, 11], [3, 6], [5, 8], [7, 10]];
+// 刑 as pairs: the 寅巳申 (无恩) and 丑戌未 (恃势) trios expanded pairwise, 子卯 (无礼),
+// and the four self-punishments (辰辰 午午 酉酉 亥亥 — possible across two charts).
+const PUNISHMENT_PAIRS: Array<[number, number]> = [
+  [2, 5], [5, 8], [2, 8],
+  [1, 10], [7, 10], [1, 7],
+  [0, 3],
+  [4, 4], [6, 6], [9, 9], [11, 11],
+];
+// 三合 frames and 三会 seasonal groups. Across two charts only a PAIR can occur,
+// so a shared frame is reported as a half-combination (半合/半会), weaker than 六合.
+const SAN_HE_TRIOS: number[][] = [[8, 0, 4], [11, 3, 7], [2, 6, 10], [5, 9, 1]];
+const SAN_HUI_TRIOS: number[][] = [[2, 3, 4], [5, 6, 7], [8, 9, 10], [11, 0, 1]];
+
+type InteractionKind = 'six_harmony' | 'san_he_half' | 'san_hui_half' | 'clash' | 'punishment' | 'harm' | 'break';
+
+const INTERACTION_LABEL: Record<InteractionKind, { zh: string; en: string; effect: 'harmonious' | 'conflicting' }> = {
+  six_harmony: { zh: '六合', en: 'six harmony', effect: 'harmonious' },
+  san_he_half: { zh: '半三合', en: 'half trine', effect: 'harmonious' },
+  san_hui_half: { zh: '半三会', en: 'half directional combination', effect: 'harmonious' },
+  clash: { zh: '冲', en: 'clash', effect: 'conflicting' },
+  punishment: { zh: '刑', en: 'punishment', effect: 'conflicting' },
+  harm: { zh: '害', en: 'harm', effect: 'conflicting' },
+  break: { zh: '破', en: 'break', effect: 'conflicting' },
+};
+
+// Branch-axis scoring: start neutral at 5, add/subtract per found interaction,
+// clamp to [0,10]. These deltas are Horomo's documented, tunable stance —
+// every point traces to one table row above.
+const BRANCH_SCORE_DELTA: Record<InteractionKind, number> = {
+  six_harmony: 1.5,
+  san_he_half: 1.0,
+  san_hui_half: 0.5,
+  clash: -1.5,
+  punishment: -1.0,
+  harm: -0.75,
+  break: -0.5,
+};
+
+// Overall weighting of the four axes (echoed in the output). Branch
+// interactions carry the most (direct chart-to-chart friction/affinity), then
+// 用神 complementarity, then the Day-Master relation, then the spouse star.
+// Axes that cannot be assessed are dropped and the remaining weights renormalized.
+const OVERALL_WEIGHTS = {
+  dayMasterRelation: 0.2,
+  branchInteractions: 0.35,
+  usefulElementComplementarity: 0.3,
+  spouseStar: 0.15,
+} as const;
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+const matchesPair = (pairs: Array<[number, number]>, a: number, b: number) =>
+  pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+const sharesTrio = (trios: number[][], a: number, b: number) =>
+  a !== b && trios.some((t) => t.includes(a) && t.includes(b));
+
+// Flat element occurrence count (visible stems + all hidden stems, 1 each) —
+// the same flat-count philosophy as computeChartData, but keyed by raw element
+// so it can be read against ANOTHER chart's 用神/spouse-star element.
+function elementCounts(pillars: BaziResult['pillars'], unknownTime: boolean): Record<string, number> {
+  const counts: Record<string, number> = { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 };
+  const keys = (unknownTime ? ['year', 'month', 'day'] : ['year', 'month', 'day', 'hour']) as Array<keyof BaziResult['pillars']>;
+  keys.forEach((k) => {
+    const p = pillars[k];
+    if (!p) return;
+    counts[p.stem.element]++;
+    BRANCH_HIDDEN_STEMS[p.branchIdx].forEach((hs) => counts[STEMS[hs].element]++);
+  });
+  return counts;
+}
+
+function resolvePerson(label: 'personA' | 'personB', p: CompatibilityPerson, gender?: 'male' | 'female'): Resolved {
+  try {
+    return resolveChart({ ...p, gender });
+  } catch (error) {
+    if (error instanceof McpToolError) throw new McpToolError(`${label}: ${error.message}`);
+    throw error;
+  }
+}
+
+// Axis 1 — 天干生克: the two Day-Master elements on the 生/克 cycle, with
+// direction. Fixed score per relation (documented): 生 8, 同 7, 克 4.
+function dayMasterRelationAxis(a: Resolved, b: Resolved) {
+  const aStem = a.result.pillars.day.stem;
+  const bStem = b.result.pillars.day.stem;
+  const aEl = aStem.element;
+  const bEl = bStem.element;
+  let relation: 'same' | 'generates' | 'controls';
+  let direction: 'AtoB' | 'BtoA' | null;
+  let score: number;
+  let sentence: string;
+  if (aEl === bEl) {
+    relation = 'same'; direction = null; score = 7;
+    sentence = `Both Day Masters are ${el(aEl)} (同) — peers of the same element.`;
+  } else if (generates(aEl) === bEl) {
+    relation = 'generates'; direction = 'AtoB'; score = 8;
+    sentence = `${aStem.zh} ${el(aEl)} (A) generates ${bStem.zh} ${el(bEl)} (B) — ${EL_LABEL[aEl].zh}生${EL_LABEL[bEl].zh}: A nourishes B (and is leaked 泄 by B).`;
+  } else if (generates(bEl) === aEl) {
+    relation = 'generates'; direction = 'BtoA'; score = 8;
+    sentence = `${bStem.zh} ${el(bEl)} (B) generates ${aStem.zh} ${el(aEl)} (A) — ${EL_LABEL[bEl].zh}生${EL_LABEL[aEl].zh}: B nourishes A (and is leaked 泄 by A).`;
+  } else if (controls(aEl) === bEl) {
+    relation = 'controls'; direction = 'AtoB'; score = 4;
+    sentence = `${aStem.zh} ${el(aEl)} (A) controls ${bStem.zh} ${el(bEl)} (B) — ${EL_LABEL[aEl].zh}克${EL_LABEL[bEl].zh}: A dominates B.`;
+  } else {
+    relation = 'controls'; direction = 'BtoA'; score = 4;
+    sentence = `${bStem.zh} ${el(bEl)} (B) controls ${aStem.zh} ${el(aEl)} (A) — ${EL_LABEL[bEl].zh}克${EL_LABEL[aEl].zh}: B dominates A.`;
+  }
+  const reasoning = `${sentence} Fixed rule scores: 生 (generation, either direction) 8, 同 (same element) 7, 克 (control, either direction) 4.`;
+  return { score, relation, direction, reasoning };
+}
+
+// Axis 2 — 地支冲刑合会: every cross-chart branch pair (up to 4×4) checked
+// against the standard relation tables above.
+function branchInteractionAxis(a: Resolved, b: Resolved) {
+  const keysOf = (r: Resolved) =>
+    (r.unknownTime ? ['year', 'month', 'day'] : ['year', 'month', 'day', 'hour']) as Array<keyof BaziResult['pillars']>;
+  const interactions: Array<{
+    kind: InteractionKind; zh: string; en: string; effect: 'harmonious' | 'conflicting';
+    pillarA: string; branchA: string; pillarB: string; branchB: string;
+  }> = [];
+  keysOf(a).forEach((ka) => {
+    const pa = a.result.pillars[ka];
+    if (!pa) return;
+    keysOf(b).forEach((kb) => {
+      const pb = b.result.pillars[kb];
+      if (!pb) return;
+      const found: InteractionKind[] = [];
+      if (matchesPair(SIX_HARMONY_PAIRS, pa.branchIdx, pb.branchIdx)) found.push('six_harmony');
+      if (sharesTrio(SAN_HE_TRIOS, pa.branchIdx, pb.branchIdx)) found.push('san_he_half');
+      if (sharesTrio(SAN_HUI_TRIOS, pa.branchIdx, pb.branchIdx)) found.push('san_hui_half');
+      if (matchesPair(CLASH_PAIRS, pa.branchIdx, pb.branchIdx)) found.push('clash');
+      if (matchesPair(PUNISHMENT_PAIRS, pa.branchIdx, pb.branchIdx)) found.push('punishment');
+      if (matchesPair(HARM_PAIRS, pa.branchIdx, pb.branchIdx)) found.push('harm');
+      if (matchesPair(BREAK_PAIRS, pa.branchIdx, pb.branchIdx)) found.push('break');
+      found.forEach((kind) => interactions.push({
+        kind, ...INTERACTION_LABEL[kind],
+        pillarA: ka, branchA: pa.branch.zh, pillarB: kb, branchB: pb.branch.zh,
+      }));
+    });
+  });
+
+  const score = round1(Math.min(10, Math.max(0,
+    5 + interactions.reduce((sum, i) => sum + BRANCH_SCORE_DELTA[i.kind], 0))));
+  const list = interactions.length
+    ? interactions.map((i) => `A ${i.pillarA} ${i.branchA} × B ${i.pillarB} ${i.branchB}: ${i.zh} (${i.en})`).join('; ')
+    : 'no notable branch interactions between the two charts';
+  const deltas = Object.entries(BRANCH_SCORE_DELTA).map(([k, v]) => `${INTERACTION_LABEL[k as InteractionKind].zh} ${v > 0 ? '+' : ''}${v}`).join(', ');
+  const reasoning = `Checked every cross-chart branch pair against the standard tables — found: ${list}. Score = 5 (neutral) plus per-interaction deltas (${deltas}), clamped to 0–10.`;
+  return { score, interactions, reasoning };
+}
+
+type UsefulResult = ReturnType<typeof computeUsefulElement>;
+
+// Axis 3 — 用神互补: how much of each person's needed element the OTHER chart
+// carries. Each direction: min(4, flat count of the needed element in the
+// partner's chart) × 2.5 → 0–10. A person whose 用神 the engine refuses to
+// assert (borderline/從格) makes that direction unassessable — never guessed.
+function complementarityAxis(aUseful: UsefulResult, bUseful: UsefulResult, aCounts: Record<string, number>, bCounts: Record<string, number>) {
+  const direction = (needer: 'A' | 'B', useful: UsefulResult, partnerCounts: Record<string, number>) => {
+    if (!useful.usefulElement) {
+      return {
+        assessed: false as const,
+        score: null,
+        neededElement: null,
+        countInPartner: null,
+        note: `cannot assess complementarity for this direction: person ${needer}'s 用神 is not asserted (${useful.flags.join(', ') || 'inconclusive'})`,
+      };
+    }
+    const count = partnerCounts[useful.usefulElement] ?? 0;
+    return {
+      assessed: true as const,
+      score: Math.min(4, count) * 2.5,
+      neededElement: useful.usefulElement,
+      countInPartner: count,
+      note: `person ${needer} needs ${el(useful.usefulElement)}; the partner's chart carries it ${count}× (flat count)`,
+    };
+  };
+  const aNeedsFromB = direction('A', aUseful, bCounts);
+  const bNeedsFromA = direction('B', bUseful, aCounts);
+  const assessedDirs = [aNeedsFromB, bNeedsFromA].filter((d) => d.assessed);
+  const score = assessedDirs.length === 0
+    ? null
+    : round1(assessedDirs.reduce((s, d) => s + (d.score as number), 0) / assessedDirs.length);
+  const reasoning = [
+    aNeedsFromB.note,
+    bNeedsFromA.note,
+    score === null
+      ? 'Neither 用神 is asserted — cannot assess complementarity for this axis.'
+      : `Direction score = min(4, count) × 2.5; axis score = mean of the ${assessedDirs.length} assessable direction(s)${assessedDirs.length === 1 ? ' (the other direction is excluded, not guessed)' : ''}.`,
+  ].join(' ');
+  return { score, aNeedsFromB, bNeedsFromA, reasoning };
+}
+
+// Axis 4 — 配偶星: classical spouse star (male → 財 = element the Day Master
+// controls; female → 官杀 = element that controls the Day Master). Asserted
+// only when BOTH genders are provided — gender is never guessed.
+function spouseStarAxis(a: Resolved, b: Resolved, aCounts: Record<string, number>, bCounts: Record<string, number>, genderA?: 'male' | 'female', genderB?: 'male' | 'female') {
+  if (!genderA || !genderB) {
+    return {
+      asserted: false as const,
+      score: null,
+      personA: null,
+      personB: null,
+      reasoning: 'Spouse star (配偶星) not asserted: it depends on gender (male → 財, female → 官杀) and gender was not provided for both persons. Nothing is guessed.',
+    };
+  }
+  const side = (who: 'A' | 'B', gender: 'male' | 'female', own: Resolved, ownCounts: Record<string, number>, partner: Resolved, partnerCounts: Record<string, number>) => {
+    const dmEl = own.result.pillars.day.stem.element;
+    const starElement = gender === 'male' ? controls(dmEl) : controlledBy(dmEl);
+    const starZh = gender === 'male' ? '財' : '官杀';
+    const ownCount = ownCounts[starElement];
+    const partnerIsStar = partner.result.pillars.day.stem.element === starElement;
+    const partnerCount = partnerCounts[starElement];
+    // 0–5 per person: own chart carries the star (up to 2) + partner supplies it
+    // (partner's Day Master IS the star element → 3, otherwise up to 2 by count).
+    const score = Math.min(5, Math.min(2, ownCount) + (partnerIsStar ? 3 : Math.min(2, partnerCount)));
+    return {
+      gender,
+      starElement,
+      starZh,
+      countInOwnChart: ownCount,
+      partnerDayMasterIsStar: partnerIsStar,
+      countInPartnerChart: partnerCount,
+      score,
+      note: `person ${who} (${gender}): spouse star ${starZh} = ${el(starElement)}; own chart has it ${ownCount}×, partner's Day Master ${partnerIsStar ? 'IS' : 'is not'} that element (partner carries it ${partnerCount}×)`,
+    };
+  };
+  const sideA = side('A', genderA, a, aCounts, b, bCounts);
+  const sideB = side('B', genderB, b, bCounts, a, aCounts);
+  const score = round1(sideA.score + sideB.score);
+  const reasoning = `${sideA.note}. ${sideB.note}. Per person 0–5 = min(2, own count) + (partner's Day Master is the star ? 3 : min(2, partner count)); axis = sum of both sides.`;
+  return { asserted: true as const, score, personA: sideA, personB: sideB, reasoning };
+}
+
+export function computeCompatibilityTool(input: CompatibilityInput): ToolOutput {
+  const a = resolvePerson('personA', input.personA, input.genderA);
+  const b = resolvePerson('personB', input.personB, input.genderB);
+
+  const aUseful = computeUsefulElement(a.result.pillars, a.result.pillars.day.stemIdx, a.unknownTime);
+  const bUseful = computeUsefulElement(b.result.pillars, b.result.pillars.day.stemIdx, b.unknownTime);
+  const aCounts = elementCounts(a.result.pillars, a.unknownTime);
+  const bCounts = elementCounts(b.result.pillars, b.unknownTime);
+
+  const dayMasterRelation = dayMasterRelationAxis(a, b);
+  const branchInteractions = branchInteractionAxis(a, b);
+  const complementarity = complementarityAxis(aUseful, bUseful, aCounts, bCounts);
+  const spouseStar = spouseStarAxis(a, b, aCounts, bCounts, input.genderA, input.genderB);
+
+  // Weighted overall — unassessable axes are dropped and weights renormalized.
+  const axes: Array<{ key: keyof typeof OVERALL_WEIGHTS; score: number | null }> = [
+    { key: 'dayMasterRelation', score: dayMasterRelation.score },
+    { key: 'branchInteractions', score: branchInteractions.score },
+    { key: 'usefulElementComplementarity', score: complementarity.score },
+    { key: 'spouseStar', score: spouseStar.score },
+  ];
+  const assessed = axes.filter((x): x is { key: keyof typeof OVERALL_WEIGHTS; score: number } => x.score !== null);
+  const weightSum = assessed.reduce((s, x) => s + OVERALL_WEIGHTS[x.key], 0);
+  const overallScore = round1(assessed.reduce((s, x) => s + x.score * OVERALL_WEIGHTS[x.key], 0) / weightSum);
+
+  const notes: string[] = [];
+  if (a.unknownTime) notes.push('Person A birth time unknown — hour pillar excluded from every axis.');
+  if (b.unknownTime) notes.push('Person B birth time unknown — hour pillar excluded from every axis.');
+  if (complementarity.score === null) notes.push('用神 complementarity could not be assessed (neither 用神 asserted); its weight was redistributed.');
+  else if (!complementarity.aNeedsFromB.assessed || !complementarity.bNeedsFromA.assessed) notes.push('用神 complementarity assessed in one direction only (the other 用神 is not asserted).');
+  if (!spouseStar.asserted) notes.push('Spouse star axis not asserted (gender missing); its weight was redistributed.');
+
+  const personJson = (r: Resolved, p: CompatibilityPerson, useful: UsefulResult, counts: Record<string, number>) => ({
+    birth: birthJson(p, r.unknownTime),
+    pillars: {
+      year: pillarJson(r.result.pillars.year),
+      month: pillarJson(r.result.pillars.month),
+      day: { ...pillarJson(r.result.pillars.day), isDayMaster: true },
+      hour: r.result.pillars.hour ? pillarJson(r.result.pillars.hour) : null,
+    },
+    dayMaster: dayMasterJson(r.result.pillars.day),
+    usefulElement: {
+      classification: useful.classification,
+      usefulElement: useful.usefulElement,
+      favorableElements: useful.favorableElements,
+      unfavorableElements: useful.unfavorableElements,
+      flags: useful.flags,
+    },
+    elementCounts: counts,
+  });
+
+  const structured = {
+    personA: personJson(a, input.personA, aUseful, aCounts),
+    personB: personJson(b, input.personB, bUseful, bCounts),
+    dimensions: {
+      dayMasterRelation,
+      branchInteractions,
+      usefulElementComplementarity: complementarity,
+      spouseStar,
+    },
+    overall: {
+      score: overallScore,
+      weights: OVERALL_WEIGHTS,
+      assessedAxes: assessed.map((x) => x.key),
+      notes,
+    },
+  };
+
+  const fmt = (s: number | null) => (s === null ? 'not assessed' : `${s}/10`);
+  const personText = (label: string, p: CompatibilityPerson, r: Resolved) => [
+    `${label} — ${header(p, r.unknownTime)}`,
+    pillarLine('Year 年', r.result.pillars.year),
+    pillarLine('Month 月', r.result.pillars.month),
+    pillarLine('Day 日 (Day Master)', r.result.pillars.day),
+    r.result.pillars.hour ? pillarLine('Hour 時', r.result.pillars.hour) : '- Hour 時: unknown (no birth time)',
+  ];
+  const text = [
+    'Compatibility · 合婚',
+    ...personText('Person A', input.personA, a),
+    '',
+    ...personText('Person B', input.personB, b),
+    '',
+    `1) Day Master relation (天干生克): ${fmt(dayMasterRelation.score)}`,
+    `   ${dayMasterRelation.reasoning}`,
+    `2) Branch interactions (地支冲刑合会): ${fmt(branchInteractions.score)}`,
+    `   ${branchInteractions.reasoning}`,
+    `3) Useful Element complementarity (用神互补): ${fmt(complementarity.score)}`,
+    `   ${complementarity.reasoning}`,
+    `4) Spouse star (配偶星): ${spouseStar.asserted ? fmt(spouseStar.score) : 'not asserted'}`,
+    `   ${spouseStar.reasoning}`,
+    '',
+    `Overall: ${overallScore}/10 — weights: Day Master ${OVERALL_WEIGHTS.dayMasterRelation}, branches ${OVERALL_WEIGHTS.branchInteractions}, 用神 ${OVERALL_WEIGHTS.usefulElementComplementarity}, spouse star ${OVERALL_WEIGHTS.spouseStar} (unassessed axes dropped, weights renormalized).`,
+    ...(notes.length ? ['Notes:', ...notes.map((n) => `- ${n}`)] : []),
+  ].join('\n');
+
+  return { text, structured };
 }
