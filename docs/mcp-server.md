@@ -44,6 +44,7 @@ wrong chart.
 | `compute_da_yun` | `date`, `time?`, `timezone`, `longitude`, `gender` | Major Luck Cycles (大運): decade pillars, start age, direction. `gender` sets direction only. |
 | `compute_bazi_day_hours` | `date`, `timezone`, `longitude` | All 12 hour pillars (時柱) of one date — one per shichen (時辰) — plus the shared Year/Month/Day pillars and each hour stem's Ten God vs the Day Master. Ranges are **true solar time**; follows the engine's 早子時 (midnight-rollover) convention, so 23:00–24:00 solar keeps the same day pillar. |
 | `compute_bazi_batch` | `dates[]` (≤ 31), `time?`, `timezone`, `longitude` | Full charts for several dates in one call. Each structured entry is exactly `compute_bazi_chart`'s structured output for that date. More than 31 dates → clear error. |
+| `compute_compatibility` | `personA {date, time?, timezone, longitude}`, `personB {…}`, `genderA?`, `genderB?` | Deterministic 合婚 analysis of two charts on four rule-based axes (each 0–10 + reasoning): Day Master 生/克 relation, cross-chart branch interactions (六合/半三合/半三会/冲/刑/害/破 from hardcoded standard tables), 用神 complementarity, and — only when **both** genders are given — the spouse star (配偶星). Borderline 用神 or missing gender → that axis is *not asserted* and dropped from the weighted overall (weights: 0.2/0.35/0.3/0.15, echoed in the output). Both persons are validated like every other tool (incl. the 60° guard, errors prefixed `personA:`/`personB:`). |
 
 ## Structured output (Phase 1.5)
 
@@ -63,6 +64,8 @@ through unvalidated); the shapes are:
 - `compute_da_yun`: `{ birth, available, direction, calculationMode, startAge {years, months}, nearestSolarTerm, cycles[] {stem, stemPinyin, stemElement, branch, branchPinyin, branchElement, ageStart, ageEnd, yearStart, yearEnd} }`.
 - `compute_bazi_day_hours`: `{ date, timezone, longitude, solarCorrectionMinutesAtNoon, convention, pillars {year, month, day}, dayMaster, hours[12] {shichen, pinyin, solarRange, pillar, tenGodVsDayMaster {zh, en, pinyin}} }`.
 - `compute_bazi_batch`: `{ timezone, longitude, time|null, count, charts[] }` where each `charts` entry is the `compute_bazi_chart` structured shape.
+- `compute_compatibility`: `{ personA {birth, pillars, dayMaster, usefulElement {classification, usefulElement|null, favorableElements, unfavorableElements, flags}, elementCounts}, personB {…}, dimensions { dayMasterRelation {score, relation, direction, reasoning}, branchInteractions {score, interactions[] {kind, zh, en, effect, pillarA, branchA, pillarB, branchB}, reasoning}, usefulElementComplementarity {score|null, aNeedsFromB, bNeedsFromA, reasoning}, spouseStar {asserted, score|null, personA|null, personB|null, reasoning} }, overall {score, weights, assessedAxes[], notes[]} }`.
+  Unassessable axes carry `score: null` (and are absent from `assessedAxes`) — never a guessed number.
 
 Deliberately **not** included anywhere: scoring, ranking, or good/bad ratings of
 hours or dates. Those weights have no canonical standard (like the 用神 weights)

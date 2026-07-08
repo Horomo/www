@@ -5,6 +5,7 @@ import {
   BATCH_MAX_DATES,
   computeBatchTool,
   computeChartTool,
+  computeCompatibilityTool,
   computeDaYunTool,
   computeDayHoursTool,
   computeUsefulTool,
@@ -142,6 +143,24 @@ const handler = createMcpHandler(
         },
       },
       async (args) => run(computeBatchTool, args),
+    );
+
+    server.registerTool(
+      'compute_compatibility',
+      {
+        title: 'Compute BaZi compatibility (合婚)',
+        description:
+          'Deterministic BaZi compatibility (合婚) analysis of two birth charts. Four rule-based axes, each 0–10 with reasoning: Day Master 生/克 relation (天干生克), all cross-chart Earthly Branch interactions (六合/三合/三会/冲/刑/害/破), Useful Element (用神) complementarity, and — only when both genders are provided — the spouse star (配偶星). Axes that cannot be assessed (borderline 用神, missing gender) are reported as "not asserted" and excluded from the weighted overall score. Calculation only — no AI judgment.',
+        inputSchema: {
+          personA: z.object(birthShape).describe('First person\'s birth data.'),
+          personB: z.object(birthShape).describe('Second person\'s birth data.'),
+          genderA: z.enum(['male', 'female']).optional()
+            .describe('Person A\'s gender — only unlocks the spouse-star (配偶星) axis. Omit to leave that axis "not asserted"; it is never guessed.'),
+          genderB: z.enum(['male', 'female']).optional()
+            .describe('Person B\'s gender — only unlocks the spouse-star (配偶星) axis. Omit to leave that axis "not asserted"; it is never guessed.'),
+        },
+      },
+      async (args) => run(computeCompatibilityTool, args),
     );
   },
   {},
